@@ -219,6 +219,8 @@ const ContentEditor = () => {
       title: '2. Трансформація',
       fields: [
         { key: 'transformation_bg', label: 'Фонове зображення блоку', type: 'image' },
+        { key: 'transformation_title', label: 'Заголовок', type: 'text' },
+        { key: 'transformation_subtitle', label: 'Підзаголовок', type: 'textarea' },
       ]
     },
     {
@@ -232,7 +234,9 @@ const ContentEditor = () => {
       id: 'about',
       title: '4. Про нас',
       fields: [
-        { key: 'about_image', label: 'Зображення розділу', type: 'image' },
+        { key: 'about_image', label: 'Фонове зображення розділу', type: 'image' },
+        { key: 'about_title', label: 'Заголовок', type: 'text' },
+        { key: 'about_text', label: 'Основний текст (можна використовувати <br />)', type: 'textarea' },
       ]
     },
     {
@@ -241,6 +245,7 @@ const ContentEditor = () => {
       fields: [
         { key: 'directions_bg', label: 'Фонове зображення', type: 'image' },
         { key: 'directions_title', label: 'Заголовок', type: 'text' },
+        { key: 'directions_subtitle', label: 'Підзаголовок', type: 'textarea' },
       ]
     },
     {
@@ -249,7 +254,9 @@ const ContentEditor = () => {
       fields: [
         { key: 'results_bg', label: 'Фонове зображення', type: 'image' },
         { key: 'results_image', label: 'Центральне фото (Системна підготовка)', type: 'image' },
-        { key: 'results_title', label: 'Заголовок', type: 'text' },
+        { key: 'results_image_title', label: 'Заголовок на фото', type: 'text' },
+        { key: 'results_image_subtitle', label: 'Підзаголовок на фото', type: 'text' },
+        { key: 'results_title', label: 'Заголовок секції', type: 'text' },
       ]
     },
     {

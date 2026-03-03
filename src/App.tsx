@@ -370,10 +370,7 @@ function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />
         </div>
 
-        {/* Decorative Japanese Kanji (Kyokushin) */}
-        <div className="absolute right-10 top-1/2 -translate-y-1/2 opacity-[0.03] select-none pointer-events-none hidden lg:block">
-          <span className="text-[40vh] font-serif leading-none">極真</span>
-        </div>
+        {/* Decorative Japanese Kanji (Kyokushin) - REMOVED AS REQUESTED */}
 
         <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
           <motion.div
@@ -381,7 +378,7 @@ function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <BrandLogo size="lg" showKanji />
+            <BrandLogo size="lg" />
             
             <h1 className="text-xl md:text-2xl font-bold mb-4 tracking-tight uppercase text-red-600">
               Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Дитяче карате Київ • Секція карате Київ</span>
@@ -457,11 +454,14 @@ function LandingPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
             >
-              <h2 className="text-3xl md:text-5xl font-black uppercase mb-4 tracking-tight">Як дитяче карате змінює дитину</h2>
-              <p className="text-zinc-500 text-base md:text-lg max-w-2xl mx-auto font-medium">
-                Наша секція карате Київ допомагає батькам виховувати сильних особистостей. <br />
-                <span className="text-red-500/80">Ми перетворюємо слабкість на силу.</span>
-              </p>
+              <h2 className="text-3xl md:text-5xl font-black uppercase mb-4 tracking-tight">
+                {content?.transformation_title || "Як дитяче карате змінює дитину"}
+              </h2>
+              <div 
+                className="text-zinc-500 text-base md:text-lg max-w-2xl mx-auto font-medium"
+                dangerouslySetInnerHTML={{ __html: content?.transformation_subtitle || `Наша секція карате Київ допомагає батькам виховувати сильних особистостей. <br />
+                <span class="text-red-500/80">Ми перетворюємо слабкість на силу.</span>` }}
+              />
             </motion.div>
           </div>
 
@@ -616,15 +616,16 @@ function LandingPage() {
           <div className="max-w-3xl">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.2em] mb-4">Клуб кіокушинкай карате в Києві</h2>
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 uppercase tracking-tight text-white leading-tight">
-              Дисципліна. Сила. Характер.
+              {content?.about_title || "Дисципліна. Сила. Характер."}
             </h2>
             
-            <div className="text-zinc-300 text-lg md:text-xl mb-8 leading-relaxed font-medium">
-              Black Bear Dojo — це середовище, де ваша дитина здобуває <span className="text-red-500 font-bold">дисципліну</span> та впевненість.<br className="hidden md:block" />
-              Системні тренування формують міцний характер, повагу до оточуючих та вміння досягати цілей.<br className="hidden md:block" />
-              Розвиток відбувається поступово: від базових навичок до участі у <span className="text-red-500 font-bold">змаганнях</span>.<br className="hidden md:block" />
-              Наш багаторічний <span className="text-red-500 font-bold">досвід</span> допомагає виховувати не лише сильних спортсменів, а й цілеспрямованих особистостей.
-            </div>
+            <div 
+              className="text-zinc-300 text-lg md:text-xl mb-8 leading-relaxed font-medium"
+              dangerouslySetInnerHTML={{ __html: content?.about_text || `Black Bear Dojo — це середовище, де ваша дитина здобуває <span class="text-red-500 font-bold">дисципліну</span> та впевненість.<br class="hidden md:block" />
+              Системні тренування формують міцний характер, повагу до оточуючих та вміння досягати цілей.<br class="hidden md:block" />
+              Розвиток відбувається поступово: від базових навичок до участі у <span class="text-red-500 font-bold">змаганнях</span>.<br class="hidden md:block" />
+              Наш багаторічний <span class="text-red-500 font-bold">досвід</span> допомагає виховувати не лише сильних спортсменів, а й цілеспрямованих особистостей.` }}
+            />
 
             <div className="flex flex-wrap gap-3 mb-10">
               <span className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white">Для дітей 4–7 років</span>
@@ -715,7 +716,7 @@ function LandingPage() {
               viewport={{ once: true }}
               className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight mb-4"
             >
-              Результати, що підтверджують рівень підготовки
+              {content?.results_title || "Результати, що підтверджують рівень підготовки"}
             </motion.h2>
             <motion.div 
               initial={{ opacity: 0, scaleX: 0 }}
@@ -773,8 +774,12 @@ function LandingPage() {
               referrerPolicy="no-referrer"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-transparent flex flex-col justify-end p-8 md:p-12 text-center">
-              <h3 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mb-2">Системна підготовка</h3>
-              <p className="text-[#D40000] font-bold text-sm md:text-lg uppercase tracking-[0.2em]">Техніка. Фізика. Дисципліна.</p>
+              <h3 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mb-2">
+                {content?.results_image_title || "Системна підготовка"}
+              </h3>
+              <p className="text-[#D40000] font-bold text-sm md:text-lg uppercase tracking-[0.2em]">
+                {content?.results_image_subtitle || "Техніка. Фізика. Дисципліна."}
+              </p>
             </div>
           </motion.div>
 
