@@ -13,7 +13,7 @@ export const LoginPage = () => {
     const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login, password })
+      body: JSON.stringify({ login: login.trim(), password: password.trim() })
     });
     if (res.ok) {
       const data = await res.json();
@@ -40,6 +40,14 @@ export const LoginPage = () => {
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors">Увійти</button>
         </form>
+        <div className="mt-6 pt-6 border-t border-white/5">
+          <button 
+            onClick={() => navigate('/')}
+            className="w-full text-zinc-500 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+          >
+            ← На головну
+          </button>
+        </div>
       </div>
     </div>
   );

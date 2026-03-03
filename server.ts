@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
@@ -10,8 +9,8 @@ const { Pool } = pkg;
 
 dotenv.config();
 
-// Session secret
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+// Session secret - MUST be stable on Vercel
+const SESSION_SECRET = process.env.SESSION_SECRET || 'black-bear-default-secret-change-me';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,13 +125,14 @@ async function startServer() {
     }
   }));
 
-  const ADMIN_TOKEN = crypto.randomBytes(32).toString('hex');
+  const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
 
   const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
     if (authHeader === `Bearer ${ADMIN_TOKEN}`) {
       next();
     } else {
+      console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}... Expected: Bearer ${ADMIN_TOKEN.substring(0, 10)}...`);
       res.status(401).json({ error: 'Unauthorized' });
     }
   };
@@ -260,13 +260,18 @@ async function startServer() {
 
   // Auth
   app.post('/api/login', (req, res) => {
-    const { login, password } = req.body;
-    const expectedLogin = process.env.ADMIN_LOGIN || 'ihorkot12';
-    const expectedPassword = process.env.ADMIN_PASSWORD || '4756500ihor';
+    const login = (req.body.login || '').trim();
+    const password = (req.body.password || '').trim();
+    const expectedLogin = (process.env.ADMIN_LOGIN || 'ihorkot12').trim();
+    const expectedPassword = (process.env.ADMIN_PASSWORD || '4756500ihor').trim();
+    
+    console.log(`Login attempt for: ${login}`);
     
     if (login === expectedLogin && password === expectedPassword) {
+      console.log('Login successful');
       res.json({ success: true, token: ADMIN_TOKEN });
     } else {
+      console.log('Login failed: Invalid credentials');
       res.status(401).json({ error: 'Invalid credentials' });
     }
   });
@@ -276,7 +281,8 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
