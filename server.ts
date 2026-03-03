@@ -236,6 +236,28 @@ async function startServer() {
     }
   });
 
+  app.post("/api/coaches", requireAuth, async (req, res) => {
+    const { name, role, bio, achievements, photo } = req.body;
+    try {
+      const result = await pool.query(
+        "INSERT INTO coaches (name, role, bio, photo, achievements) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [name, role, bio, photo, JSON.stringify(achievements || [])]
+      );
+      res.json({ success: true, id: result.rows[0].id });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create coach" });
+    }
+  });
+
+  app.delete("/api/coaches/:id", requireAuth, async (req, res) => {
+    try {
+      await pool.query("DELETE FROM coaches WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete coach" });
+    }
+  });
+
   app.post('/api/coaches/:id/photo', requireAuth, async (req, res) => {
     const { photo } = req.body;
     try {

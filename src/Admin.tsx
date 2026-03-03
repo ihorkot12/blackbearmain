@@ -90,13 +90,6 @@ export const AdminPage = () => {
             <span className="font-medium">Контент сайту</span>
           </button>
           <button 
-            onClick={() => setActiveTab('coaches')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'coaches' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Users size={18} />
-            <span className="font-medium">Тренери</span>
-          </button>
-          <button 
             onClick={() => setActiveTab('leads')}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'leads' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
           >
@@ -120,7 +113,6 @@ export const AdminPage = () => {
       {/* Main Content */}
       <div className="flex-1 p-10 overflow-y-auto">
         {activeTab === 'content' && <ContentEditor />}
-        {activeTab === 'coaches' && <CoachesEditor />}
         {activeTab === 'leads' && <LeadsViewer />}
       </div>
     </div>
@@ -187,13 +179,6 @@ const ContentEditor = () => {
       ]
     },
     {
-      id: 'about',
-      title: 'Про нас',
-      fields: [
-        { key: 'about_image', label: 'Фонове зображення', type: 'image' },
-      ]
-    },
-    {
       id: 'transformation',
       title: 'Трансформація',
       fields: [
@@ -205,6 +190,13 @@ const ContentEditor = () => {
       title: 'Як це працює',
       fields: [
         { key: 'how_bg', label: 'Фонове зображення', type: 'image' },
+      ]
+    },
+    {
+      id: 'about',
+      title: 'Про нас',
+      fields: [
+        { key: 'about_image', label: 'Фонове зображення', type: 'image' },
       ]
     },
     {
@@ -225,6 +217,11 @@ const ContentEditor = () => {
         { key: 'results_image', label: 'Фотографія (Системна підготовка)', type: 'image' },
         { key: 'results_bg', label: 'Фонове зображення', type: 'image' },
       ]
+    },
+    {
+      id: 'coaches',
+      title: 'Тренери',
+      fields: []
     },
     {
       id: 'schedule',
@@ -303,39 +300,43 @@ const ContentEditor = () => {
 
         {/* Fields */}
         <div className="flex-1 space-y-6">
-          {activeFields.map(field => (
-            <div key={field.key} className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
-              <label className="block text-sm font-bold text-zinc-300 mb-2">{field.label}</label>
-              {field.type === 'textarea' ? (
-                <textarea 
-                  value={content[field.key] || ''} 
-                  onChange={e => handleChange(field.key, e.target.value)}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white min-h-[100px] focus:border-red-600 outline-none transition-colors"
-                />
-              ) : (
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
+          {activeSection === 'coaches' ? (
+            <CoachesEditor />
+          ) : (
+            activeFields.map(field => (
+              <div key={field.key} className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
+                <label className="block text-sm font-bold text-zinc-300 mb-2">{field.label}</label>
+                {field.type === 'textarea' ? (
+                  <textarea 
                     value={content[field.key] || ''} 
                     onChange={e => handleChange(field.key, e.target.value)}
-                    className="flex-1 bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none transition-colors"
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white min-h-[100px] focus:border-red-600 outline-none transition-colors"
                   />
-                  {(field.key.includes('image') || field.key.includes('bg')) && (
-                    <label className="flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl cursor-pointer transition-colors border border-white/10">
-                      <ImageIcon size={20} />
-                      <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(field.key, e)} />
-                    </label>
-                  )}
-                </div>
-              )}
-              {(field.key.includes('image') || field.key.includes('bg')) && content[field.key] && (
-                <div className="mt-4">
-                  <p className="text-xs text-zinc-500 mb-2">Попередній перегляд:</p>
-                  <img src={content[field.key]} alt="Preview" className="h-32 rounded-lg object-cover border border-white/10" />
-                </div>
-              )}
-            </div>
-          ))}
+                ) : (
+                  <div className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={content[field.key] || ''} 
+                      onChange={e => handleChange(field.key, e.target.value)}
+                      className="flex-1 bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none transition-colors"
+                    />
+                    {(field.key.includes('image') || field.key.includes('bg')) && (
+                      <label className="flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl cursor-pointer transition-colors border border-white/10">
+                        <ImageIcon size={20} />
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(field.key, e)} />
+                      </label>
+                    )}
+                  </div>
+                )}
+                {(field.key.includes('image') || field.key.includes('bg')) && content[field.key] && (
+                  <div className="mt-4">
+                    <p className="text-xs text-zinc-500 mb-2">Попередній перегляд:</p>
+                    <img src={content[field.key]} alt="Preview" className="h-32 rounded-lg object-cover border border-white/10" />
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
@@ -357,18 +358,43 @@ const CoachesEditor = () => {
   const handleSaveCoach = async (coach: any) => {
     try {
       const token = localStorage.getItem('admin_token');
-      await fetch(`/api/coaches/${coach.id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(coach)
-      });
+      if (coach.id) {
+        await fetch(`/api/coaches/${coach.id}`, {
+          method: 'PUT',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(coach)
+        });
+      } else {
+        await fetch('/api/coaches', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(coach)
+        });
+      }
       setEditingCoach(null);
       fetchCoaches();
     } catch (e) {
       alert('Помилка збереження');
+    }
+  };
+
+  const handleDeleteCoach = async (id: number) => {
+    if (!confirm('Ви впевнені, що хочете видалити цього тренера?')) return;
+    try {
+      const token = localStorage.getItem('admin_token');
+      await fetch(`/api/coaches/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      fetchCoaches();
+    } catch (e) {
+      alert('Помилка видалення');
     }
   };
 
@@ -384,17 +410,19 @@ const CoachesEditor = () => {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
-      const token = localStorage.getItem('admin_token');
-      await fetch(`/api/coaches/${coachId}/photo`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ photo: base64 })
-      });
-      fetchCoaches();
-      if (editingCoach && editingCoach.id === coachId) {
+      if (coachId) {
+        const token = localStorage.getItem('admin_token');
+        await fetch(`/api/coaches/${coachId}/photo`, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ photo: base64 })
+        });
+        fetchCoaches();
+      }
+      if (editingCoach && (editingCoach.id === coachId || !editingCoach.id)) {
         setEditingCoach({ ...editingCoach, photo: base64 });
       }
     };
@@ -490,12 +518,19 @@ const CoachesEditor = () => {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-bold">Тренери</h2>
+        <button 
+          onClick={() => setEditingCoach({ name: '', role: '', bio: '', achievements: [], photo: '' })}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors"
+        >
+          <Plus size={18} />
+          Додати тренера
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {coaches.map(coach => (
           <div key={coach.id} className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 flex flex-col">
-            <div className="aspect-[4/3] rounded-xl overflow-hidden mb-6 bg-black">
+            <div className="aspect-[4/3] rounded-xl overflow-hidden mb-6 bg-black relative group">
               {coach.photo ? (
                 <img src={coach.photo} alt={coach.name} className="w-full h-full object-cover" />
               ) : (
@@ -503,6 +538,12 @@ const CoachesEditor = () => {
                   <ImageIcon size={32} />
                 </div>
               )}
+              <button 
+                onClick={() => handleDeleteCoach(coach.id)}
+                className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
             <h3 className="text-xl font-bold mb-1">{coach.name}</h3>
             <p className="text-sm text-red-500 mb-4">{coach.role}</p>
