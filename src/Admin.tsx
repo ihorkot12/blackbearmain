@@ -125,7 +125,7 @@ const ContentEditor = () => {
   const [activeSection, setActiveSection] = useState('hero');
 
   useEffect(() => {
-    fetch('/api/content').then(res => res.json()).then(setContent);
+    fetch(`/api/content?t=${Date.now()}`).then(res => res.json()).then(setContent);
   }, []);
 
   const handleChange = (key: string, value: string) => {
@@ -136,7 +136,7 @@ const ContentEditor = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
-      await fetch('/api/content', {
+      const response = await fetch('/api/content', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -144,9 +144,16 @@ const ContentEditor = () => {
         },
         body: JSON.stringify(delta || content)
       });
-    } catch (e) {
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+      
+      console.log('Save successful');
+    } catch (e: any) {
       console.error('Save failed', e);
-      alert('Помилка збереження. Перевірте розмір файлу або з\'єднання.');
+      alert(`Помилка збереження: ${e.message}. Спробуйте файл меншого розміру.`);
     }
     setSaving(false);
   };
@@ -162,10 +169,37 @@ const ContentEditor = () => {
 
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      setContent(prev => ({ ...prev, [key]: base64 }));
-      // Save ONLY the new image to keep payload small
-      await handleSave({ [key]: base64 });
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Max dimensions to keep file size reasonable
+        const MAX_WIDTH = 1920;
+        const MAX_HEIGHT = 1080;
+
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+        if (height > MAX_HEIGHT) {
+          width *= MAX_HEIGHT / height;
+          height = MAX_HEIGHT;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+
+        // Compress as JPEG with 0.7 quality
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+        
+        setContent(prev => ({ ...prev, [key]: compressedBase64 }));
+        await handleSave({ [key]: compressedBase64 });
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };

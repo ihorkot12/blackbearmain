@@ -179,11 +179,11 @@ function LandingPage() {
   const [activeLocation, setActiveLocation] = useState<'shulyavka' | 'nekrasova'>('shulyavka');
 
   React.useEffect(() => {
-    fetch('/api/content')
+    fetch(`/api/content?t=${Date.now()}`)
       .then(res => res.json())
       .then(setContent);
     
-    fetch('/api/coaches')
+    fetch(`/api/coaches?t=${Date.now()}`)
       .then(res => res.json())
       .then(setCoaches);
   }, []);
@@ -364,7 +364,7 @@ function LandingPage() {
           <img 
             src={content?.hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop"} 
             alt="Kyokushin Karate Training Kyiv" 
-            className="w-full h-full object-cover opacity-30 grayscale scale-105"
+            className="w-full h-full object-cover opacity-40 scale-105"
             referrerPolicy="no-referrer"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />

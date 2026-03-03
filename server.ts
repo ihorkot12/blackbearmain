@@ -198,6 +198,7 @@ async function startServer() {
 
   // Site Content
   app.get("/api/content", async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     try {
       const result = await pool.query("SELECT * FROM site_content");
       const content = result.rows.reduce((acc, item) => {
