@@ -132,7 +132,7 @@ const ContentEditor = () => {
     setContent(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async (updatedContent?: Record<string, string>) => {
+  const handleSave = async (delta?: Record<string, string>) => {
     setSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
@@ -142,10 +142,11 @@ const ContentEditor = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(updatedContent || content)
+        body: JSON.stringify(delta || content)
       });
     } catch (e) {
       console.error('Save failed', e);
+      alert('Помилка збереження. Перевірте розмір файлу або з\'єднання.');
     }
     setSaving(false);
   };
@@ -162,10 +163,9 @@ const ContentEditor = () => {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
-      const newContent = { ...content, [key]: base64 };
-      setContent(newContent);
-      // Save immediately for images to ensure they are stored
-      await handleSave(newContent);
+      setContent(prev => ({ ...prev, [key]: base64 }));
+      // Save ONLY the new image to keep payload small
+      await handleSave({ [key]: base64 });
     };
     reader.readAsDataURL(file);
   };
