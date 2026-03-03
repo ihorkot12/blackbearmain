@@ -132,7 +132,7 @@ const ContentEditor = () => {
     setContent(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async () => {
+  const handleSave = async (updatedContent?: Record<string, string>) => {
     setSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
@@ -142,11 +142,10 @@ const ContentEditor = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(content)
+        body: JSON.stringify(updatedContent || content)
       });
-      alert('Збережено успішно!');
     } catch (e) {
-      alert('Помилка збереження');
+      console.error('Save failed', e);
     }
     setSaving(false);
   };
@@ -155,15 +154,18 @@ const ContentEditor = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Файл занадто великий. Максимальний розмір - 10 МБ.');
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Файл занадто великий. Максимальний розмір - 15 МБ.');
       return;
     }
 
     const reader = new FileReader();
-    reader.onloadend = () => {
+    reader.onloadend = async () => {
       const base64 = reader.result as string;
-      handleChange(key, base64);
+      const newContent = { ...content, [key]: base64 };
+      setContent(newContent);
+      // Save immediately for images to ensure they are stored
+      await handleSave(newContent);
     };
     reader.readAsDataURL(file);
   };
@@ -171,99 +173,92 @@ const ContentEditor = () => {
   const sections = [
     {
       id: 'hero',
-      title: 'Головний екран',
+      title: '1. Головний екран',
       fields: [
-        { key: 'hero_title', label: 'Головний заголовок (підтримує HTML)', type: 'textarea' },
-        { key: 'hero_subtitle', label: 'Головний підзаголовок', type: 'textarea' },
-        { key: 'hero_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'hero_bg', label: 'Фонове зображення (Головне)', type: 'image' },
+        { key: 'hero_title', label: 'Заголовок', type: 'textarea' },
+        { key: 'hero_subtitle', label: 'Підзаголовок', type: 'textarea' },
       ]
     },
     {
       id: 'transformation',
-      title: 'Трансформація',
+      title: '2. Трансформація',
       fields: [
-        { key: 'transformation_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'transformation_bg', label: 'Фонове зображення блоку', type: 'image' },
       ]
     },
     {
       id: 'how',
-      title: 'Як це працює',
+      title: '3. Як це працює',
       fields: [
-        { key: 'how_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'how_bg', label: 'Фонове зображення блоку', type: 'image' },
       ]
     },
     {
       id: 'about',
-      title: 'Про нас',
+      title: '4. Про нас',
       fields: [
-        { key: 'about_image', label: 'Фонове зображення', type: 'image' },
+        { key: 'about_image', label: 'Зображення розділу', type: 'image' },
       ]
     },
     {
       id: 'directions',
-      title: 'Напрями',
+      title: '5. Напрями',
       fields: [
-        { key: 'directions_title', label: 'Заголовок', type: 'text' },
-        { key: 'directions_subtitle', label: 'Підзаголовок', type: 'textarea' },
         { key: 'directions_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'directions_title', label: 'Заголовок', type: 'text' },
       ]
     },
     {
       id: 'results',
-      title: 'Результати',
+      title: '6. Результати',
       fields: [
-        { key: 'results_title', label: 'Заголовок', type: 'text' },
-        { key: 'results_subtitle', label: 'Підзаголовок', type: 'textarea' },
-        { key: 'results_image', label: 'Фотографія (Системна підготовка)', type: 'image' },
         { key: 'results_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'results_image', label: 'Центральне фото (Системна підготовка)', type: 'image' },
+        { key: 'results_title', label: 'Заголовок', type: 'text' },
       ]
     },
     {
       id: 'coaches',
-      title: 'Тренери',
+      title: '7. Тренери',
       fields: []
     },
     {
       id: 'schedule',
-      title: 'Розклад',
+      title: '8. Розклад',
       fields: [
         { key: 'schedule_bg', label: 'Фонове зображення', type: 'image' },
       ]
     },
     {
       id: 'reviews',
-      title: 'Відгуки',
+      title: '9. Відгуки',
       fields: [
-        { key: 'reviews_title', label: 'Заголовок', type: 'text' },
-        { key: 'reviews_subtitle', label: 'Підзаголовок', type: 'textarea' },
         { key: 'reviews_bg', label: 'Фонове зображення', type: 'image' },
       ]
     },
     {
       id: 'faq',
-      title: 'FAQ',
+      title: '10. FAQ',
       fields: [
-        { key: 'faq_title', label: 'Заголовок', type: 'text' },
-        { key: 'faq_subtitle', label: 'Підзаголовок', type: 'textarea' },
         { key: 'faq_bg', label: 'Фонове зображення', type: 'image' },
       ]
     },
     {
       id: 'contacts',
-      title: 'Контакти та Соцмережі',
+      title: '11. Контакти',
       fields: [
-        { key: 'contact_title', label: 'Заголовок форми', type: 'text' },
-        { key: 'contact_subtitle', label: 'Підзаголовок форми', type: 'textarea' },
-        { key: 'social_instagram', label: 'Instagram (URL)', type: 'text' },
-        { key: 'social_facebook', label: 'Facebook (URL)', type: 'text' },
         { key: 'contact_bg', label: 'Фонове зображення', type: 'image' },
+        { key: 'contact_title', label: 'Заголовок форми', type: 'text' },
+        { key: 'social_instagram', label: 'Instagram Link', type: 'text' },
+        { key: 'social_facebook', label: 'Facebook Link', type: 'text' },
       ]
     },
     {
       id: 'analytics',
-      title: 'Аналітика (Google Pixel)',
+      title: 'Аналітика',
       fields: [
-        { key: 'google_pixel_code', label: 'Код Google Pixel (вставляється в <head>)', type: 'textarea' },
+        { key: 'google_pixel_code', label: 'Google Pixel Code', type: 'textarea' },
       ]
     }
   ];
@@ -275,7 +270,7 @@ const ContentEditor = () => {
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-bold">Конструктор сайту</h2>
         <button 
-          onClick={handleSave}
+          onClick={() => handleSave()}
           disabled={saving}
           className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
         >
@@ -306,33 +301,40 @@ const ContentEditor = () => {
             activeFields.map(field => (
               <div key={field.key} className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
                 <label className="block text-sm font-bold text-zinc-300 mb-2">{field.label}</label>
-                {field.type === 'textarea' ? (
+                {field.type === 'image' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <label className="flex-1 flex items-center justify-center gap-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 border-2 border-dashed border-red-600/30 rounded-2xl p-8 cursor-pointer transition-all group">
+                        <ImageIcon size={32} className="group-hover:scale-110 transition-transform" />
+                        <div className="text-left">
+                          <p className="font-bold uppercase tracking-widest text-xs">Завантажити нове фото</p>
+                          <p className="text-[10px] opacity-60">PNG, JPG до 15MB</p>
+                        </div>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(field.key, e)} />
+                      </label>
+                    </div>
+                    {content[field.key] && (
+                      <div className="relative rounded-2xl overflow-hidden border border-white/10 aspect-video bg-black">
+                        <img src={content[field.key]} alt="Preview" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">Поточне зображення</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : field.type === 'textarea' ? (
                   <textarea 
                     value={content[field.key] || ''} 
                     onChange={e => handleChange(field.key, e.target.value)}
                     className="w-full bg-black border border-white/10 rounded-xl p-4 text-white min-h-[100px] focus:border-red-600 outline-none transition-colors"
                   />
                 ) : (
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      value={content[field.key] || ''} 
-                      onChange={e => handleChange(field.key, e.target.value)}
-                      className="flex-1 bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none transition-colors"
-                    />
-                    {(field.key.includes('image') || field.key.includes('bg')) && (
-                      <label className="flex items-center justify-center bg-zinc-800 hover:bg-zinc-700 text-white px-4 rounded-xl cursor-pointer transition-colors border border-white/10">
-                        <ImageIcon size={20} />
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(field.key, e)} />
-                      </label>
-                    )}
-                  </div>
-                )}
-                {(field.key.includes('image') || field.key.includes('bg')) && content[field.key] && (
-                  <div className="mt-4">
-                    <p className="text-xs text-zinc-500 mb-2">Попередній перегляд:</p>
-                    <img src={content[field.key]} alt="Preview" className="h-32 rounded-lg object-cover border border-white/10" />
-                  </div>
+                  <input 
+                    type="text" 
+                    value={content[field.key] || ''} 
+                    onChange={e => handleChange(field.key, e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none transition-colors"
+                  />
                 )}
               </div>
             ))
