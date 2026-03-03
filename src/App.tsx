@@ -5,6 +5,8 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { LoginPage, AdminPage } from './Admin';
 import { 
   Shield, 
   Trophy, 
@@ -18,7 +20,8 @@ import {
   CheckCircle2,
   Instagram,
   Facebook,
-  Send
+  Send,
+  User
 } from 'lucide-react';
 
 // --- Components ---
@@ -48,21 +51,17 @@ const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
         </p>
       </div>
 
-      <div className="pt-8">
+      <div className="pt-8 flex justify-center">
         <Button variant="secondary" onClick={onBack} showIcon={false}>
           Повернутись на головну
         </Button>
       </div>
 
       <div className="pt-12 flex items-center justify-center gap-8 text-zinc-600">
-        <div className="flex flex-col items-center gap-2">
+        <a href="https://instagram.com/karate_kyiv" target="_blank" rel="noopener noreferrer" className="flex flex-col items-center gap-2 hover:text-white transition-colors">
           <Instagram size={24} />
           <span className="text-[10px] uppercase font-bold tracking-widest">Instagram</span>
-        </div>
-        <div className="flex flex-col items-center gap-2">
-          <Send size={24} />
-          <span className="text-[10px] uppercase font-bold tracking-widest">Telegram</span>
-        </div>
+        </a>
       </div>
     </div>
   </motion.div>
@@ -70,32 +69,32 @@ const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
 
 const BrandLogo = ({ size = 'md', showKanji = false, align = 'center' }: { size?: 'sm' | 'md' | 'lg', showKanji?: boolean, align?: 'start' | 'center' }) => {
   const sizes = {
-    sm: { text: 'text-base md:text-lg', b: 'w-6 h-6 text-xs', spacing: 'gap-2', kanji: 'text-[7px]', line: 'h-[1.5px]' },
-    md: { text: 'text-xl', b: 'w-8 h-8 text-sm', spacing: 'gap-3', kanji: 'text-[9px]', line: 'h-[2px]' },
-    lg: { text: 'text-3xl md:text-5xl', b: 'w-10 h-10 md:w-16 md:h-16 text-lg md:text-2xl', spacing: 'gap-4 md:gap-6', kanji: 'text-[10px] md:text-sm', line: 'h-[2px] md:h-[4px]' },
+    sm: { text: 'text-[28px]', b: 'w-6 h-6 text-xs', spacing: 'gap-3', kanji: 'text-[7px]', line: 'h-[2px]' },
+    md: { text: 'text-[36px]', b: 'w-8 h-8 text-sm', spacing: 'gap-4', kanji: 'text-[9px]', line: 'h-[2px]' },
+    lg: { text: 'text-[42px] md:text-[56px]', b: 'w-10 h-10 md:w-14 md:h-14 text-lg md:text-2xl', spacing: 'gap-5 md:gap-6', kanji: 'text-[10px] md:text-sm', line: 'h-[2px]' },
   };
   const s = sizes[size];
 
   return (
     <div className={`flex flex-col ${align === 'center' ? 'items-center' : 'items-start'} ${size === 'lg' ? 'mb-10' : ''}`}>
-      <div className={`flex items-center ${s.spacing} font-brand uppercase`}>
+      <div className={`flex items-center ${s.spacing} font-sans uppercase group cursor-pointer`}>
         {/* Skewed B Icon */}
-        <div className={`${s.b} bg-[#D10000] rounded-[2px] flex items-center justify-center shadow-[0_0_20px_rgba(209,0,0,0.5)] transform -skew-x-[18deg] shrink-0 border border-white/10`}>
-          <span className="text-white transform skew-x-[18deg] font-black italic tracking-tighter">B</span>
+        <div 
+          className={`${s.b} bg-[#C10000] flex items-center justify-center shrink-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.3)]`}
+          style={{ clipPath: 'polygon(15% 0, 100% 0, 85% 100%, 0 100%)' }}
+        >
+          <span className="text-white font-black italic tracking-tighter">B</span>
         </div>
         
         {/* Text Part */}
-        <div className={`${s.text} flex items-center gap-4 whitespace-nowrap font-black tracking-tighter`}>
-          <div className="flex flex-col items-start">
-            <span className="text-white leading-none">Black Bear</span>
-            <div className={`w-full ${s.line} bg-[#FFB800] mt-2 shadow-[0_0_10px_rgba(255,184,0,0.5)]`} />
+        <div className={`${s.text} flex items-baseline gap-3 md:gap-4 whitespace-nowrap font-black tracking-tight leading-none`}>
+          <div className="flex flex-col items-start relative pb-1">
+            <span className="text-[#FFFFFF]">BLACK BEAR</span>
+            <div className={`absolute bottom-0 left-0 w-full ${s.line} bg-gradient-to-r from-[#C8A400] to-[#E8C547]`} />
           </div>
           
-          <div className="flex items-center text-[#D10000] leading-none drop-shadow-[0_0_12px_rgba(209,0,0,0.4)]">
-            <span className="font-bold">D</span>
-            <div className="w-[0.72em] h-[0.72em] bg-[#D10000] rounded-full mx-[0.06em] shadow-[0_0_15px_rgba(209,0,0,0.7)]" />
-            <span>J</span>
-            <div className="w-[0.72em] h-[0.72em] bg-[#D10000] rounded-full mx-[0.06em] shadow-[0_0_15px_rgba(209,0,0,0.7)]" />
+          <div className="text-[#C10000] tracking-[0.06em] group-hover:drop-shadow-[0_0_10px_rgba(193,0,0,0.5)] transition-all duration-200" style={{ textShadow: '0 0 10px rgba(255,0,0,0.3)' }}>
+            DOJO
           </div>
         </div>
       </div>
@@ -159,18 +158,64 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 // --- Main App ---
 
 export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/admin" element={<AdminPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+function LandingPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = React.useState(false);
   const [activeHash, setActiveHash] = React.useState(typeof window !== 'undefined' ? window.location.hash : '');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [content, setContent] = useState<any>(null);
+  const [coaches, setCoaches] = useState<any[]>([]);
+  const [activeLocation, setActiveLocation] = useState<'shulyavka' | 'nekrasova'>('shulyavka');
+
+  React.useEffect(() => {
+    fetch('/api/content')
+      .then(res => res.json())
+      .then(setContent);
+    
+    fetch('/api/coaches')
+      .then(res => res.json())
+      .then(setCoaches);
+  }, []);
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const formData = new FormData(e.target as HTMLFormElement);
+    const data = {
+      name: formData.get('name'),
+      phone: formData.get('phone'),
+      age_group: formData.get('age'),
+      location: formData.get('location')
+    };
+
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (res.ok) {
+        setIsSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    } catch (err) {
+      console.error('Failed to submit lead', err);
+    } finally {
+      setIsSubmitting(false);
+    }
 
     // Conversion Tracking (Mock)
     console.log('Conversion Event: Lead Generated');
@@ -181,10 +226,6 @@ export default function App() {
         'currency': 'UAH'
       });
     }
-
-    setIsSubmitting(false);
-    setIsSubmitted(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   React.useEffect(() => {
@@ -202,6 +243,17 @@ export default function App() {
     };
   }, []);
 
+  React.useEffect(() => {
+    if (content?.google_pixel_code) {
+      const script = document.createElement('script');
+      script.innerHTML = content.google_pixel_code;
+      document.head.appendChild(script);
+      return () => {
+        document.head.removeChild(script);
+      };
+    }
+  }, [content?.google_pixel_code]);
+
   const navLinks = [
     { name: 'Про клуб', href: '#about' },
     { name: 'Напрями', href: '#directions' },
@@ -211,7 +263,7 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
       
       <AnimatePresence>
         {isSubmitted && <ThankYouPage onBack={() => setIsSubmitted(false)} />}
@@ -230,7 +282,10 @@ export default function App() {
           : 'bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10'
       }`}>
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between">
-          <div className="flex items-center shrink-0">
+          <div 
+            className="flex items-center shrink-0 cursor-pointer" 
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          >
             <BrandLogo size="sm" align="start" />
           </div>
 
@@ -253,7 +308,11 @@ export default function App() {
                   </a>
                 );
               })}
-              <Button variant="primary" className="h-[48px] px-8 text-[11px] shadow-[0_8px_24px_rgba(196,0,0,0.35)] hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(196,0,0,0.45)]">
+              <Link to="/login" className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#EAEAEA] hover:text-red-500 transition-all duration-300 flex items-center gap-2">
+                <User size={14} />
+                Вхід
+              </Link>
+              <Button variant="primary" className="h-[48px] px-8 text-[11px] shadow-[0_8px_24px_rgba(196,0,0,0.35)] hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(196,0,0,0.45)]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
                 Записатись
               </Button>
             </div>
@@ -285,18 +344,25 @@ export default function App() {
                     {link.name}
                   </a>
                 ))}
-                <Button variant="primary">Записатися на пробне</Button>
+                <Link 
+                  to="/login" 
+                  onClick={() => setIsMenuOpen(false)}
+                  className="text-2xl font-bold text-red-500"
+                >
+                  Вхід до CRM
+                </Link>
+                <Button variant="primary" onClick={() => { setIsMenuOpen(false); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Записатися на пробне</Button>
               </div>
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden snap-start pt-24">
+      <section className="relative h-screen flex items-center justify-center overflow-hidden pt-24">
         {/* Background Image with Deep Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop" 
+            src={content?.hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop"} 
             alt="Kyokushin Karate Training Kyiv" 
             className="w-full h-full object-cover opacity-30 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -322,17 +388,15 @@ export default function App() {
             </h1>
 
             <div className="text-3xl md:text-6xl font-black mb-6 tracking-tighter leading-none uppercase">
-              <span className="bg-gradient-to-r from-white via-white to-zinc-500 bg-clip-text text-transparent">Формуємо дисципліну,</span><br />
-              <span className="text-red-600 tracking-tight">силу та впевненість.</span>
+              <div dangerouslySetInnerHTML={{ __html: content?.hero_title || "<span class='bg-gradient-to-r from-white via-white to-zinc-500 bg-clip-text text-transparent'>Формуємо дисципліну,</span><br /><span class='text-red-600 tracking-tight'>силу та впевненість.</span>" }} />
             </div>
             
             <p className="text-base md:text-lg text-zinc-300 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
-              Професійна секція карате Київ під керівництвом 3 дану. <br className="hidden md:block" />
-              20+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи.
+              {content?.hero_subtitle || "Професійна секція карате Київ під керівництвом 3 дану. 20+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи."}
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-8">
-              <Button variant="primary" className="w-full sm:w-auto">
+              <Button variant="primary" className="w-full sm:w-auto" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
                 Записатися на пробне
               </Button>
               <Button variant="secondary" className="w-full sm:w-auto" showIcon={false} onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
@@ -370,9 +434,21 @@ export default function App() {
       </section>
 
       {/* Transformation Section (Dark Professional Style) */}
-      <section className="min-h-screen py-12 flex items-center bg-black relative overflow-hidden snap-start">
+      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
         {/* Subtle Background Accents */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none" />
+        {content?.transformation_bg ? (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.transformation_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
+          </div>
+        ) : (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none" />
+        )}
         
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center mb-10">
@@ -454,27 +530,28 @@ export default function App() {
               viewport={{ once: true }}
               transition={{ delay: 0.2 }}
             >
-              <Button variant="primary" className="mx-auto mb-6 h-[52px]">
+              <Button variant="primary" className="mx-auto mb-6 h-[52px]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
                 Записати дитину на пробне
               </Button>
-              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">
-                <div className="flex items-center gap-2">
-                  <Users size={14} className="text-red-600" />
-                  <span>500+ дітей пройшли школу</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Clock size={14} className="text-red-600" />
-                  <span>20 років досвіду</span>
-                </div>
-              </div>
             </motion.div>
           </div>
         </div>
       </section>
 
       {/* How it works & What you need Section */}
-      <section className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+        {content?.how_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.how_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
+          </div>
+        )}
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12">
             {/* Steps */}
             <div>
@@ -523,57 +600,62 @@ export default function App() {
       </section>
 
       {/* About Section */}
-      <section id="about" className="min-h-screen py-12 flex items-center bg-zinc-950 border-y border-white/5 snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-8 items-center">
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.2em] mb-2">Клуб карате Black Bear Dojo Київ</h2>
-              <h2 className="text-3xl font-bold mb-4 uppercase tracking-tight">Більше, ніж просто спорт</h2>
-              <p className="text-zinc-400 text-base mb-4 leading-relaxed">
-                Black Bear Dojo — це спортивна система підготовки, яка формує дисципліну, силу та конкурентоспроможність на татамі і поза ним. Ми не просто вчимо битися — ми виховуємо особистість через філософію кіокушинкай.
-              </p>
-              <p className="text-zinc-400 text-base mb-6 leading-relaxed">
-                Наш підхід базується на трьох стовпах: фізична міць, ментальна стійкість та повага до оточуючих.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-zinc-900 rounded-xl border border-white/5">
-                  <div className="text-2xl font-bold text-red-600 mb-1">20+</div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Років досвіду</div>
-                </div>
-                <div className="p-3 bg-zinc-900 rounded-xl border border-white/5">
-                  <div className="text-2xl font-bold text-red-600 mb-1">500+</div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Учнів пройшли шлях</div>
-                </div>
-              </div>
-            </motion.div>
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              className="relative aspect-video rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
-            >
-              <img 
-                src="https://images.unsplash.com/photo-1509011553436-198a69499b5e?q=80&w=800&auto=format&fit=crop" 
-                alt="Dojo Atmosphere" 
-                className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-red-600/10 mix-blend-overlay" />
-            </motion.div>
+      <section id="about" className="py-8 md:py-10 bg-zinc-950 relative overflow-hidden">
+        {/* Background Image with Overlay */}
+        <div className="absolute inset-0 z-0">
+          <img 
+            src={content?.about_image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1920&auto=format&fit=crop"} 
+            alt="Karate Emotion" 
+            className="w-full h-full object-cover grayscale opacity-30"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-black/40" />
+        </div>
+
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="max-w-3xl">
+            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.2em] mb-4">Клуб кіокушинкай карате в Києві</h2>
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 uppercase tracking-tight text-white leading-tight">
+              Дисципліна. Сила. Характер.
+            </h2>
+            
+            <div className="text-zinc-300 text-lg md:text-xl mb-8 leading-relaxed font-medium">
+              Black Bear Dojo — це середовище, де ваша дитина здобуває <span className="text-red-500 font-bold">дисципліну</span> та впевненість.<br className="hidden md:block" />
+              Системні тренування формують міцний характер, повагу до оточуючих та вміння досягати цілей.<br className="hidden md:block" />
+              Розвиток відбувається поступово: від базових навичок до участі у <span className="text-red-500 font-bold">змаганнях</span>.<br className="hidden md:block" />
+              Наш багаторічний <span className="text-red-500 font-bold">досвід</span> допомагає виховувати не лише сильних спортсменів, а й цілеспрямованих особистостей.
+            </div>
+
+            <div className="flex flex-wrap gap-3 mb-10">
+              <span className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white">Для дітей 4–7 років</span>
+              <span className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white">Для дітей 7–12 років</span>
+              <span className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white">Для підлітків 12+</span>
+            </div>
+
+            <Button variant="primary" className="px-10 py-5 text-sm" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              Записатися на пробне тренування
+            </Button>
           </div>
         </div>
       </section>
 
       {/* Directions Section */}
-      <section id="directions" className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
+      <section id="directions" className="py-8 md:py-10 bg-black relative overflow-hidden">
+        {content?.directions_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.directions_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
+          </div>
+        )}
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
           <SectionTitle 
-            title="Секція карате для дітей у Києві" 
-            subtitle="Ми розробили спеціальні програми для кожної вікової категорії з чіткими результатами"
+            title={content?.directions_title || "Секція карате для дітей у Києві"} 
+            subtitle={content?.directions_subtitle || "Ми розробили спеціальні програми для кожної вікової категорії з чіткими результатами"}
             light
           />
           
@@ -611,84 +693,112 @@ export default function App() {
       </section>
 
       {/* Results Section */}
-      <section className="min-h-screen py-12 flex items-center bg-zinc-950 border-y border-white/5 snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <SectionTitle title="Наші результати" subtitle="Елітний рівень підготовки підтверджений фактами та нагородами" light />
+      <section id="results" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+        {content?.results_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.results_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B] via-[#0B0B0B]/90 to-[#0B0B0B]" />
+          </div>
+        )}
+        <div className="max-w-[1200px] mx-auto px-6 relative z-10">
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight mb-4"
+            >
+              Результати, що підтверджують рівень підготовки
+            </motion.h2>
+            <motion.div 
+              initial={{ opacity: 0, scaleX: 0 }}
+              whileInView={{ opacity: 1, scaleX: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="w-24 h-0.5 bg-[#D40000] mx-auto mb-6"
+            />
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+              className="text-zinc-400 text-lg md:text-xl"
+            >
+              Фактичні досягнення клубу та його вихованців
+            </motion.p>
+          </div>
+
+          {/* Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-16">
             {[
-              { label: 'Досвіду', value: '20+', sub: 'років у спорті' },
-              { label: 'Учнів', value: '500+', sub: 'пройшли школу' },
-              { label: 'Чемпіонів', value: 'UA/EU', sub: 'серед вихованців' },
-              { label: 'Турнірів', value: 'INTL', sub: 'міжнародний рівень' },
-            ].map((stat, i) => (
-              <div key={i} className="text-center p-6 bg-zinc-900 rounded-[2rem] border border-white/5">
-                <div className="text-4xl font-black text-red-600 mb-1">{stat.value}</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-white mb-1">{stat.label}</div>
-                <div className="text-[9px] uppercase tracking-widest text-zinc-500">{stat.sub}</div>
-              </div>
+              { top: '20+ років', bottom: 'тренерського досвіду' },
+              { top: 'Чемпіони України', bottom: 'серед вихованців клубу' },
+              { top: 'Призери та чемпіони Європи', bottom: 'міжнародний рівень підготовки' },
+              { top: 'Міжнародні турніри', bottom: 'участь у змаганнях за межами України' },
+              { top: 'Регіональні та всеукраїнські змагання', bottom: 'постійна участь у міських та обласних турнірах' },
+            ].map((card, idx) => (
+              <motion.div 
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 * idx, duration: 0.5 }}
+                className="bg-[#141414] p-6 rounded-2xl border border-[#D40000]/20 hover:border-[#D40000]/60 hover:shadow-[0_0_20px_rgba(212,0,0,0.15)] transition-all duration-300 flex flex-col justify-center text-center min-h-[140px]"
+              >
+                <div className="text-white font-bold text-lg leading-tight mb-2 uppercase tracking-wide">{card.top}</div>
+                <div className="text-zinc-500 text-xs uppercase tracking-widest leading-relaxed">{card.bottom}</div>
+              </motion.div>
             ))}
           </div>
 
-          <div className="grid md:grid-cols-3 gap-4">
-            {[
-              'https://images.unsplash.com/photo-1578267153699-8958577e2d58?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1564415315949-7a0c4c73aab4?q=80&w=800&auto=format&fit=crop',
-              'https://images.unsplash.com/photo-1622599511051-16f55a123326?q=80&w=800&auto=format&fit=crop'
-            ].map((img, i) => (
-              <div key={i} className="aspect-video rounded-2xl overflow-hidden border border-white/10 grayscale hover:grayscale-0 transition-all duration-500">
-                <img src={img} alt="Competition Results" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          {/* Photo Block */}
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.4, duration: 0.7 }}
+            className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl overflow-hidden mb-16 group"
+          >
+            <img 
+              src={content?.results_image || "https://images.unsplash.com/photo-1564415315949-7a0c4c73aab4?q=80&w=1600&auto=format&fit=crop"} 
+              alt="Карате змагання" 
+              className="w-full h-full object-cover grayscale brightness-50 group-hover:scale-105 transition-transform duration-1000"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-transparent flex flex-col justify-end p-8 md:p-12 text-center">
+              <h3 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mb-2">Системна підготовка</h3>
+              <p className="text-[#D40000] font-bold text-sm md:text-lg uppercase tracking-[0.2em]">Техніка. Фізика. Дисципліна.</p>
+            </div>
+          </motion.div>
 
-      {/* Why Us Section */}
-      <section className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <SectionTitle 
-            title="Чому обирають Black Bear Dojo" 
-            subtitle="Карате для дітей Шулявка / Солом’янський район — системна модель успіху вашої дитини"
-            light
-          />
-          
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {[
-              { title: 'Реальні чемпіони', desc: 'Виховуємо переможців національних та європейських першостей.', icon: Trophy },
-              { title: 'Професійний склад', desc: 'Тренери з 3 даном та 20-річним досвідом діяльності.', icon: Star },
-              { title: 'Системна модель', desc: 'Поєднання класичної школи та сучасних методик розвитку.', icon: Shield },
-            ].map((item, idx) => (
-              <div key={idx} className="p-8 bg-zinc-900 rounded-[2rem] border border-red-600/20 hover:border-red-600 transition-all duration-500">
-                <div className="w-12 h-12 bg-red-600 rounded-xl flex items-center justify-center text-white mb-6 shadow-lg shadow-red-600/20">
-                  <item.icon size={24} />
-                </div>
-                <h3 className="text-xl font-black mb-3 uppercase tracking-tight">{item.title}</h3>
-                <p className="text-zinc-400 leading-relaxed text-base">{item.desc}</p>
-              </div>
-            ))}
-          </div>
+          {/* CTA Button */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.6 }}
+            className="text-center"
+          >
+            <a 
+              href="#contact"
+              className="inline-flex items-center justify-center bg-[#D40000] hover:bg-[#A30000] text-white font-bold uppercase tracking-widest text-sm px-10 py-5 rounded-full shadow-[0_10px_30px_rgba(212,0,0,0.3)] hover:shadow-[0_15px_40px_rgba(212,0,0,0.4)] transition-all duration-300 hover:-translate-y-1"
+            >
+              Записатися на пробне тренування
+            </a>
+          </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 opacity-60">
-            {[
-              { title: 'Контроль дисципліни', desc: 'Чіткі правила поведінки.' },
-              { title: 'Фокус на безпеці', desc: 'Контрольоване середовище.' },
-              { title: 'Спортивні табори', desc: 'Виїзні інтенсиви в горах.' },
-            ].map((item, idx) => (
-              <div key={idx} className="p-4 bg-zinc-900/50 rounded-xl border border-white/5 flex items-center gap-3">
-                <CheckCircle2 className="text-red-600 shrink-0" size={16} />
-                <div>
-                  <h4 className="font-bold text-[10px] uppercase">{item.title}</h4>
-                  <p className="text-[9px] text-zinc-500">{item.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
       {/* Coaches Section */}
-      <section id="coach" className="min-h-screen py-12 flex items-center bg-zinc-950 snap-start">
+      <section id="coach" className="py-8 md:py-10 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6">
           <SectionTitle 
             title="Наші Тренери" 
@@ -697,133 +807,214 @@ export default function App() {
           />
           
           <div className="grid lg:grid-cols-2 gap-8">
-            {/* Coach 1: Ihor Kotliarevskyi */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-white/5 flex flex-col md:flex-row group"
-            >
-              <div className="relative w-full md:w-1/2 h-[400px] md:h-auto overflow-hidden">
-                <img 
-                  src="https://ais-dev-52dzs75wldpn6rggyas75b-286910022589.europe-west2.run.app/api/image/step-77" 
-                  alt="Ігор Котляревський" 
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-zinc-900" />
-              </div>
-              
-              <div className="p-8 md:w-1/2 flex flex-col justify-center space-y-6">
-                <div>
-                  <span className="bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block shadow-lg shadow-red-600/20">Засновник клубу</span>
-                  <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Ігор <br />Котляревський</h3>
+            {coaches.map((coach, index) => (
+              <motion.div 
+                key={coach.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className={`bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-white/5 flex flex-col md:flex-row group ${index % 2 !== 0 ? 'md:flex-row-reverse' : ''}`}
+              >
+                <div className="relative w-full md:w-1/2 h-[400px] md:h-auto overflow-hidden">
+                  <img 
+                    src={coach.photo || "https://picsum.photos/seed/coach/800/1000"} 
+                    alt={coach.name} 
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className={`absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent md:bg-gradient-to-${index % 2 !== 0 ? 'l' : 'r'} md:from-transparent md:to-zinc-900`} />
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="text-red-500 font-bold text-[10px] uppercase tracking-widest">Звання та досягнення</div>
-                  <ul className="grid grid-cols-1 gap-y-2 text-zinc-300 text-sm">
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> 3 дан карате Кіокушинкай</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Майстер спорту України</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Чемпіон України</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Призер чемпіонатів Європи</li>
-                  </ul>
-                </div>
+                <div className="p-8 md:w-1/2 flex flex-col justify-center space-y-6">
+                  <div>
+                    <span className={`bg-${index === 0 ? 'red-600' : 'zinc-700'} text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block shadow-lg ${index === 0 ? 'shadow-red-600/20' : ''}`}>{coach.role}</span>
+                    <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">{coach.name}</h3>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="text-red-500 font-bold text-[10px] uppercase tracking-widest">Звання та досягнення</div>
+                    <ul className="grid grid-cols-1 gap-y-2 text-zinc-300 text-sm">
+                      {(coach.achievements || []).map((ach: string, i: number) => (
+                        <li key={i} className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> {ach}</li>
+                      ))}
+                    </ul>
+                  </div>
 
-                <div className="pt-6 border-t border-white/5">
-                  <p className="text-zinc-400 italic text-sm leading-relaxed">
-                    "Моя мета — не просто навчити битися, а сформувати характер, який допоможе дитині перемагати в житті."
-                  </p>
+                  <div className="pt-6 border-t border-white/5">
+                    <p className="text-zinc-400 italic text-sm leading-relaxed">
+                      "{coach.bio}"
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-
-            {/* Coach 2: Oleh Kramarenko */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-              className="bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-white/5 flex flex-col md:flex-row-reverse group"
-            >
-              <div className="relative w-full md:w-1/2 h-[400px] md:h-auto overflow-hidden">
-                <img 
-                  src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop" 
-                  alt="Олег Крамаренко" 
-                  className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 scale-105 group-hover:scale-100"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent md:bg-gradient-to-l md:from-transparent md:to-zinc-900" />
-              </div>
-              
-              <div className="p-8 md:w-1/2 flex flex-col justify-center space-y-6">
-                <div>
-                  <span className="bg-zinc-700 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest mb-3 inline-block">Провідний тренер</span>
-                  <h3 className="text-3xl font-black uppercase tracking-tighter leading-none">Олег <br />Крамаренко</h3>
-                </div>
-                
-                <div className="space-y-4">
-                  <div className="text-red-500 font-bold text-[10px] uppercase tracking-widest">Звання та досягнення</div>
-                  <ul className="grid grid-cols-1 gap-y-2 text-zinc-300 text-sm">
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Чемпіон Європи</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Багаторазовий чемпіон України</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> Експерт з техніки куміте</li>
-                    <li className="flex items-center gap-3"><CheckCircle2 size={16} className="text-red-600" /> 15+ років досвіду викладання</li>
-                  </ul>
-                </div>
-
-                <div className="pt-6 border-t border-white/5">
-                  <p className="text-zinc-400 italic text-sm leading-relaxed">
-                    "Кожне тренування — це перемога над собою. Ми вчимо дітей не здаватися перед труднощами."
-                  </p>
-                </div>
-              </div>
-            </motion.div>
+              </motion.div>
+            ))}
           </div>
         </div>
       </section>
 
       {/* Schedule Section */}
-      <section id="schedule" className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <SectionTitle title="Розклад занять" light />
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-white/10">
-                  <th className="py-6 px-4 text-zinc-500 uppercase text-xs font-bold tracking-widest">Дні</th>
-                  <th className="py-6 px-4 text-zinc-500 uppercase text-xs font-bold tracking-widest">Група</th>
-                  <th className="py-6 px-4 text-zinc-500 uppercase text-xs font-bold tracking-widest">Час</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                <tr>
-                  <td className="py-4 px-4 font-bold text-lg">Пн, Ср, Пт</td>
-                  <td className="py-4 px-4">
-                    <div className="font-bold text-base">Молодша група</div>
-                    <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">4–12 років</div>
-                  </td>
-                  <td className="py-4 px-4 font-mono text-red-500 font-bold text-lg">18:15 – 19:15</td>
-                </tr>
-                <tr>
-                  <td className="py-4 px-4 font-bold text-lg">Пн, Ср, Пт</td>
-                  <td className="py-4 px-4">
-                    <div className="font-bold text-base">Старша група</div>
-                    <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Підлітки та дорослі</div>
-                  </td>
-                  <td className="py-4 px-4 font-mono text-red-500 font-bold text-lg">19:15 – 20:45</td>
-                </tr>
-              </tbody>
-            </table>
+      <section id="schedule" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+        {content?.schedule_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.schedule_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B] via-[#0B0B0B]/90 to-[#0B0B0B]" />
           </div>
+        )}
+        <div className="max-w-[1200px] mx-auto px-6 relative z-10">
+          
+          {/* Header */}
+          <div className="text-center mb-12">
+            <motion.h2 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight mb-4"
+            >
+              Розклад занять
+            </motion.h2>
+            <motion.div 
+              initial={{ opacity: 0, scaleX: 0 }}
+              whileInView={{ opacity: 1, scaleX: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="w-24 h-0.5 bg-[#D40000] mx-auto mb-6"
+            />
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3 }}
+              className="text-zinc-400 text-lg md:text-xl"
+            >
+              Оберіть зручну локацію та групу
+            </motion.p>
+          </div>
+
+          {/* Two Cards Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            {/* Location 1: Shulyavka */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="bg-[#141414] rounded-3xl p-6 md:p-8 border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors"
+            >
+              <div className="absolute top-0 right-0 w-48 h-48 bg-[#D40000]/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-[#D40000]/10 transition-colors"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 text-[#D40000] mb-3">
+                  <MapPin size={20} />
+                  <span className="font-bold uppercase tracking-widest text-xs">Локація 1</span>
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2">Шулявка</h3>
+                <p className="text-zinc-400 text-sm mb-4">вул. Сім'ї Бродських, 31/33<br/>Київ, 03057 (м. Шулявська)</p>
+                
+                <div className="inline-block px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest mb-6">
+                  Дні: Пн, Ср, Пт
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { group: 'Молодша група', age: '4–7 років', time: '17:00 – 17:40' },
+                    { group: 'Середня група', age: '7–12 років', time: '18:00 – 19:00' },
+                    { group: 'Старша група', age: '12+ років', time: '19:00 – 20:30' },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-black/50 border border-white/5 hover:border-[#D40000]/30 transition-colors">
+                      <div>
+                        <div className="text-white font-bold text-base">{item.group}</div>
+                        <div className="text-zinc-500 text-[10px] uppercase tracking-widest">{item.age}</div>
+                      </div>
+                      <div className="text-[#D40000] font-mono font-bold text-lg mt-1 sm:mt-0">
+                        {item.time}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Location 2: Nekrasova */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+              className="bg-[#141414] rounded-3xl p-6 md:p-8 border border-white/5 relative overflow-hidden group hover:border-white/10 transition-colors"
+            >
+              <div className="absolute top-0 right-0 w-48 h-48 bg-[#D40000]/5 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-[#D40000]/10 transition-colors"></div>
+              
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 text-[#D40000] mb-3">
+                  <MapPin size={20} />
+                  <span className="font-bold uppercase tracking-widest text-xs">Локація 2</span>
+                </div>
+                <h3 className="text-2xl font-black text-white mb-2">Віктора Некрасова 1–3</h3>
+                <p className="text-zinc-400 text-sm mb-1">Тренер: Крамаренко Олег</p>
+                <a href="tel:+380955680604" className="text-[#D40000] hover:text-white transition-colors font-bold text-base mb-4 block">+38 095 568 06 04</a>
+                
+                <div className="inline-block px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-white text-xs font-bold uppercase tracking-widest mb-6">
+                  Дні: Пн, Ср, Пт
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    { group: 'Група', age: '5–7 років', time: '17:00 – 18:00' },
+                    { group: 'Група', age: '8–12 років', time: '18:00 – 19:00' },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl bg-black/50 border border-white/5 hover:border-[#D40000]/30 transition-colors">
+                      <div>
+                        <div className="text-white font-bold text-base">{item.group}</div>
+                        <div className="text-zinc-500 text-[10px] uppercase tracking-widest">{item.age}</div>
+                      </div>
+                      <div className="text-[#D40000] font-mono font-bold text-lg mt-1 sm:mt-0">
+                        {item.time}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+
+          </div>
+
+          {/* CTA Button */}
+          <div className="text-center mt-12 relative z-20">
+            <a 
+              href="#contact"
+              className="inline-flex items-center justify-center bg-[#D40000] hover:bg-[#A30000] text-white font-bold uppercase tracking-widest text-sm px-10 py-5 rounded-full shadow-[0_10px_30px_rgba(212,0,0,0.3)] hover:shadow-[0_15px_40px_rgba(212,0,0,0.4)] transition-all duration-300 hover:-translate-y-1 mb-4"
+            >
+              Записатися на пробне тренування
+            </a>
+            <p className="text-zinc-500 text-xs uppercase tracking-widest">
+              або зателефонувати тренеру
+            </p>
+          </div>
+
         </div>
       </section>
 
       {/* Reviews Section */}
-      <section className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <SectionTitle title="Відгуки батьків" subtitle="Що кажуть про нас ті, хто вже довірив нам своїх дітей" light />
+      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+        {content?.reviews_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.reviews_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
+          </div>
+        )}
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <SectionTitle title={content?.reviews_title || "Відгуки батьків"} subtitle={content?.reviews_subtitle || "Що кажуть про нас ті, хто вже довірив нам своїх дітей"} light />
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { name: 'Олена', text: 'Син став набагато дисциплінованішим вже за перші два місяці. Дуже задоволені підходом тренера.' },
@@ -840,9 +1031,20 @@ export default function App() {
       </section>
 
       {/* FAQ Section */}
-      <section className="min-h-screen py-12 flex items-center bg-black snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <SectionTitle title="Часті запитання (FAQ)" subtitle="Відповідаємо на головні питання батьків" light />
+      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+        {content?.faq_bg && (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.faq_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
+          </div>
+        )}
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <SectionTitle title={content?.faq_title || "Часті запитання (FAQ)"} subtitle={content?.faq_subtitle || "Відповідаємо на головні питання батьків"} light />
           
           <div className="max-w-3xl mx-auto space-y-2">
             {[
@@ -860,11 +1062,11 @@ export default function App() {
               },
               { 
                 q: 'Хто тренує дітей і який у вас досвід?', 
-                a: 'Тренування проводить Ігор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 20 років. У клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай і сучасну фізичну підготовку.' 
+                a: 'Тренування проводять Ігор Котляревський та Олег Крамаренко.\n\nІгор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 20 років у спорті та підготовці спортсменів.\n\nОлег Крамаренко — тренер клубу, який працює з дитячими та підлітковими групами, готує спортсменів до змагань і забезпечує системну підготовку відповідно до стандартів кіокушинкай.\n\nУ клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай та сучасну фізичну підготовку, з акцентом на дисципліну, техніку та поступовий розвиток спортсмена.' 
               },
               { 
                 q: 'Скільки коштує навчання і що входить у абонемент?', 
-                a: 'Абонемент включає: регулярні тренування у віковій групі, системну фізичну підготовку, технічну базу карате, підготовку до змагань (за рівнем готовності). Перше тренування — пробне. Необхідна базова форма для занять.' 
+                a: 'Вартість абонемента — 2500 грн на місяць.\n\nАбонемент включає:\n– регулярні тренування у віковій групі\n– системну фізичну підготовку\n– технічну базу кіокушинкай\n– підготовку до змагань (за рівнем готовності)\n\nПерше тренування — пробне.\nДля занять необхідна базова форма.' 
               },
             ].map((item, idx) => (
               <details key={idx} className="group bg-zinc-900 rounded-xl border border-white/5 overflow-hidden">
@@ -872,7 +1074,7 @@ export default function App() {
                   {item.q}
                   <ChevronRight className="group-open:rotate-90 transition-transform text-red-600" size={16} />
                 </summary>
-                <div className="px-4 pb-4 text-zinc-400 text-sm leading-relaxed">
+                <div className="px-4 pb-4 text-zinc-400 text-sm leading-relaxed whitespace-pre-line">
                   {item.a}
                 </div>
               </details>
@@ -881,64 +1083,56 @@ export default function App() {
         </div>
       </section>
 
-      {/* Local Block with Map */}
-      <section className="min-h-screen py-12 flex items-center bg-zinc-950 border-y border-white/5 snap-start">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="grid lg:grid-cols-2 gap-8 items-center">
-            <div className="text-left">
-              <h2 className="text-2xl font-black mb-4 uppercase tracking-tight">Карате в Києві — Black Bear Dojo</h2>
-              <p className="text-zinc-400 text-base mb-6 leading-relaxed">
-                Зручна локація біля метро Шулявська. Системний розвиток вашої дитини в професійному середовищі.
-              </p>
-              <div className="flex flex-wrap gap-3 text-[10px] font-black uppercase tracking-widest text-red-500">
-                <span>карате Київ</span>
-                <span>•</span>
-                <span>кіокушинкай</span>
-                <span>•</span>
-                <span>секція для дітей</span>
-              </div>
-            </div>
-            <div className="aspect-video rounded-2xl overflow-hidden border border-white/10 bg-zinc-900 flex items-center justify-center">
-              <div className="text-center p-4">
-                <MapPin size={32} className="text-red-600 mx-auto mb-2" />
-                <p className="text-zinc-500 uppercase tracking-widest font-black text-[10px]">Google Maps Placeholder</p>
-                <p className="text-[10px] text-zinc-600 mt-1">Київ, вул. Прикладна, 5</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Contact & Footer Section */}
-      <section id="contact" className="min-h-screen flex flex-col bg-zinc-950 relative overflow-hidden snap-start">
-        <div className="flex-grow flex items-center py-12">
+      <section id="contact" className="py-8 md:py-10 flex flex-col bg-zinc-950 relative overflow-hidden">
+        {content?.contact_bg ? (
+          <div className="absolute inset-0 z-0">
+            <img 
+              src={content.contact_bg} 
+              alt="Background" 
+              className="w-full h-full object-cover opacity-20 grayscale"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-zinc-950/90 to-zinc-950" />
+          </div>
+        ) : (
           <div className="absolute top-0 right-0 w-1/2 h-full bg-red-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
+        )}
+        
+        <div className="flex-grow flex items-center relative z-10">
+          {!content?.contact_bg && (
+             <div className="absolute top-0 right-0 w-1/2 h-full bg-red-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
+          )}
           
           <div className="max-w-7xl mx-auto px-6 relative z-10 w-full">
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <h2 className="text-3xl font-bold mb-4 uppercase leading-tight">Запишіть дитину в секцію карате Київ</h2>
-                <p className="text-zinc-400 text-base mb-6">
-                  Залиште заявку на дитяче карате Київ, і ми зателефонуємо вам для узгодження часу пробного заняття.
-                </p>
+                <h2 className="text-3xl font-bold mb-4 uppercase leading-tight" dangerouslySetInnerHTML={{ __html: content?.contact_title || "Запишіть дитину в секцію карате Київ" }} />
+                <p className="text-zinc-400 text-base mb-6" dangerouslySetInnerHTML={{ __html: content?.contact_subtitle || "Залиште заявку на дитяче карате Київ, і ми зателефонуємо вам для узгодження часу пробного заняття." }} />
                 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center text-red-600 border border-white/5">
-                      <MapPin size={16} />
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center text-red-600 border border-white/5 shrink-0">
+                      <MapPin size={20} />
                     </div>
                     <div>
-                      <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Локація</div>
-                      <div className="text-white text-sm font-medium">Київ, м. Шулявська (вул. Прикладна, 5)</div>
+                      <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2">Локації</div>
+                      <div className="space-y-2">
+                        <div className="text-white text-sm font-medium leading-tight">вул. Сім'ї Бродських, 31/33<br/><span className="text-zinc-500 text-xs">Київ, 03057 (м. Шулявська)</span></div>
+                        <div className="text-white text-sm font-medium leading-tight">вул. Віктора Некрасова, 1-3<br/><span className="text-zinc-500 text-xs">Київ, 04136</span></div>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-zinc-900 rounded-full flex items-center justify-center text-red-600 border border-white/5">
-                      <Send size={16} />
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center text-red-600 border border-white/5 shrink-0">
+                      <Send size={20} />
                     </div>
                     <div>
-                      <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Telegram / Viber</div>
-                      <div className="text-white text-sm font-medium">+38 (097) 123 45 67</div>
+                      <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-2">Телефони (Telegram / Viber)</div>
+                      <div className="space-y-2">
+                        <div className="text-white text-sm font-medium">Ігор Котляревський:<br/><a href="tel:+380954756500" className="text-red-500 hover:text-red-400 transition-colors">095 475 65 00</a></div>
+                        <div className="text-white text-sm font-medium">Олег Крамаренко:<br/><a href="tel:+380955680604" className="text-red-500 hover:text-red-400 transition-colors">095 568 06 04</a></div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -953,6 +1147,7 @@ export default function App() {
                     <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Ваше ім'я</label>
                     <input 
                       required
+                      name="name"
                       type="text" 
                       className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors text-xs"
                       placeholder="Олександр"
@@ -962,17 +1157,26 @@ export default function App() {
                     <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Телефон</label>
                     <input 
                       required
+                      name="phone"
                       type="tel" 
                       className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors text-xs"
                       placeholder="+38 (0__) ___ __ __"
                     />
                   </div>
                   <div>
-                    <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Вік дитини</label>
-                    <select className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors appearance-none text-xs">
-                      <option>4–7 років</option>
-                      <option>7–12 років</option>
-                      <option>Підліток</option>
+                    <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Локація</label>
+                    <select name="location" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors appearance-none text-xs text-white">
+                      <option value="Шулявка">Шулявка (вул. Сім'ї Бродських, 31/33)</option>
+                      <option value="Віктора Некрасова">Віктора Некрасова, 1-3</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-1">Вік дитини / Група</label>
+                    <select name="age" className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 focus:border-red-600 outline-none transition-colors appearance-none text-xs text-white">
+                      <option value="4-7 років">Молодша група (4–7 років)</option>
+                      <option value="7-12 років">Середня група (7–12 років)</option>
+                      <option value="12+ років">Старша група (12+ років)</option>
+                      <option value="Дорослий">Доросла група</option>
                     </select>
                   </div>
                   <Button 
@@ -999,9 +1203,8 @@ export default function App() {
             <BrandLogo size="sm" />
             
             <div className="flex items-center gap-6">
-              <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Instagram size={20} /></a>
-              <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Facebook size={20} /></a>
-              <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Send size={20} /></a>
+              <a href={content?.social_instagram || "https://instagram.com/karate_kyiv"} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white transition-colors"><Instagram size={20} /></a>
+              <a href={content?.social_facebook || "https://www.facebook.com/karatee.kyiv/"} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white transition-colors"><Facebook size={20} /></a>
             </div>
 
             <div className="text-zinc-600 text-[10px] max-w-xs text-center md:text-right">
