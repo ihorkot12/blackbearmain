@@ -140,10 +140,19 @@ async function startServer() {
   async function sendTelegramMessage(text: string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = process.env.TELEGRAM_CHAT_ID;
-    if (!token || !chatId) return;
+    
+    console.log('Attempting to send Telegram notification...');
+    console.log(`Telegram Token exists: ${!!token}`);
+    console.log(`Telegram Chat ID exists: ${!!chatId}`);
+    
+    if (!token || !chatId) {
+      console.warn('Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.');
+      return;
+    }
 
     try {
-      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      console.log('Sending request to Telegram API...');
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,8 +161,15 @@ async function startServer() {
           parse_mode: 'HTML'
         })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Telegram API error:', response.status, errorData);
+      } else {
+        console.log('Telegram message sent successfully');
+      }
     } catch (e) {
-      console.error('Failed to send Telegram message', e);
+      console.error('Failed to send Telegram message:', e);
     }
   }
 
@@ -169,8 +185,10 @@ async function startServer() {
 
   app.post("/api/leads", async (req, res) => {
     const { name, phone, age_group, location } = req.body;
+    console.log(`New lead submission: ${name}, ${phone}`);
     try {
       await pool.query("INSERT INTO leads (name, phone, age_group, location) VALUES ($1, $2, $3, $4)", [name, phone, age_group, location]);
+      console.log('Lead saved to database');
       
       const message = `
 <b>🔔 Нова заявка на пробне заняття!</b>
@@ -183,6 +201,7 @@ async function startServer() {
 
       res.json({ success: true });
     } catch (e) {
+      console.error("Failed to save lead:", e);
       res.status(500).json({ error: "Failed to save lead" });
     }
   });
