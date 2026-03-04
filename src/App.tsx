@@ -3,10 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
-import { LoginPage, AdminPage } from './Admin';
+
+const LoginPage = lazy(() => import('./Admin').then(m => ({ default: m.LoginPage })));
+const AdminPage = lazy(() => import('./Admin').then(m => ({ default: m.AdminPage })));
+
 import { 
   Shield, 
   Trophy, 
@@ -160,11 +163,13 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 export default function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
+      <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/admin" element={<AdminPage />} />
+        </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }
@@ -380,6 +385,7 @@ function LandingPage() {
             alt="Kyokushin Karate Training Kyiv" 
             className="w-full h-full object-cover opacity-40 scale-105"
             referrerPolicy="no-referrer"
+            fetchPriority="high"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />
         </div>
@@ -454,6 +460,7 @@ function LandingPage() {
               alt="Background" 
               className="w-full h-full object-cover opacity-20 grayscale"
               referrerPolicy="no-referrer"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
           </div>
@@ -561,6 +568,7 @@ function LandingPage() {
               alt="Background" 
               className="w-full h-full object-cover opacity-20 grayscale"
               referrerPolicy="no-referrer"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
           </div>
@@ -618,10 +626,11 @@ function LandingPage() {
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={content?.about_image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1920&auto=format&fit=crop"} 
+            src={content?.about_image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1200&auto=format&fit=crop"} 
             alt="Karate Emotion" 
             className="w-full h-full object-cover grayscale opacity-30"
             referrerPolicy="no-referrer"
+            loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-black/40" />
         </div>
@@ -663,6 +672,7 @@ function LandingPage() {
               alt="Background" 
               className="w-full h-full object-cover opacity-20 grayscale"
               referrerPolicy="no-referrer"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
           </div>
@@ -716,6 +726,7 @@ function LandingPage() {
               alt="Background" 
               className="w-full h-full object-cover opacity-20 grayscale"
               referrerPolicy="no-referrer"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-[#0B0B0B] via-[#0B0B0B]/90 to-[#0B0B0B]" />
           </div>
@@ -782,10 +793,11 @@ function LandingPage() {
             className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl overflow-hidden mb-16 group"
           >
             <img 
-              src={content?.results_image || "https://images.unsplash.com/photo-1564415315949-7a0c4c73aab4?q=80&w=1600&auto=format&fit=crop"} 
+              src={content?.results_image || "https://images.unsplash.com/photo-1564415315949-7a0c4c73aab4?q=80&w=1200&auto=format&fit=crop"} 
               alt="Карате змагання" 
               className="w-full h-full object-cover grayscale brightness-50 group-hover:scale-105 transition-transform duration-1000"
               referrerPolicy="no-referrer"
+              loading="lazy"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0B] via-[#0B0B0B]/40 to-transparent flex flex-col justify-end p-8 md:p-12 text-center">
               <h3 className="text-3xl md:text-5xl font-black text-white uppercase tracking-tight mb-2">
