@@ -193,11 +193,14 @@ function LandingPage() {
     setIsSubmitting(true);
 
     const formData = new FormData(e.target as HTMLFormElement);
+    const eventId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const data = {
       name: formData.get('name'),
       phone: formData.get('phone'),
       age_group: formData.get('age'),
-      location: formData.get('location')
+      location: formData.get('location'),
+      event_id: eventId
     };
 
     try {
@@ -234,7 +237,7 @@ function LandingPage() {
           content_name: 'Trial Lesson Signup',
           currency: 'UAH',
           value: 1.0
-        });
+        }, { eventID: eventId });
       }
     }
   };

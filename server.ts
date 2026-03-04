@@ -173,6 +173,57 @@ async function startServer() {
     }
   }
 
+  async function sendMetaEvent(eventName: string, userData: any, req: express.Request) {
+    const pixelId = process.env.META_PIXEL_ID;
+    const accessToken = process.env.META_ACCESS_TOKEN;
+
+    if (!pixelId || !accessToken) {
+      console.warn('Meta CAPI skipped: META_PIXEL_ID or META_ACCESS_TOKEN is missing.');
+      return;
+    }
+
+    const hash = (val: string) => {
+      if (!val) return undefined;
+      return crypto.createHash('sha256').update(val.trim().toLowerCase()).digest('hex');
+    };
+
+    const payload = {
+      data: [
+        {
+          event_name: eventName,
+          event_time: Math.floor(Date.now() / 1000),
+          action_source: 'website',
+          event_source_url: req.headers.referer || '',
+          event_id: userData.event_id,
+          user_data: {
+            client_ip_address: req.ip,
+            client_user_agent: req.headers['user-agent'],
+            ph: userData.phone ? [hash(userData.phone)] : undefined,
+            fn: userData.name ? [hash(userData.name)] : undefined,
+          },
+        },
+      ],
+    };
+
+    try {
+      console.log(`Sending Meta CAPI event: ${eventName} (ID: ${userData.event_id})`);
+      const response = await fetch(`https://graph.facebook.com/v18.0/${pixelId}/events?access_token=${accessToken}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Meta CAPI error:', response.status, errorData);
+      } else {
+        console.log('Meta CAPI event sent successfully');
+      }
+    } catch (e) {
+      console.error('Failed to send Meta CAPI event:', e);
+    }
+  }
+
   // Leads
   app.get("/api/leads", requireAuth, async (req, res) => {
     try {
@@ -184,7 +235,7 @@ async function startServer() {
   });
 
   app.post("/api/leads", async (req, res) => {
-    const { name, phone, age_group, location } = req.body;
+    const { name, phone, age_group, location, event_id } = req.body;
     console.log(`New lead submission: ${name}, ${phone}`);
     try {
       await pool.query("INSERT INTO leads (name, phone, age_group, location) VALUES ($1, $2, $3, $4)", [name, phone, age_group, location]);
@@ -197,7 +248,12 @@ async function startServer() {
 <b>Вікова група:</b> ${age_group}
 <b>Локація:</b> ${location || 'Не вказано'}
       `;
-      await sendTelegramMessage(message);
+      
+      // Send notifications in background
+      Promise.all([
+        sendTelegramMessage(message),
+        sendMetaEvent('Lead', { name, phone, event_id }, req)
+      ]).catch(err => console.error('Background notification error:', err));
 
       res.json({ success: true });
     } catch (e) {
