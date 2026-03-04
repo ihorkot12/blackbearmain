@@ -66,7 +66,8 @@ async function initDb() {
         "coach_name": "Ігор Котляревський",
         "coach_role": "Сенсей, Чорний пояс 3-й дан",
         "coach_bio": "Понад 15 років досвіду викладання. Виховав десятки чемпіонів України та Європи. Його підхід базується на поєднанні традиційної етики карате та сучасних методик фізичного розвитку.",
-        "coach_photo": "https://picsum.photos/seed/coach/800/1000"
+        "coach_photo": "https://picsum.photos/seed/coach/800/1000",
+        "meta_pixel_code": "!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '2370050340139768');fbq('track', 'PageView');"
       };
       for (const [key, value] of Object.entries(initialContent)) {
         await client.query("INSERT INTO site_content (key, value) VALUES ($1, $2)", [key, value]);

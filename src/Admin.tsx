@@ -300,6 +300,7 @@ const ContentEditor = () => {
       title: 'Аналітика',
       fields: [
         { key: 'google_pixel_code', label: 'Google Pixel Code', type: 'textarea' },
+        { key: 'meta_pixel_code', label: 'Meta Pixel Code', type: 'textarea' },
       ]
     }
   ];

@@ -263,15 +263,25 @@ function LandingPage() {
   }, []);
 
   React.useEffect(() => {
-    if (content?.google_pixel_code) {
+    const injectScript = (code: string, id: string) => {
+      if (!code) return null;
+      // Remove script tags if user pasted them
+      const cleanCode = code.replace(/<\/?script.*?>/gi, '');
       const script = document.createElement('script');
-      script.innerHTML = content.google_pixel_code;
+      script.id = id;
+      script.innerHTML = cleanCode;
       document.head.appendChild(script);
-      return () => {
-        document.head.removeChild(script);
-      };
-    }
-  }, [content?.google_pixel_code]);
+      return script;
+    };
+
+    const googleScript = injectScript(content?.google_pixel_code, 'google-pixel');
+    const metaScript = injectScript(content?.meta_pixel_code, 'meta-pixel');
+
+    return () => {
+      if (googleScript) document.head.removeChild(googleScript);
+      if (metaScript) document.head.removeChild(metaScript);
+    };
+  }, [content?.google_pixel_code, content?.meta_pixel_code]);
 
   const navLinks = [
     { name: 'Про клуб', href: '#about' },
