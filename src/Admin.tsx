@@ -121,6 +121,7 @@ export const AdminPage = () => {
 
 const ContentEditor = () => {
   const [content, setContent] = useState<Record<string, string>>({});
+  const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState('hero');
 
@@ -130,19 +131,35 @@ const ContentEditor = () => {
 
   const handleChange = (key: string, value: string) => {
     setContent(prev => ({ ...prev, [key]: value }));
+    setDirtyFields(prev => new Set(prev).add(key));
   };
 
   const handleSave = async (delta?: Record<string, string>) => {
     setSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
+      
+      // If delta is provided (e.g. image upload), use it. 
+      // Otherwise, collect all dirty fields from the current content state.
+      const payload: Record<string, string> = delta || {};
+      if (!delta) {
+        dirtyFields.forEach(key => {
+          payload[key] = content[key];
+        });
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setSaving(false);
+        return;
+      }
+
       const response = await fetch('/api/content', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(delta || content)
+        body: JSON.stringify(payload)
       });
       
       if (!response.ok) {
@@ -150,10 +167,11 @@ const ContentEditor = () => {
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
       
+      setDirtyFields(new Set());
       console.log('Save successful');
     } catch (e: any) {
       console.error('Save failed', e);
-      alert(`Помилка збереження: ${e.message}. Спробуйте файл меншого розміру.`);
+      alert(`Помилка збереження: ${e.message}. Якщо ви вставляєте скрипт, спробуйте видалити теги <script> та <noscript> і залишити лише чистий код.`);
     }
     setSaving(false);
   };
