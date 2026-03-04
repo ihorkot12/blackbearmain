@@ -217,14 +217,25 @@ function LandingPage() {
       setIsSubmitting(false);
     }
 
-    // Conversion Tracking (Mock)
+    // Conversion Tracking
     console.log('Conversion Event: Lead Generated');
-    if (typeof window !== 'undefined' && (window as any).gtag) {
-      (window as any).gtag('event', 'conversion', {
-        'send_to': 'AW-CONVERSION_ID/LABEL',
-        'value': 1.0,
-        'currency': 'UAH'
-      });
+    if (typeof window !== 'undefined') {
+      // Google Ads (if configured)
+      if ((window as any).gtag) {
+        (window as any).gtag('event', 'conversion', {
+          'send_to': 'AW-CONVERSION_ID/LABEL',
+          'value': 1.0,
+          'currency': 'UAH'
+        });
+      }
+      // Meta Pixel
+      if ((window as any).fbq) {
+        (window as any).fbq('track', 'Lead', {
+          content_name: 'Trial Lesson Signup',
+          currency: 'UAH',
+          value: 1.0
+        });
+      }
     }
   };
 
