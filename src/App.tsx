@@ -264,22 +264,59 @@ function LandingPage() {
 
   React.useEffect(() => {
     const injectScript = (code: string, id: string) => {
-      if (!code) return null;
-      // Remove script tags if user pasted them
-      const cleanCode = code.replace(/<\/?script.*?>/gi, '');
-      const script = document.createElement('script');
-      script.id = id;
-      script.innerHTML = cleanCode;
-      document.head.appendChild(script);
-      return script;
+      if (!code || typeof code !== 'string') return [];
+      
+      const elements: HTMLElement[] = [];
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = code;
+      
+      const scripts = tempDiv.querySelectorAll('script');
+      if (scripts.length > 0) {
+        scripts.forEach((s, idx) => {
+          const newScript = document.createElement('script');
+          newScript.id = `${id}-script-${idx}`;
+          if (s.src) {
+            newScript.src = s.src;
+            newScript.async = s.async;
+          } else {
+            newScript.innerHTML = s.innerHTML;
+          }
+          document.head.appendChild(newScript);
+          elements.push(newScript);
+        });
+      } else if (code.trim().length > 0) {
+        // If no script tags found, but there is content
+        // Check if it looks like HTML (contains tags)
+        if (tempDiv.children.length === 0) {
+          // It's just text/comments, assume it's raw JS
+          const script = document.createElement('script');
+          script.id = id;
+          script.innerHTML = code;
+          document.head.appendChild(script);
+          elements.push(script);
+        }
+      }
+      
+      // Handle noscript tags separately
+      const noscripts = tempDiv.querySelectorAll('noscript');
+      noscripts.forEach((ns, idx) => {
+        const newNoScript = document.createElement('noscript');
+        newNoScript.id = `${id}-noscript-${idx}`;
+        newNoScript.innerHTML = ns.innerHTML;
+        document.body.appendChild(newNoScript);
+        elements.push(newNoScript);
+      });
+
+      return elements;
     };
 
-    const googleScript = injectScript(content?.google_pixel_code, 'google-pixel');
-    const metaScript = injectScript(content?.meta_pixel_code, 'meta-pixel');
+    const googleElements = injectScript(content?.google_pixel_code, 'google-pixel');
+    const metaElements = injectScript(content?.meta_pixel_code, 'meta-pixel');
 
     return () => {
-      if (googleScript) document.head.removeChild(googleScript);
-      if (metaScript) document.head.removeChild(metaScript);
+      [...googleElements, ...metaElements].forEach(el => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
     };
   }, [content?.google_pixel_code, content?.meta_pixel_code]);
 
