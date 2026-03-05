@@ -27,6 +27,12 @@ import {
   User
 } from 'lucide-react';
 
+declare global {
+  interface Window {
+    fbq: any;
+  }
+}
+
 // --- Components ---
 
 const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
@@ -378,7 +384,15 @@ function LandingPage() {
                 <User size={14} />
                 Вхід
               </Link>
-              <Button variant="primary" className="h-[48px] px-8 text-[11px] shadow-[0_8px_24px_rgba(196,0,0,0.35)] hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(196,0,0,0.45)]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button 
+                id="cta-button-header"
+                variant="primary" 
+                className="h-[48px] px-8 text-[11px] shadow-[0_8px_24px_rgba(196,0,0,0.35)] hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(196,0,0,0.45)]" 
+                onClick={() => {
+                  if (window.fbq) window.fbq('track', 'Lead');
+                  document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Записатись
               </Button>
             </div>
@@ -417,7 +431,17 @@ function LandingPage() {
                 >
                   Вхід до CRM
                 </Link>
-                <Button variant="primary" onClick={() => { setIsMenuOpen(false); document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); }}>Записатися на пробне</Button>
+                <Button 
+                  id="cta-button-mobile"
+                  variant="primary" 
+                  onClick={() => { 
+                    if (window.fbq) window.fbq('track', 'Lead');
+                    setIsMenuOpen(false); 
+                    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); 
+                  }}
+                >
+                  Записатися на пробне
+                </Button>
               </div>
           </motion.div>
         )}
@@ -460,10 +484,27 @@ function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-8">
-              <Button variant="primary" className="w-full sm:w-auto" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button 
+                id="cta-button-hero"
+                variant="primary" 
+                className="w-full sm:w-auto" 
+                onClick={() => {
+                  if (window.fbq) window.fbq('track', 'Lead');
+                  document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Записатися на пробне
               </Button>
-              <Button variant="secondary" className="w-full sm:w-auto" showIcon={false} onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button 
+                id="cta-button-question"
+                variant="secondary" 
+                className="w-full sm:w-auto" 
+                showIcon={false} 
+                onClick={() => {
+                  if (window.fbq) window.fbq('track', 'Contact');
+                  document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+              >
                 Задати питання тренеру
               </Button>
             </div>
