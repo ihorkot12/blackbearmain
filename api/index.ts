@@ -1430,9 +1430,20 @@ async function startServer() {
     }
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
-    const { createServer: createViteServer } = await import("vite");
+    // Delete all leads
+    app.delete('/api/leads/delete-all', requireAuth, async (req, res) => {
+      try {
+        await pool.query('DELETE FROM leads');
+        res.json({ message: 'All leads deleted' });
+      } catch (e) {
+        console.error('Delete all leads failed', e);
+        res.status(500).json({ error: 'Server error' });
+      }
+    });
+
+    // Vite middleware for development
+    if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+      const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",

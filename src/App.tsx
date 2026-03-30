@@ -853,15 +853,17 @@ function LandingPage() {
             >
               <div className="absolute top-0 left-10 w-20 h-[2px] bg-zinc-700 group-hover:bg-red-600 transition-colors duration-500" />
               <h3 className="text-xl md:text-2xl font-black uppercase mb-8 text-zinc-300 flex items-center gap-4">
-                Ваша дитина:
+                {content?.problems_title || "Ваша дитина:"}
               </h3>
               <ul className="space-y-6">
                 {[
-                  'Невпевнена у власних силах?',
-                  'Багато часу проводить у телефоні?',
-                  'Потребує дисципліни та фізичного розвитку?',
-                  'Має труднощі у спілкуванні з однолітками?'
-                ].map((item, i) => (
+                  content?.problem1 || 'Невпевнена у власних силах?',
+                  content?.problem2 || 'Багато часу проводить у телефоні?',
+                  content?.problem3 || 'Потребує дисципліни та фізичного розвитку?',
+                  content?.problem4 || 'Має труднощі у спілкуванні з однолітками?',
+                  content?.problem5,
+                  content?.problem6
+                ].filter(Boolean).map((item, i) => (
                   <li key={i} className="flex items-start gap-4 text-base text-zinc-400 group-hover:text-zinc-300 transition-colors">
                     <div className="w-5 h-5 rounded-full border border-red-600/30 flex items-center justify-center shrink-0 mt-1">
                       <X size={12} className="text-red-600/50" />
@@ -921,29 +923,48 @@ function LandingPage() {
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="text-center mb-16">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Атмосфера додзьо</h2>
-            <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Відчуйте енергію тренувань</h3>
+            <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
+              {content?.video_title || "Відчуйте енергію тренувань"}
+            </h3>
           </div>
           
           <motion.div 
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="relative aspect-video rounded-[3rem] overflow-hidden border border-white/10 group cursor-pointer"
+            className="relative aspect-video rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl shadow-red-600/5"
           >
-            <img 
-              src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1200&auto=format&fit=crop" 
-              alt="Training Video Placeholder" 
-              className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-700"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(220,38,38,0.5)] group-hover:scale-110 transition-transform">
-                <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-2" />
+            {content?.video_url ? (
+              <iframe 
+                src={content.video_url.includes('youtube.com/watch?v=') 
+                  ? content.video_url.replace('watch?v=', 'embed/') 
+                  : content.video_url.includes('youtu.be/')
+                  ? content.video_url.replace('youtu.be/', 'youtube.com/embed/')
+                  : content.video_url
+                }
+                title="Training Video"
+                className="w-full h-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <div className="relative w-full h-full cursor-pointer">
+                <img 
+                  src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1200&auto=format&fit=crop" 
+                  alt="Training Video Placeholder" 
+                  className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-700"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(220,38,38,0.5)] group-hover:scale-110 transition-transform">
+                    <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-2" />
+                  </div>
+                </div>
+                <div className="absolute bottom-10 left-10">
+                  <p className="text-white font-bold uppercase tracking-widest text-sm">Дивитись відео тренування</p>
+                </div>
               </div>
-            </div>
-            <div className="absolute bottom-10 left-10">
-              <p className="text-white font-bold uppercase tracking-widest text-sm">Дивитись відео тренування</p>
-            </div>
+            )}
           </motion.div>
         </div>
       </section>

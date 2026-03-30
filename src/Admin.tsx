@@ -286,7 +286,7 @@ export const AdminPage = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
               {activeTab === 'content' && <ContentEditor />}
               {activeTab === 'leads' && <LeadsViewer />}
               {activeTab === 'coaches' && <CoachesEditor />}
@@ -936,7 +936,7 @@ const SettingsEditor = () => {
   );
 };
 
-const Dashboard = () => {
+const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
   const [stats, setStats] = useState({
     leads: 0,
     coaches: 0,
@@ -1224,10 +1224,30 @@ const Dashboard = () => {
           <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
           <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
           <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-            <button className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1">Додати учня</button>
-            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Редагувати розклад</button>
-            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Контент сайту</button>
-            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Звіти</button>
+            <button 
+              onClick={() => setActiveTab('participants')}
+              className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+            >
+              Додати учня
+            </button>
+            <button 
+              onClick={() => setActiveTab('schedule')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Редагувати розклад
+            </button>
+            <button 
+              onClick={() => setActiveTab('content')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Контент сайту
+            </button>
+            <button 
+              onClick={() => setActiveTab('dashboard')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Звіти
+            </button>
           </div>
         </div>
       </div>
@@ -1703,6 +1723,7 @@ const ContentEditor = () => {
     { id: 'results', title: 'Результати', icon: Award },
     { id: 'faq', title: 'FAQ', icon: MessageSquare },
     { id: 'contacts', title: 'Контакти', icon: Settings },
+    { id: 'video_problems', title: 'Відео та Проблеми', icon: Zap },
     { id: 'kids_landing', title: 'Діти 4-7', icon: Smile },
     { id: 'junior_landing', title: 'Діти 7-12', icon: Trophy },
     { id: 'teen_landing', title: 'Підлітки', icon: Zap },
@@ -1746,6 +1767,18 @@ const ContentEditor = () => {
       { key: 'contact_email', label: 'Email', type: 'text' },
       { key: 'social_instagram', label: 'Instagram URL', type: 'text' },
       { key: 'social_facebook', label: 'Facebook URL', type: 'text' },
+    ],
+    video_problems: [
+      { key: 'video_url', label: 'YouTube URL кліпа', type: 'text', placeholder: 'https://www.youtube.com/watch?v=...' },
+      { key: 'video_title', label: 'Заголовок відео', type: 'text' },
+      { key: 'problems_title', label: 'Заголовок секції проблем', type: 'text' },
+      { key: 'problems_subtitle', label: 'Підзаголовок секції проблем', type: 'textarea' },
+      { key: 'problem1', label: 'Проблема 1', type: 'text' },
+      { key: 'problem2', label: 'Проблема 2', type: 'text' },
+      { key: 'problem3', label: 'Проблема 3', type: 'text' },
+      { key: 'problem4', label: 'Проблема 4', type: 'text' },
+      { key: 'problem5', label: 'Проблема 5', type: 'text' },
+      { key: 'problem6', label: 'Проблема 6', type: 'text' },
     ],
     kids_landing: [
       { key: 'kids_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
@@ -2666,6 +2699,31 @@ const LeadsViewer = () => {
     fetchLeads();
   }, []);
 
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+
+  const handleDeleteAll = async () => {
+    setIsDeletingAll(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/leads/delete-all', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        toast.success('Всі заявки видалено');
+        fetchLeads();
+      } else {
+        toast.error('Помилка видалення заявок');
+      }
+    } catch (e) {
+      toast.error('Помилка видалення заявок');
+    }
+    setIsDeletingAll(false);
+    setShowDeleteAllConfirm(false);
+  };
+
   const handleSaveLead = async (lead: any) => {
     try {
       const token = localStorage.getItem('admin_token');
@@ -2716,16 +2774,36 @@ const LeadsViewer = () => {
 
   return (
     <div>
-      <div className="flex items-center gap-4 mb-8">
-        <h2 className="text-3xl font-bold">Заявки з сайту</h2>
-        <button 
-          onClick={fetchLeads}
-          className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
-          title="Оновити"
-        >
-          <RefreshCw size={18} />
-        </button>
+      <div className="flex items-center justify-between gap-4 mb-8">
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-bold">Заявки з сайту</h2>
+          <button 
+            onClick={fetchLeads}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
+            title="Оновити"
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
+        {leads.length > 0 && (
+          <button 
+            onClick={() => setShowDeleteAllConfirm(true)}
+            className="px-6 py-3 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white rounded-xl font-bold transition-all flex items-center gap-2 border border-red-600/20"
+          >
+            <Trash2 size={18} />
+            Видалити всі ({leads.length})
+          </button>
+        )}
       </div>
+      
+      <ConfirmModal 
+        isOpen={showDeleteAllConfirm}
+        onClose={() => setShowDeleteAllConfirm(false)}
+        onConfirm={handleDeleteAll}
+        loading={isDeletingAll}
+        title="Видалити ВСІ заявки?"
+        message="Ви впевнені, що хочете видалити абсолютно всі заявки? Цю дію неможливо скасувати."
+      />
       
       {editingLead && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
