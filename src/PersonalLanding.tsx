@@ -48,17 +48,35 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 export const PersonalLanding = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
+  const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    fetch('/api/locations')
+    // Check session storage for cached data
+    const cachedData = sessionStorage.getItem('site_init_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        if (Array.isArray(data.locations)) setLocations(data.locations);
+        if (data.content) setContent(data.content);
+      } catch (e) {
+        console.error('Error parsing cached data', e);
+      }
+    }
+
+    fetch('/api/init')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setLocations(data);
+        if (data && !data.error) {
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (data.content) setContent(data.content);
+          // Save to session storage
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
       })
-      .catch(err => console.error('Error fetching locations:', err));
+      .catch(err => console.error('Error fetching init data:', err));
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -96,9 +114,9 @@ export const PersonalLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
       <SEO 
-        title="Персональні тренування з карате"
-        description="Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Швидкий результат для дорослих та дітей."
-        keywords="персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ"
+        title={content?.personal_seo_title || "Персональні тренування з карате"}
+        description={content?.personal_seo_description || "Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Швидкий результат для дорослих та дітей."}
+        keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ"}
       />
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
@@ -124,7 +142,7 @@ export const PersonalLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2000&auto=format&fit=crop" 
+            src={content?.personal_hero_bg || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2000&auto=format&fit=crop"} 
             alt="Personal Training" 
             className="w-full h-full object-cover opacity-40 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -144,12 +162,14 @@ export const PersonalLanding = () => {
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
               Персональний наставник: Залишилось 1 вільне місце на вечір
             </div>
-            <h1 className="text-6xl md:text-[110px] font-black uppercase leading-[0.85] tracking-tighter mb-10">
-              Максимальний <br /> <span className="text-red-600 text-glow">результат</span> <br /> тет-а-тет
-            </h1>
-            <p className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium">
-              Персональні тренування з карате Кіокушинкай — це найшвидший спосіб опанувати бойове мистецтво, зміцнити тіло та загартувати дух під наглядом майстра. <span className="text-white">Перша консультація — БЕЗКОШТОВНО.</span>
-            </p>
+            <h1 
+              className="text-6xl md:text-[110px] font-black uppercase leading-[0.85] tracking-tighter mb-10"
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Максимальний <br /> <span className="text-red-600 text-glow">результат</span> <br /> тет-а-тет' }}
+            />
+            <p 
+              className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Персональні тренування з карате Кіокушинкай — це найшвидший спосіб опанувати бойове мистецтво, зміцнити тіло та загартувати дух під наглядом майстра. <span className="text-white">Перша консультація — БЕЗКОШТОВНО.</span>' }}
+            />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
@@ -203,7 +223,7 @@ export const PersonalLanding = () => {
             <div className="relative">
               <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
               <img 
-                src="https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=1000&auto=format&fit=crop" 
+                src={content?.personal_advantages_image || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=1000&auto=format&fit=crop"} 
                 alt="Personal Training Session" 
                 className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"

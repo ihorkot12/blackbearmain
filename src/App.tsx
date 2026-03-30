@@ -323,25 +323,41 @@ function LandingPage() {
   ];
 
   React.useEffect(() => {
-    fetch(`/api/content?t=${Date.now()}`)
-      .then(res => res.json())
-      .then(data => setContent(data && !data.error ? data : null))
-      .catch(() => setContent(null));
-    
-    fetch(`/api/coaches?t=${Date.now()}`)
-      .then(res => res.json())
-      .then(data => setCoaches(Array.isArray(data) && data.length > 0 ? data : defaultCoaches))
-      .catch(() => setCoaches(defaultCoaches));
+    // Check session storage for cached data
+    const cachedData = sessionStorage.getItem('site_init_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        setContent(data.content || null);
+        setCoaches(Array.isArray(data.coaches) && data.coaches.length > 0 ? data.coaches : defaultCoaches);
+        setLocations(Array.isArray(data.locations) && data.locations.length > 0 ? data.locations : defaultLocations);
+        setSchedule(Array.isArray(data.schedule) && data.schedule.length > 0 ? data.schedule : defaultSchedule);
+        // Still fetch in background to update cache if needed
+      } catch (e) {
+        console.error('Error parsing cached data', e);
+      }
+    }
 
-    fetch('/api/locations')
+    fetch('/api/init')
       .then(res => res.json())
-      .then(data => setLocations(Array.isArray(data) && data.length > 0 ? data : defaultLocations))
-      .catch(() => setLocations(defaultLocations));
-
-    fetch('/api/schedule')
-      .then(res => res.json())
-      .then(data => setSchedule(Array.isArray(data) && data.length > 0 ? data : defaultSchedule))
-      .catch(() => setSchedule(defaultSchedule));
+      .then(data => {
+        if (data && !data.error) {
+          setContent(data.content || null);
+          setCoaches(Array.isArray(data.coaches) && data.coaches.length > 0 ? data.coaches : defaultCoaches);
+          setLocations(Array.isArray(data.locations) && data.locations.length > 0 ? data.locations : defaultLocations);
+          setSchedule(Array.isArray(data.schedule) && data.schedule.length > 0 ? data.schedule : defaultSchedule);
+          // Save to session storage
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
+      })
+      .catch(() => {
+        if (!sessionStorage.getItem('site_init_data')) {
+          setContent(null);
+          setCoaches(defaultCoaches);
+          setLocations(defaultLocations);
+          setSchedule(defaultSchedule);
+        }
+      });
   }, []);
 
   const handleFormSubmit = async (e: React.FormEvent) => {

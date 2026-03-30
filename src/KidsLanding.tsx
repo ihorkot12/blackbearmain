@@ -78,17 +78,35 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 export const KidsLanding = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
+  const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    fetch('/api/locations')
+    // Check session storage for cached data
+    const cachedData = sessionStorage.getItem('site_init_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        if (Array.isArray(data.locations)) setLocations(data.locations);
+        if (data.content) setContent(data.content);
+      } catch (e) {
+        console.error('Error parsing cached data', e);
+      }
+    }
+
+    fetch('/api/init')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setLocations(data);
+        if (data && !data.error) {
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (data.content) setContent(data.content);
+          // Save to session storage
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
       })
-      .catch(err => console.error('Error fetching locations:', err));
+      .catch(err => console.error('Error fetching init data:', err));
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -156,9 +174,9 @@ export const KidsLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
       <SEO 
-        title="Карате для дітей 4-7 років"
-        description="Секція карате для дітей 4-7 років у Києві (Шулявка, Відрадний). Ігрова форма навчання, розвиток координації та дисципліни. Перше тренування безкоштовно!"
-        keywords="карате для дітей 4 роки київ, карате для дітей 5 років київ, дитяче карате шулявка, карате для малюків київ, секція карате для дітей відрадний"
+        title={content?.kids_seo_title || "Карате для дітей 4-7 років"}
+        description={content?.kids_seo_description || "Секція карате для дітей 4-7 років у Києві (Шулявка, Відрадний). Ігрова форма навчання, розвиток координації та дисципліни. Перше тренування безкоштовно!"}
+        keywords={content?.kids_seo_keywords || "карате для дітей 4 роки київ, карате для дітей 5 років київ, дитяче карате шулявка, карате для малюків київ, секція карате для дітей відрадний"}
       />
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
@@ -184,7 +202,7 @@ export const KidsLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop" 
+            src={content?.kids_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop"} 
             alt="Kids Karate" 
             className="w-full h-full object-cover opacity-30 grayscale scale-110"
             referrerPolicy="no-referrer"
@@ -204,12 +222,14 @@ export const KidsLanding = () => {
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
               Набір у групу 4–7 років: Залишилось 3 вільних місця
             </div>
-            <h1 className="text-6xl md:text-[120px] font-black uppercase leading-[0.85] tracking-tighter mb-10">
-              Фундамент <br /> <span className="text-red-600">майбутнього</span> <br /> лідера
-            </h1>
-            <p className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-xl font-medium">
-              Ми не просто вчимо карате. Ми формуємо характер, який допоможе вашій дитині бути успішною в школі та житті. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>
-            </p>
+            <h1 
+              className="text-6xl md:text-[120px] font-black uppercase leading-[0.85] tracking-tighter mb-10"
+              dangerouslySetInnerHTML={{ __html: content?.kids_hero_title || 'Фундамент <br /> <span className="text-red-600">майбутнього</span> <br /> лідера' }}
+            />
+            <p 
+              className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-xl font-medium"
+              dangerouslySetInnerHTML={{ __html: content?.kids_hero_subtitle || 'Ми не просто вчимо карате. Ми формуємо характер, який допоможе вашій дитині бути успішною в школі та житті. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
+            />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
@@ -285,7 +305,7 @@ export const KidsLanding = () => {
               <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
               <div className="absolute -inset-6 border border-zinc-800 rounded-[4rem] rotate-1" />
               <img 
-                src="https://images.unsplash.com/photo-1509563268479-0f004cf3f58b?q=80&w=1000&auto=format&fit=crop" 
+                src={content?.kids_advantages_image || "https://images.unsplash.com/photo-1509563268479-0f004cf3f58b?q=80&w=1000&auto=format&fit=crop"} 
                 alt="Training" 
                 className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"

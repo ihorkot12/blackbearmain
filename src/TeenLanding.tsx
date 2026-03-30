@@ -45,17 +45,35 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 export const TeenLanding = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
+  const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
 
-    fetch('/api/locations')
+    // Check session storage for cached data
+    const cachedData = sessionStorage.getItem('site_init_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        if (Array.isArray(data.locations)) setLocations(data.locations);
+        if (data.content) setContent(data.content);
+      } catch (e) {
+        console.error('Error parsing cached data', e);
+      }
+    }
+
+    fetch('/api/init')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setLocations(data);
+        if (data && !data.error) {
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (data.content) setContent(data.content);
+          // Save to session storage
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
       })
-      .catch(err => console.error('Error fetching locations:', err));
+      .catch(err => console.error('Error fetching init data:', err));
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -123,9 +141,9 @@ export const TeenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
       <SEO 
-        title="Карате для підлітків 12+ років"
-        description="Секція карате для підлітків у Києві. Професійні турніри, самооборона, лідерство та впевненість у собі. Локації: Шулявка, Відрадний. Перше тренування безкоштовно!"
-        keywords="карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ"
+        title={content?.teen_seo_title || "Карате для підлітків 12+ років"}
+        description={content?.teen_seo_description || "Секція карате для підлітків у Києві. Професійні турніри, самооборона, лідерство та впевненість у собі. Локації: Шулявка, Відрадний. Перше тренування безкоштовно!"}
+        keywords={content?.teen_seo_keywords || "карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ"}
       />
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
@@ -151,7 +169,7 @@ export const TeenLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=2000&auto=format&fit=crop" 
+            src={content?.teen_hero_bg || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=2000&auto=format&fit=crop"} 
             alt="Teen Karate" 
             className="w-full h-full object-cover opacity-40 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -171,12 +189,14 @@ export const TeenLanding = () => {
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
               Група 12+: Залишилось 4 вільних місця
             </div>
-            <h1 className="text-6xl md:text-[130px] font-black uppercase leading-[0.8] tracking-tighter mb-10">
-              Стань <br /> <span className="text-red-600 text-glow">найкращою</span> <br /> версією себе
-            </h1>
-            <p className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium">
-              Карате для підлітків — це не просто спорт. Це твоя перевага в житті, впевненість у будь-якій компанії та сталевий характер. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>
-            </p>
+            <h1 
+              className="text-6xl md:text-[130px] font-black uppercase leading-[0.8] tracking-tighter mb-10"
+              dangerouslySetInnerHTML={{ __html: content?.teen_hero_title || 'Стань <br /> <span className="text-red-600 text-glow">найкращою</span> <br /> версією себе' }}
+            />
+            <p 
+              className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
+              dangerouslySetInnerHTML={{ __html: content?.teen_hero_subtitle || 'Карате для підлітків — це не просто спорт. Це твоя перевага в житті, впевненість у будь-якій компанії та сталевий характер. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
+            />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
@@ -245,7 +265,7 @@ export const TeenLanding = () => {
               <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
               <div className="absolute -inset-6 border border-zinc-800 rounded-[4rem] rotate-1" />
               <img 
-                src="https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1000&auto=format&fit=crop" 
+                src={content?.teen_advantages_image || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1000&auto=format&fit=crop"} 
                 alt="Teen Training" 
                 className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"

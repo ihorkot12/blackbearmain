@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 import session from 'express-session';
 import crypto from 'crypto';
 import pkg from 'pg';
+import compression from 'compression';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -22,10 +25,8 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
-let dbInitialized = false;
 
 async function initDb() {
-    if (dbInitialized) return;
   if (!process.env.DATABASE_URL) {
     console.warn("DATABASE_URL is not set. Database features will be disabled.");
     return;
@@ -126,6 +127,13 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS images (
+        id SERIAL PRIMARY KEY,
+        data TEXT NOT NULL,
+        content_type TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
@@ -289,9 +297,29 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.set('trust proxy', true);
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ limit: '50mb', extended: true }));
+  // Trust the first proxy (Cloud Run / Nginx)
+  app.set('trust proxy', 1);
+  
+  // Security and Performance Middleware
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disable for easier integration of external scripts if needed, or configure properly
+    crossOriginEmbedderPolicy: false,
+  }));
+  app.use(compression());
+  
+  // General API Rate Limiter
+  const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000, // 1 minute
+    max: 300, // limit each IP to 300 requests per minute
+    message: { error: 'Занадто багато запитів. Спробуйте пізніше.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+  });
+  app.use('/api/', apiLimiter);
+  
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
   app.use(session({
     secret: SESSION_SECRET,
@@ -408,7 +436,8 @@ async function startServer() {
   app.get("/api/leads", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
     try {
-      const result = await pool.query("SELECT * FROM leads ORDER BY created_at DESC");
+      // Limit to 100 most recent leads to save bandwidth/quota
+      const result = await pool.query("SELECT * FROM leads ORDER BY created_at DESC LIMIT 100");
       res.json(result.rows);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -418,7 +447,17 @@ async function startServer() {
     }
   });
 
-  app.post("/api/leads", async (req, res) => {
+  // Lead Submission Rate Limiter
+  const leadLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // limit each IP to 5 requests per windowMs
+    message: { error: 'Ви вже надіслали кілька заявок. Будь ласка, зачекайте 15 хвилин.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    validate: false,
+  });
+
+  app.post("/api/leads", leadLimiter, async (req, res) => {
     const { name, phone, age_group, location, event_id, source } = req.body;
     console.log(`New lead submission: ${name}, ${phone}, source: ${source}`);
     try {
@@ -475,16 +514,207 @@ async function startServer() {
     }
   });
 
-  // Site Content
-  app.get("/api/content", async (req, res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    if (!pool) return res.json({});
+  // Caches for Optimization
+  let initCache: any = null;
+  let lastInitUpdate = 0;
+  let contentCache: any = null;
+  let lastCacheUpdate = 0;
+  const imageCache = new Map<string, { contentType: string, buffer: Buffer, timestamp: number }>();
+  const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache
+  const IMAGE_CACHE_TTL = 60 * 60 * 1000; // 1 hour server-side cache
+
+  const invalidateInitCache = () => {
+    initCache = null;
+    lastInitUpdate = 0;
+    contentCache = null;
+    lastCacheUpdate = 0;
+    imageCache.clear();
+  };
+
+  // Image Serving Endpoints for Bandwidth Optimization
+  app.get("/api/images/content/:key", async (req, res) => {
+    if (!pool) return res.status(500).send("Database not configured");
+    const cacheKey = `content_${req.params.key}`;
+    const cached = imageCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.send(cached.buffer);
+    }
+
     try {
-      const result = await pool.query("SELECT * FROM site_content");
-      const content = result.rows.reduce((acc, item) => {
-        acc[item.key] = item.value;
+      const result = await pool.query("SELECT value FROM site_content WHERE key = $1", [req.params.key]);
+      if (result.rows.length === 0 || !result.rows[0].value.startsWith('data:image/')) {
+        return res.status(404).send("Image not found");
+      }
+      
+      const base64Data = result.rows[0].value;
+      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).send("Invalid image format");
+      }
+      
+      const contentType = matches[1];
+      const buffer = Buffer.from(matches[2], 'base64');
+      
+      // Update cache
+      imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
+      res.send(buffer);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send("Internal server error");
+    }
+  });
+
+  app.get("/api/images/coaches/:id", async (req, res) => {
+    if (!pool) return res.status(500).send("Database not configured");
+    const cacheKey = `coach_${req.params.id}`;
+    const cached = imageCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.send(cached.buffer);
+    }
+
+    try {
+      const result = await pool.query("SELECT photo FROM coaches WHERE id = $1", [req.params.id]);
+      if (result.rows.length === 0 || !result.rows[0].photo || !result.rows[0].photo.startsWith('data:image/')) {
+        return res.status(404).send("Image not found");
+      }
+      
+      const base64Data = result.rows[0].photo;
+      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).send("Invalid image format");
+      }
+      
+      const contentType = matches[1];
+      const buffer = Buffer.from(matches[2], 'base64');
+      
+      // Update cache
+      imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
+      
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
+      res.send(buffer);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send("Internal server error");
+    }
+  });
+
+  // Combined Init Data for Optimization
+  app.get("/api/init", async (req, res) => {
+    const now = Date.now();
+    
+    // Serve from cache if available and not expired
+    if (initCache && (now - lastInitUpdate < CACHE_TTL)) {
+      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes browser cache
+      return res.json(initCache);
+    }
+
+    if (!pool) return res.json({ content: {}, coaches: [], locations: [], schedule: [] });
+    
+    try {
+      const [contentRes, coachesRes, locationsRes, scheduleRes] = await Promise.all([
+        pool.query(`
+          SELECT key, 
+                 CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
+                 CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
+          FROM site_content
+        `),
+        pool.query(`
+          SELECT id, name, role, bio, achievements, order_index,
+                 CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
+                 CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
+          FROM coaches
+          ORDER BY order_index ASC
+        `),
+        pool.query("SELECT * FROM locations"),
+        pool.query(`
+          SELECT s.*, c.name as coach_name, l.name as location_name 
+          FROM schedule s
+          LEFT JOIN coaches c ON s.coach_id = c.id
+          LEFT JOIN locations l ON s.location_id = l.id
+        `)
+      ]);
+
+      const content = contentRes.rows.reduce((acc, item) => {
+        if (item.type === 'IMAGE') {
+          acc[item.key] = `/api/images/content/${item.key}?v=${lastInitUpdate || now}`;
+        } else {
+          acc[item.key] = item.value;
+        }
         return acc;
       }, {});
+
+      const coaches = coachesRes.rows.map(coach => {
+        const c = { ...coach };
+        if (c.photo_type === 'IMAGE') {
+          c.photo = `/api/images/coaches/${c.id}?v=${lastInitUpdate || now}`;
+        }
+        delete c.photo_type;
+        return c;
+      });
+
+      const data = {
+        content,
+        coaches,
+        locations: locationsRes.rows,
+        schedule: scheduleRes.rows
+      };
+
+      // Update caches
+      initCache = data;
+      lastInitUpdate = now;
+      contentCache = content;
+      lastCacheUpdate = now;
+
+      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes browser cache
+      res.json(data);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch init data" });
+    }
+  });
+
+  // Site Content
+  app.get("/api/content", async (req, res) => {
+    const now = Date.now();
+    
+    // Serve from cache if available and not expired
+    if (contentCache && (now - lastCacheUpdate < CACHE_TTL)) {
+      res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes browser cache
+      return res.json(contentCache);
+    }
+
+    if (!pool) return res.json({});
+    try {
+      const result = await pool.query(`
+        SELECT key, 
+               CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
+               CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
+        FROM site_content
+      `);
+      const content = result.rows.reduce((acc, item) => {
+        if (item.type === 'IMAGE') {
+          acc[item.key] = `/api/images/content/${item.key}?v=${lastInitUpdate || now}`;
+        } else {
+          acc[item.key] = item.value;
+        }
+        return acc;
+      }, {});
+      
+      // Update cache
+      contentCache = content;
+      lastCacheUpdate = now;
+      
+      res.setHeader('Cache-Control', 'public, max-age=300');
       res.json(content);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -504,6 +734,9 @@ async function startServer() {
           [key, String(value)]
         );
       }
+      // Invalidate cache
+      invalidateInitCache();
+      
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -515,7 +748,13 @@ async function startServer() {
   app.get("/api/coaches", async (req, res) => {
     if (!pool) return res.json([]);
     try {
-      const result = await pool.query("SELECT * FROM coaches ORDER BY order_index ASC");
+      const result = await pool.query(`
+        SELECT id, name, role, bio, achievements, order_index,
+               CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
+               CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
+        FROM coaches 
+        ORDER BY order_index ASC
+      `);
       res.json(result.rows.map((c: any) => {
         let parsedAchievements = [];
         try {
@@ -523,7 +762,13 @@ async function startServer() {
         } catch (err) {
           console.error('Failed to parse achievements for coach', c.id, err);
         }
-        return { ...c, achievements: parsedAchievements };
+        
+        const coach = { ...c, achievements: parsedAchievements };
+        if (coach.photo_type === 'IMAGE') {
+          coach.photo = `/api/images/coaches/${coach.id}?v=${lastInitUpdate || Date.now()}`;
+        }
+        delete coach.photo_type;
+        return coach;
       }));
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -542,6 +787,8 @@ async function startServer() {
         "INSERT INTO coaches (name, role, bio, photo, achievements) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         [name, role, bio, photo, JSON.stringify(achievements || [])]
       );
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true, id: result.rows[0].id });
     } catch (e) {
       res.status(500).json({ error: "Failed to create coach" });
@@ -552,6 +799,8 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
       await pool.query("DELETE FROM coaches WHERE id = $1", [req.params.id]);
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete coach" });
@@ -563,6 +812,8 @@ async function startServer() {
     const { photo } = req.body;
     try {
       await pool.query('UPDATE coaches SET photo = $1 WHERE id = $2', [photo, req.params.id]);
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: 'Failed to update photo' });
@@ -575,6 +826,8 @@ async function startServer() {
       await pool.query('UPDATE coaches SET name = $1, role = $2, bio = $3, achievements = $4, photo = $5 WHERE id = $6', [
         name, role, bio, JSON.stringify(achievements || []), photo, req.params.id
       ]);
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: 'Failed to update coach' });
@@ -603,6 +856,8 @@ async function startServer() {
         "INSERT INTO locations (name, address, map_link, order_index) VALUES ($1, $2, $3, $4) RETURNING id",
         [name, address, map_link, order_index || 0]
       );
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true, id: result.rows[0].id });
     } catch (e) {
       res.status(500).json({ error: "Failed to create location" });
@@ -617,6 +872,8 @@ async function startServer() {
         "UPDATE locations SET name = $1, address = $2, map_link = $3, order_index = $4 WHERE id = $5",
         [name, address, map_link, order_index || 0, req.params.id]
       );
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to update location" });
@@ -627,6 +884,8 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
       await pool.query("DELETE FROM locations WHERE id = $1", [req.params.id]);
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete location" });
@@ -661,6 +920,8 @@ async function startServer() {
         "INSERT INTO schedule (location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
         [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0]
       );
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true, id: result.rows[0].id });
     } catch (e) {
       console.error(e);
@@ -676,6 +937,8 @@ async function startServer() {
         "UPDATE schedule SET location_id = $1, coach_id = $2, day_of_week = $3, start_time = $4, end_time = $5, group_name = $6, price = $7, order_index = $8 WHERE id = $9",
         [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0, req.params.id]
       );
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -687,6 +950,8 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
       await pool.query("DELETE FROM schedule WHERE id = $1", [req.params.id]);
+      // Invalidate cache
+      invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete schedule entry" });
@@ -1099,13 +1364,70 @@ async function startServer() {
     }
   });
 
-  // Simple upload mock (since we don't have a real storage provider here)
+  // Image Upload and Serving
   app.post("/api/upload", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { image } = req.body;
-    // In a real app, you'd save this to S3/Cloudinary. 
-    // Here we just return the base64 or a mock URL.
-    // For simplicity, we'll just return the base64 back as the "URL"
-    res.json({ url: image });
+    if (!image || !image.startsWith('data:image/')) {
+      return res.status(400).json({ error: "Invalid image data" });
+    }
+
+    try {
+      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).json({ error: "Invalid image format" });
+      }
+      
+      const contentType = matches[1];
+      const result = await pool.query(
+        "INSERT INTO images (data, content_type) VALUES ($1, $2) RETURNING id",
+        [image, contentType]
+      );
+      
+      const id = result.rows[0].id;
+      res.json({ url: `/api/images/${id}` });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
+
+  app.get("/api/images/:id", async (req, res) => {
+    if (!pool) return res.status(500).send("Database not configured");
+    const id = req.params.id;
+    const cacheKey = `img_${id}`;
+    const cached = imageCache.get(cacheKey);
+    
+    if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
+      res.setHeader('Content-Type', cached.contentType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.send(cached.buffer);
+    }
+
+    try {
+      const result = await pool.query("SELECT data, content_type FROM images WHERE id = $1", [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).send("Image not found");
+      }
+      
+      const { data, content_type } = result.rows[0];
+      const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        return res.status(400).send("Invalid image format in database");
+      }
+      
+      const buffer = Buffer.from(matches[2], 'base64');
+      
+      // Update cache
+      imageCache.set(cacheKey, { contentType: content_type, buffer, timestamp: Date.now() });
+      
+      res.setHeader('Content-Type', content_type);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.send(buffer);
+    } catch (e) {
+      console.error(e);
+      res.status(500).send("Internal server error");
+    }
   });
 
   // Vite middleware for development
@@ -1117,7 +1439,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    app.use(express.static(path.join(__dirname, "dist"), {
+      maxAge: '1d',
+      immutable: true
+    }));
     app.get("*", (req, res) => {
       res.sendFile(path.join(__dirname, "dist", "index.html"));
     });

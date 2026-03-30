@@ -51,17 +51,35 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 export const WomenLanding = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
+  const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
     
-    fetch('/api/locations')
+    // Check session storage for cached data
+    const cachedData = sessionStorage.getItem('site_init_data');
+    if (cachedData) {
+      try {
+        const data = JSON.parse(cachedData);
+        if (Array.isArray(data.locations)) setLocations(data.locations);
+        if (data.content) setContent(data.content);
+      } catch (e) {
+        console.error('Error parsing cached data', e);
+      }
+    }
+
+    fetch('/api/init')
       .then(res => res.json())
       .then(data => {
-        if (Array.isArray(data)) setLocations(data);
+        if (data && !data.error) {
+          if (Array.isArray(data.locations)) setLocations(data.locations);
+          if (data.content) setContent(data.content);
+          // Save to session storage
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
       })
-      .catch(err => console.error('Error fetching locations:', err));
+      .catch(err => console.error('Error fetching init data:', err));
 
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -114,9 +132,9 @@ export const WomenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
       <SEO 
-        title="Карате для жінок та дівчат"
-        description="Секція карате для жінок у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс для дівчат? Запишіться на безкоштовне тренування!"
-        keywords="карате для жінок київ, карате для дівчат київ, жіноча самооборона київ, фітнес карате київ, секція карате шулявка жінки"
+        title={content?.women_seo_title || "Карате для жінок та дівчат"}
+        description={content?.women_seo_description || "Секція карате для жінок у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс для дівчат? Запишіться на безкоштовне тренування!"}
+        keywords={content?.women_seo_keywords || "карате для жінок київ, карате для дівчат київ, жіноча самооборона київ, фітнес карате київ, секція карате шулявка жінки"}
       />
       
       {/* Navigation */}
@@ -143,7 +161,7 @@ export const WomenLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop" 
+            src={content?.women_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop"} 
             alt="Women Karate" 
             className="w-full h-full object-cover opacity-40 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -162,13 +180,14 @@ export const WomenLanding = () => {
               <Flame size={12} />
               Естетика • Сила • Впевненість
             </div>
-            <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] mb-8">
-              Карате для <br />
-              <span className="text-red-600">Сильних Жінок</span>
-            </h1>
-            <p className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed max-w-xl">
-              Відкрийте для себе мистецтво, яке дарує ідеальне тіло, непохитний спокій та навички самооборони без ризику для вашої краси.
-            </p>
+            <h1 
+              className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] mb-8"
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Сильних Жінок</span>' }}
+            />
+            <p 
+              className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed max-w-xl"
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_subtitle || 'Відкрийте для себе мистецтво, яке дарує ідеальне тіло, непохитний спокій та навички самооборони без ризику для вашої краси.' }}
+            />
             <div className="flex flex-col sm:flex-row gap-4">
               <Button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
                 Спробувати безкоштовно
@@ -225,9 +244,10 @@ export const WomenLanding = () => {
             <div className="relative">
               <div className="aspect-square rounded-3xl overflow-hidden border border-white/10">
                 <img 
-                  src="https://images.unsplash.com/photo-1599058917233-3583503c5e8e?q=80&w=1000&auto=format&fit=crop" 
+                  src={content?.women_advantages_image || "https://images.unsplash.com/photo-1599058917233-3583503c5e8e?q=80&w=1000&auto=format&fit=crop"} 
                   alt="Training" 
                   className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
+                  referrerPolicy="no-referrer"
                 />
               </div>
               <div className="absolute -bottom-6 -right-6 p-8 bg-red-600 rounded-3xl shadow-2xl max-w-[240px]">

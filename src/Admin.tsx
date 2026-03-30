@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
-  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield,
+  Smile, Trophy, Zap, Target, Heart
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -1635,6 +1636,10 @@ const ContentEditor = () => {
       if (!response.ok) throw new Error('Server error');
       setDirtyFields(new Set());
       toast.success('Контент успішно збережено');
+      
+      // Re-fetch content to get URLs instead of base64 strings
+      const freshContent = await fetch(`/api/content?t=${Date.now()}`).then(res => res.json());
+      setContent(freshContent);
     } catch (e: any) {
       console.error('Save failed', e);
       toast.error(`Помилка збереження: ${e.message}`);
@@ -1653,7 +1658,7 @@ const ContentEditor = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_WIDTH = 1920;
+        const MAX_WIDTH = 1280;
         if (width > MAX_WIDTH) {
           height *= MAX_WIDTH / width;
           width = MAX_WIDTH;
@@ -1662,9 +1667,29 @@ const ContentEditor = () => {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-        setContent(prev => ({ ...prev, [key]: compressedBase64 }));
-        setDirtyFields(prev => new Set(prev).add(key));
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        
+        // Upload to server and get URL
+        try {
+          const token = localStorage.getItem('admin_token');
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ image: compressedBase64 })
+          });
+          
+          if (!res.ok) throw new Error('Upload failed');
+          const { url } = await res.json();
+          
+          setContent(prev => ({ ...prev, [key]: url }));
+          setDirtyFields(prev => new Set(prev).add(key));
+        } catch (err) {
+          console.error('Image upload failed', err);
+          toast.error('Помилка завантаження зображення');
+        }
       };
       img.src = reader.result as string;
     };
@@ -1678,6 +1703,11 @@ const ContentEditor = () => {
     { id: 'results', title: 'Результати', icon: Award },
     { id: 'faq', title: 'FAQ', icon: MessageSquare },
     { id: 'contacts', title: 'Контакти', icon: Settings },
+    { id: 'kids_landing', title: 'Діти 4-7', icon: Smile },
+    { id: 'junior_landing', title: 'Діти 7-12', icon: Trophy },
+    { id: 'teen_landing', title: 'Підлітки', icon: Zap },
+    { id: 'personal_landing', title: 'Персональні', icon: Target },
+    { id: 'women_landing', title: 'Жінки', icon: Heart },
     { id: 'analytics', title: 'Аналітика', icon: Shield },
   ];
 
@@ -1716,6 +1746,51 @@ const ContentEditor = () => {
       { key: 'contact_email', label: 'Email', type: 'text' },
       { key: 'social_instagram', label: 'Instagram URL', type: 'text' },
       { key: 'social_facebook', label: 'Facebook URL', type: 'text' },
+    ],
+    kids_landing: [
+      { key: 'kids_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
+      { key: 'kids_hero_title', label: 'Hero: Заголовок', type: 'textarea' },
+      { key: 'kids_hero_subtitle', label: 'Hero: Підзаголовок', type: 'textarea' },
+      { key: 'kids_advantages_image', label: 'Секція переваг: Зображення', type: 'image' },
+      { key: 'kids_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'kids_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'kids_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
+    ],
+    junior_landing: [
+      { key: 'junior_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
+      { key: 'junior_hero_title', label: 'Hero: Заголовок', type: 'textarea' },
+      { key: 'junior_hero_subtitle', label: 'Hero: Підзаголовок', type: 'textarea' },
+      { key: 'junior_advantages_image', label: 'Секція переваг: Зображення', type: 'image' },
+      { key: 'junior_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'junior_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'junior_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
+    ],
+    teen_landing: [
+      { key: 'teen_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
+      { key: 'teen_hero_title', label: 'Hero: Заголовок', type: 'textarea' },
+      { key: 'teen_hero_subtitle', label: 'Hero: Підзаголовок', type: 'textarea' },
+      { key: 'teen_advantages_image', label: 'Секція переваг: Зображення', type: 'image' },
+      { key: 'teen_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'teen_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'teen_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
+    ],
+    personal_landing: [
+      { key: 'personal_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
+      { key: 'personal_hero_title', label: 'Hero: Заголовок', type: 'textarea' },
+      { key: 'personal_hero_subtitle', label: 'Hero: Підзаголовок', type: 'textarea' },
+      { key: 'personal_advantages_image', label: 'Секція переваг: Зображення', type: 'image' },
+      { key: 'personal_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'personal_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'personal_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
+    ],
+    women_landing: [
+      { key: 'women_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
+      { key: 'women_hero_title', label: 'Hero: Заголовок', type: 'textarea' },
+      { key: 'women_hero_subtitle', label: 'Hero: Підзаголовок', type: 'textarea' },
+      { key: 'women_advantages_image', label: 'Секція переваг: Зображення', type: 'image' },
+      { key: 'women_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'women_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'women_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
     ],
     analytics: [
       { key: 'meta_pixel_code', label: 'Meta Pixel Code (Facebook)', type: 'textarea', placeholder: 'Вставте повний код пікселя <script>...</script>' },
@@ -1898,22 +1973,58 @@ const CoachesEditor = () => {
 
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = reader.result as string;
-      if (coachId) {
-        const token = localStorage.getItem('admin_token');
-        await fetch(`/api/coaches/${coachId}/photo`, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ photo: base64 })
-        });
-        fetchCoaches();
-      }
-      if (editingCoach && (editingCoach.id === coachId || !editingCoach.id)) {
-        setEditingCoach({ ...editingCoach, photo: base64 });
-      }
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const MAX_WIDTH = 800;
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL('image/jpeg', 0.6);
+
+        // Upload to server and get URL
+        try {
+          const token = localStorage.getItem('admin_token');
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ image: base64 })
+          });
+          
+          if (!res.ok) throw new Error('Upload failed');
+          const { url } = await res.json();
+
+          if (coachId) {
+            await fetch(`/api/coaches/${coachId}/photo`, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ photo: url })
+            });
+            fetchCoaches();
+          }
+          
+          if (editingCoach && (editingCoach.id === coachId || !editingCoach.id)) {
+            setEditingCoach({ ...editingCoach, photo: url });
+          }
+        } catch (err) {
+          console.error('Photo upload failed', err);
+          toast.error('Помилка завантаження фото');
+        }
+      };
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
