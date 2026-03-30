@@ -1,6 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Users, MessageSquare, LogOut, Save, Image as ImageIcon, Plus, Trash2 } from 'lucide-react';
+import { 
+  Settings, Users, MessageSquare, LogOut, Save, Image as ImageIcon, 
+  Plus, Trash2, MapPin, Clock, UserCheck, RefreshCw, 
+  LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
+  Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
+  TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle
+} from 'lucide-react';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+  LineChart, Line, AreaChart, Area, PieChart, Cell, Pie
+} from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
+import { toast, Toaster } from 'sonner';
+
+// --- Custom Confirmation Modal ---
+const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, loading }: any) => (
+  <AnimatePresence>
+    {isOpen && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+        />
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95, y: 20 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 20 }}
+          className="relative w-full max-w-md bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl -mr-16 -mt-16" />
+          
+          <div className="w-16 h-16 bg-red-600/10 text-red-600 rounded-2xl flex items-center justify-center mb-6">
+            <AlertCircle size={32} />
+          </div>
+          
+          <h3 className="text-2xl font-black uppercase tracking-tight mb-2">{title}</h3>
+          <p className="text-zinc-500 font-medium mb-8">{message}</p>
+          
+          <div className="flex gap-4">
+            <button 
+              onClick={onConfirm}
+              disabled={loading}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all shadow-lg shadow-red-600/20 disabled:opacity-50"
+            >
+              {loading ? 'Видалення...' : 'Так, видалити'}
+            </button>
+            <button 
+              onClick={onClose}
+              className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+            >
+              Скасувати
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    )}
+  </AnimatePresence>
+);
 
 export const LoginPage = () => {
   const [login, setLogin] = useState('');
@@ -54,7 +115,8 @@ export const LoginPage = () => {
 };
 
 export const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('content');
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isFullAdmin, setIsFullAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -75,45 +137,868 @@ export const AdminPage = () => {
     checkAuth();
   }, [navigate]);
 
-  return (
-    <div className="min-h-screen bg-black text-white flex">
-      {/* Sidebar */}
-      <div className="w-64 bg-zinc-950 border-r border-white/5 p-6 flex flex-col">
-        <div className="text-xl font-black text-red-600 uppercase tracking-widest mb-10">BBD Admin</div>
-        
-        <nav className="space-y-2 flex-grow">
-          <button 
-            onClick={() => setActiveTab('content')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'content' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <Settings size={18} />
-            <span className="font-medium">Контент сайту</span>
-          </button>
-          <button 
-            onClick={() => setActiveTab('leads')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-colors ${activeTab === 'leads' ? 'bg-red-600 text-white' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'}`}
-          >
-            <MessageSquare size={18} />
-            <span className="font-medium">Заявки</span>
-          </button>
-        </nav>
+  const coachMenuItems = [
+    { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard },
+    { id: 'leads', label: 'Заявки', icon: MessageSquare },
+    { id: 'participants', label: 'Учасники', icon: UserCheck },
+    { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
+    { id: 'rating', label: 'Рейтинг', icon: Award },
+  ];
 
-        <button 
-          onClick={() => {
-            localStorage.removeItem('admin_token');
-            navigate('/');
-          }}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-zinc-500 hover:bg-zinc-900 hover:text-white transition-colors mt-auto"
-        >
-          <LogOut size={18} />
-          <span className="font-medium">Вийти на сайт</span>
-        </button>
+  const fullAdminMenuItems = [
+    { id: 'content', label: 'Конструктор', icon: Settings },
+    { id: 'schedule', label: 'Розклад', icon: Clock },
+    { id: 'coaches', label: 'Тренери', icon: Users },
+    { id: 'locations', label: 'Локації', icon: MapPin },
+    { id: 'settings', label: 'Налаштування', icon: Activity },
+  ];
+
+  const currentMenuItems = isFullAdmin ? fullAdminMenuItems : coachMenuItems;
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex font-sans selection:bg-red-600/30">
+      <Toaster position="top-right" theme="dark" richColors />
+      {/* Sidebar */}
+      <div className="w-72 bg-zinc-950 border-r border-white/5 flex flex-col sticky top-0 h-screen z-40">
+        <div className="p-8">
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-12 h-12 bg-red-600 flex items-center justify-center rotate-3 shadow-[0_0_30px_rgba(220,38,38,0.4)] rounded-xl">
+              <span className="text-white font-black italic text-xl">B</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-black tracking-tighter text-xl uppercase leading-none">Black Bear</span>
+              <span className="text-red-600 font-bold text-[10px] uppercase tracking-[0.4em] mt-1">
+                {isFullAdmin ? 'Full Admin' : 'Coach Panel'}
+              </span>
+            </div>
+          </div>
+          
+          <nav className="space-y-2">
+            {currentMenuItems.map((item) => (
+              <button 
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-500 group relative ${
+                  activeTab === item.id 
+                    ? 'text-white' 
+                    : 'text-zinc-500 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {activeTab === item.id && (
+                  <motion.div 
+                    layoutId="active-tab"
+                    className="absolute inset-0 bg-red-600 rounded-2xl shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                  />
+                )}
+                <item.icon size={20} className={`relative z-10 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110 transition-transform'}`} />
+                <span className="relative z-10 font-black uppercase tracking-widest text-[10px]">{item.label}</span>
+                {activeTab === item.id && <ChevronRight size={14} className="relative z-10 ml-auto opacity-50" />}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-auto p-8 space-y-2">
+          <button 
+            onClick={() => {
+              setIsFullAdmin(!isFullAdmin);
+              setActiveTab(isFullAdmin ? 'dashboard' : 'content');
+            }}
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-white transition-all duration-300 group border border-white/5"
+          >
+            <BarChart3 size={20} className="group-hover:rotate-12 transition-transform" />
+            <span className="font-black uppercase tracking-widest text-[10px]">
+              {isFullAdmin ? 'Панель тренера' : 'Повна адмінка'}
+            </span>
+          </button>
+          
+          <button 
+            onClick={() => {
+              localStorage.removeItem('admin_token');
+              navigate('/');
+            }}
+            className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-red-600/10 hover:text-red-500 transition-all duration-300 group border border-transparent hover:border-red-600/20"
+          >
+            <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
+            <span className="font-black uppercase tracking-widest text-[10px]">Вийти на сайт</span>
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 p-10 overflow-y-auto">
-        {activeTab === 'content' && <ContentEditor />}
-        {activeTab === 'leads' && <LeadsViewer />}
+      <div className="flex-1 min-h-screen flex flex-col bg-[radial-gradient(circle_at_50%_0%,_rgba(220,38,38,0.03)_0%,_transparent_50%)]">
+        {/* Top Bar */}
+        <header className="h-24 border-b border-white/5 flex items-center justify-between px-12 sticky top-0 bg-black/50 backdrop-blur-xl z-30">
+          <div className="flex items-center gap-6 flex-1 max-w-xl">
+            <div className="relative w-full group">
+              <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-red-600 transition-colors" size={18} />
+              <input 
+                type="text" 
+                placeholder="Швидкий пошук..." 
+                className="w-full bg-white/5 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <button className="relative p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors">
+              <Bell size={20} />
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full border-2 border-black" />
+            </button>
+            <div className="h-10 w-px bg-white/10" />
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-sm font-black uppercase tracking-tight">Ігор Котляревський</p>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Головний тренер</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/20">
+                І
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="p-12 max-w-7xl mx-auto w-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              {activeTab === 'dashboard' && <Dashboard />}
+              {activeTab === 'content' && <ContentEditor />}
+              {activeTab === 'leads' && <LeadsViewer />}
+              {activeTab === 'coaches' && <CoachesEditor />}
+              {activeTab === 'locations' && <LocationsEditor />}
+              {activeTab === 'schedule' && <ScheduleEditor />}
+              {activeTab === 'participants' && <ParticipantsEditor />}
+              {activeTab === 'attendance' && <AttendanceEditor />}
+              {activeTab === 'rating' && <RatingEditor />}
+              {activeTab === 'settings' && <SettingsEditor />}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
+    </div>
+  );
+};
+
+const RatingEditor = () => (
+  <div className="space-y-8">
+    <div className="flex justify-between items-center">
+      <h2 className="text-4xl font-black uppercase tracking-tight">Рейтинг та досягнення</h2>
+      <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-red-600/20">
+        Оновити рейтинг
+      </button>
+    </div>
+    <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
+      <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8">
+        <Award size={48} />
+      </div>
+      <h3 className="text-2xl font-black uppercase tracking-tight mb-4">Модуль рейтингу в розробці</h3>
+      <p className="text-zinc-500 max-w-md font-medium">
+        Тут ви зможете керувати поясами, досягненнями та внутрішнім рейтингом учнів додзьо.
+      </p>
+    </div>
+  </div>
+);
+
+const SettingsEditor = () => (
+  <div className="space-y-8">
+    <div className="flex justify-between items-center">
+      <h2 className="text-4xl font-black uppercase tracking-tight">Налаштування системи</h2>
+      <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-red-600/20">
+        Зберегти зміни
+      </button>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
+        <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
+          <Bell size={20} className="text-red-600" />
+          Сповіщення
+        </h3>
+        <div className="space-y-4">
+          {[
+            'Нові заявки на email',
+            'Звіти про відвідуваність',
+            'Нагадування про оплату',
+            'Системні оновлення'
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
+              <span className="font-bold text-sm">{item}</span>
+              <div className="w-12 h-6 bg-red-600 rounded-full relative">
+                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
+        <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
+          <Activity size={20} className="text-red-600" />
+          Безпека
+        </h3>
+        <div className="space-y-4">
+          <button className="w-full text-left p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-red-600/30 transition-all">
+            <p className="font-bold text-sm mb-1">Змінити пароль адміністратора</p>
+            <p className="text-xs text-zinc-500">Останні зміни: 2 тижні тому</p>
+          </button>
+          <button className="w-full text-left p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-red-600/30 transition-all">
+            <p className="font-bold text-sm mb-1">Двофакторна автентифікація</p>
+            <p className="text-xs text-red-600 font-bold uppercase tracking-widest">Вимкнено</p>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const Dashboard = () => {
+  const [stats, setStats] = useState({
+    leads: 0,
+    coaches: 0,
+    locations: 0,
+    participants: 0,
+    newLeads: 0
+  });
+  const [chartData, setChartData] = useState<any>({
+    leadsOverTime: [],
+    groupDistribution: [],
+    recentLeads: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const token = localStorage.getItem('admin_token');
+      try {
+        const response = await fetch('/api/dashboard/stats', { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        const data = await response.json();
+
+        setStats({
+          leads: data.totals?.total_leads || 0,
+          newLeads: data.totals?.new_leads || 0,
+          coaches: data.totals?.total_coaches || 0,
+          locations: data.totals?.total_locations || 0,
+          participants: data.totals?.total_participants || 0
+        });
+
+        setChartData({
+          leadsOverTime: (data.leadsOverTime || []).map((d: any) => ({
+            date: new Date(d.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
+            count: parseInt(d.count)
+          })),
+          groupDistribution: (data.groupDistribution || []).map((g: any) => ({
+            name: g.group_name,
+            value: parseInt(g.count)
+          })),
+          recentLeads: data.recentLeads || []
+        });
+      } catch (e) {
+        console.error('Failed to fetch stats', e);
+      }
+      setLoading(false);
+    };
+    fetchStats();
+  }, []);
+
+  const COLORS = ['#DC2626', '#1D4ED8', '#059669', '#7C3AED', '#D97706'];
+
+  const statCards = [
+    { label: 'Нові заявки', value: stats.newLeads, icon: MessageSquare, color: 'text-red-500', bg: 'bg-red-500/10', trend: '+12%' },
+    { label: 'Всього заявок', value: stats.leads, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10', trend: '+5%' },
+    { label: 'Учасники клубу', value: stats.participants, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10', trend: '+2%' },
+    { label: 'Тренери', value: stats.coaches, icon: Users, color: 'text-purple-500', bg: 'bg-purple-500/10', trend: '0%' },
+  ];
+
+  if (loading) return (
+    <div className="animate-pulse space-y-8">
+      <div className="h-12 w-64 bg-zinc-900/50 rounded-2xl" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[1,2,3,4].map(i => <div key={i} className="h-40 bg-zinc-900/50 rounded-[2.5rem]" />)}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="h-96 bg-zinc-900/50 rounded-[3rem]" />
+        <div className="h-96 bg-zinc-900/50 rounded-[3rem]" />
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-10">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-5xl font-black uppercase tracking-tighter leading-none mb-3">
+            Панель <span className="text-red-600">Керування</span>
+          </h2>
+          <p className="text-zinc-500 font-medium text-lg">Вітаємо, Ігоре. Ось що відбувається у вашому додзьо.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="bg-zinc-900/50 border border-white/5 p-2 rounded-2xl flex items-center gap-2">
+            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white font-black italic">B</div>
+            <div className="pr-4">
+              <p className="text-xs font-black uppercase tracking-tighter leading-none">Admin</p>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Black Bear Dojo</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((stat, i) => (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            key={i} 
+            className="bg-zinc-900/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all group relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl -mr-16 -mt-16 group-hover:bg-red-600/10 transition-colors" />
+            <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
+              <stat.icon size={28} />
+            </div>
+            <div className="flex items-end justify-between">
+              <div>
+                <div className="text-5xl font-black tracking-tighter mb-1">{stat.value}</div>
+                <div className="text-[11px] font-black uppercase tracking-widest text-zinc-500">{stat.label}</div>
+              </div>
+              <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full ${stat.trend.startsWith('+') ? 'bg-green-500/10 text-green-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                {stat.trend.startsWith('+') ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                {stat.trend}
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5"
+        >
+          <div className="flex items-center justify-between mb-10">
+            <div>
+              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+                <BarChart3 className="text-red-600" size={24} />
+                Динаміка заявок
+              </h3>
+              <p className="text-zinc-500 text-sm font-medium">Кількість нових лідів за останні 14 днів</p>
+            </div>
+            <div className="flex gap-2">
+              <button className="px-4 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors">Тиждень</button>
+              <button className="px-4 py-2 bg-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-white">Місяць</button>
+            </div>
+          </div>
+          
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData.leadsOverTime}>
+                <defs>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#52525b" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fontWeight: 700 }}
+                />
+                <YAxis 
+                  stroke="#52525b" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false}
+                  tick={{ fontWeight: 700 }}
+                />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
+                  itemStyle={{ color: '#fff', fontWeight: 900, fontSize: '12px' }}
+                  labelStyle={{ color: '#71717a', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="count" 
+                  stroke="#DC2626" 
+                  strokeWidth={4}
+                  fillOpacity={1} 
+                  fill="url(#colorLeads)" 
+                  animationDuration={2000}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </motion.div>
+
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5"
+        >
+          <div className="mb-10">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <PieChartIcon className="text-red-600" size={24} />
+              Розподіл груп
+            </h3>
+            <p className="text-zinc-500 text-sm font-medium">Учні за віковими категоріями</p>
+          </div>
+
+          <div className="h-[250px] w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData.groupDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={8}
+                  dataKey="value"
+                  animationDuration={1500}
+                >
+                  {chartData.groupDistribution.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="transparent" />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
+                  itemStyle={{ color: '#fff', fontWeight: 900, fontSize: '12px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-3xl font-black tracking-tighter">{stats.participants}</span>
+              <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Учнів</span>
+            </div>
+          </div>
+
+          <div className="mt-8 space-y-3">
+            {chartData.groupDistribution.map((group: any, i: number) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                  <span className="text-xs font-bold text-zinc-400">{group.name}</span>
+                </div>
+                <span className="text-xs font-black">{group.value}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8">
+        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-10">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <Activity size={24} className="text-red-600" />
+              Останні заявки
+            </h3>
+            <button className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors">Всі заявки →</button>
+          </div>
+          <div className="space-y-4">
+            {chartData.recentLeads.map((lead: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
+                    {lead.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">{lead.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold">{lead.phone}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                    lead.status === 'new' ? 'bg-red-600/20 text-red-500' : 'bg-zinc-800 text-zinc-500'
+                  }`}>
+                    {lead.status === 'new' ? 'Нова' : lead.status}
+                  </span>
+                  <p className="text-[8px] text-zinc-600 font-bold uppercase mt-2">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {chartData.recentLeads.length === 0 && (
+              <div className="text-center py-10 text-zinc-500 font-bold italic">Заявок поки немає</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
+            <LayoutDashboard size={48} />
+          </div>
+          <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
+          <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+            <button className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1">Додати учня</button>
+            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Редагувати розклад</button>
+            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Контент сайту</button>
+            <button className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1">Звіти</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ParticipantsEditor = () => {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingParticipant, setEditingParticipant] = useState<any | null>(null);
+  const [search, setSearch] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchData = async () => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const [pRes, gRes] = await Promise.all([
+        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/groups').then(r => r.json())
+      ]);
+      setParticipants(Array.isArray(pRes) ? pRes : []);
+      setGroups(Array.isArray(gRes) ? gRes : []);
+    } catch (e) {
+      console.error('Fetch participants failed', e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSave = async (data: any) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/participants', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        setEditingParticipant(null);
+        fetchData();
+        toast.success('Учасника збережено');
+      }
+    } catch (e) {
+      toast.error('Помилка збереження');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      await fetch(`/api/participants/${confirmDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      toast.success('Учасника видалено');
+      fetchData();
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+    setIsDeleting(false);
+    setConfirmDelete(null);
+  };
+
+  const filtered = participants.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Учасники</h2>
+          <p className="text-zinc-500 font-medium">Керування базою учнів клубу</p>
+        </div>
+        <button 
+          onClick={() => setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' })}
+          className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center gap-3"
+        >
+          <Plus size={18} />
+          Додати учня
+        </button>
+      </div>
+
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+          <input 
+            type="text" 
+            placeholder="Пошук за ім'ям..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-colors"
+          />
+        </div>
+        <button className="bg-zinc-900 border border-white/5 p-4 rounded-2xl text-zinc-500 hover:text-white transition-colors">
+          <Filter size={18} />
+        </button>
+      </div>
+
+      <div className="bg-zinc-900/30 rounded-[3rem] border border-white/5 overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/5">
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Вік</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Група</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Батьківський вхід</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(p => (
+              <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                <td className="p-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black">
+                      {p.name[0]}
+                    </div>
+                    <span className="font-bold text-lg">{p.name}</span>
+                  </div>
+                </td>
+                <td className="p-8 text-zinc-400 font-medium">{p.age} років</td>
+                <td className="p-8">
+                  <span className="px-4 py-2 bg-white/5 rounded-full text-xs font-bold text-zinc-300 border border-white/5">
+                    {p.group_name || 'Без групи'}
+                  </span>
+                </td>
+                <td className="p-8">
+                  <div className="text-xs font-mono text-zinc-500">
+                    <p>L: {p.parent_login}</p>
+                    <p>P: {p.parent_password}</p>
+                  </div>
+                </td>
+                <td className="p-8 text-right">
+                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-3 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
+                      <Trash2 size={18} />
+                    </button>
+                    <button className="p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors">
+                      <Edit2 size={18} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        loading={isDeleting}
+        title="Видалити учасника?"
+        message={`Ви впевнені, що хочете видалити учня ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
+      />
+
+      {editingParticipant && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Новий учень</h3>
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">ПІБ учня</label>
+                <input 
+                  type="text" 
+                  value={editingParticipant.name}
+                  onChange={e => setEditingParticipant({...editingParticipant, name: e.target.value})}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Вік</label>
+                  <input 
+                    type="number" 
+                    value={editingParticipant.age}
+                    onChange={e => setEditingParticipant({...editingParticipant, age: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Група</label>
+                  <select 
+                    value={editingParticipant.group_id}
+                    onChange={e => setEditingParticipant({...editingParticipant, group_id: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  >
+                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін батьків</label>
+                  <input 
+                    type="text" 
+                    value={editingParticipant.parent_login}
+                    onChange={e => setEditingParticipant({...editingParticipant, parent_login: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
+                  <input 
+                    type="text" 
+                    value={editingParticipant.parent_password}
+                    onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-6">
+                <button 
+                  onClick={() => setEditingParticipant(null)}
+                  className="flex-1 py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors"
+                >
+                  Скасувати
+                </button>
+                <button 
+                  onClick={() => handleSave(editingParticipant)}
+                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
+                >
+                  Зберегти
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const AttendanceEditor = () => {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<Record<number, string>>({});
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const [pRes, aRes] = await Promise.all([
+        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`/api/attendance/${date}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+      ]);
+      setParticipants(Array.isArray(pRes) ? pRes : []);
+      const attMap: Record<number, string> = {};
+      if (Array.isArray(aRes)) {
+        aRes.forEach((a: any) => attMap[a.participant_id] = a.status);
+      }
+      setAttendance(attMap);
+    } catch (e) {
+      console.error('Fetch attendance failed', e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [date]);
+
+  const toggleAttendance = async (participantId: number, currentStatus: string) => {
+    const newStatus = currentStatus === 'present' ? 'absent' : 'present';
+    const token = localStorage.getItem('admin_token');
+    try {
+      setAttendance(prev => ({ ...prev, [participantId]: newStatus }));
+      await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ participant_id: participantId, date, status: newStatus })
+      });
+      toast.success(newStatus === 'present' ? 'Відмічено присутність' : 'Відмічено відсутність');
+    } catch (e) {
+      toast.error('Помилка оновлення');
+      fetchData();
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Відвідуваність</h2>
+          <p className="text-zinc-500 font-medium">Відмічайте присутність учнів на заняттях</p>
+        </div>
+        <div className="flex items-center gap-4 bg-zinc-900 p-2 rounded-2xl border border-white/5">
+          <button 
+            onClick={() => {
+              const d = new Date(date);
+              d.setDate(d.getDate() - 1);
+              setDate(d.toISOString().split('T')[0]);
+            }}
+            className="p-3 hover:bg-white/5 rounded-xl transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <input 
+            type="date" 
+            value={date}
+            onChange={e => setDate(e.target.value)}
+            className="bg-transparent text-white font-bold outline-none px-4"
+          />
+          <button 
+            onClick={() => {
+              const d = new Date(date);
+              d.setDate(d.getDate() + 1);
+              setDate(d.toISOString().split('T')[0]);
+            }}
+            className="p-3 hover:bg-white/5 rounded-xl transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {participants.map(p => (
+          <button
+            key={p.id}
+            onClick={() => toggleAttendance(p.id, attendance[p.id] || 'absent')}
+            className={`p-8 rounded-[2.5rem] border transition-all duration-500 flex items-center justify-between group ${
+              attendance[p.id] === 'present' 
+                ? 'bg-green-500/10 border-green-500/30 text-green-500' 
+                : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-white/10'
+            }`}
+          >
+            <div className="text-left">
+              <p className="font-black uppercase tracking-tight text-lg group-hover:translate-x-1 transition-transform">{p.name}</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">{p.group_name || 'Без групи'}</p>
+            </div>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+              attendance[p.id] === 'present' ? 'bg-green-500 text-white rotate-12' : 'bg-white/5 text-zinc-700'
+            }`}>
+              {attendance[p.id] === 'present' ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -138,9 +1023,6 @@ const ContentEditor = () => {
     setSaving(true);
     try {
       const token = localStorage.getItem('admin_token');
-      
-      // If delta is provided (e.g. image upload), use it. 
-      // Otherwise, collect all dirty fields from the current content state.
       const payload: Record<string, string> = delta || {};
       if (!delta) {
         dirtyFields.forEach(key => {
@@ -162,16 +1044,12 @@ const ContentEditor = () => {
         body: JSON.stringify(payload)
       });
       
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || `Server error: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error('Server error');
       setDirtyFields(new Set());
-      console.log('Save successful');
+      toast.success('Контент успішно збережено');
     } catch (e: any) {
       console.error('Save failed', e);
-      alert(`Помилка збереження: ${e.message}. Якщо ви вставляєте скрипт, спробуйте видалити теги <script> та <noscript> і залишити лише чистий код.`);
+      toast.error(`Помилка збереження: ${e.message}`);
     }
     setSaving(false);
   };
@@ -180,11 +1058,6 @@ const ContentEditor = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 15 * 1024 * 1024) {
-      alert('Файл занадто великий. Максимальний розмір - 15 МБ.');
-      return;
-    }
-
     const reader = new FileReader();
     reader.onloadend = async () => {
       const img = new Image();
@@ -192,30 +1065,18 @@ const ContentEditor = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-
-        // Max dimensions to keep file size reasonable
         const MAX_WIDTH = 1920;
-        const MAX_HEIGHT = 1080;
-
         if (width > MAX_WIDTH) {
           height *= MAX_WIDTH / width;
           width = MAX_WIDTH;
         }
-        if (height > MAX_HEIGHT) {
-          width *= MAX_HEIGHT / height;
-          height = MAX_HEIGHT;
-        }
-
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-
-        // Compress as JPEG with 0.7 quality
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
-        
         setContent(prev => ({ ...prev, [key]: compressedBase64 }));
-        await handleSave({ [key]: compressedBase64 });
+        setDirtyFields(prev => new Set(prev).add(key));
       };
       img.src = reader.result as string;
     };
@@ -223,184 +1084,139 @@ const ContentEditor = () => {
   };
 
   const sections = [
-    {
-      id: 'hero',
-      title: '1. Головний екран',
-      fields: [
-        { key: 'hero_bg', label: 'Фонове зображення (Головне)', type: 'image' },
-        { key: 'hero_title', label: 'Заголовок', type: 'textarea' },
-        { key: 'hero_subtitle', label: 'Підзаголовок', type: 'textarea' },
-      ]
-    },
-    {
-      id: 'transformation',
-      title: '2. Трансформація',
-      fields: [
-        { key: 'transformation_bg', label: 'Фонове зображення блоку', type: 'image' },
-        { key: 'transformation_title', label: 'Заголовок', type: 'text' },
-        { key: 'transformation_subtitle', label: 'Підзаголовок', type: 'textarea' },
-      ]
-    },
-    {
-      id: 'how',
-      title: '3. Як це працює',
-      fields: [
-        { key: 'how_bg', label: 'Фонове зображення блоку', type: 'image' },
-      ]
-    },
-    {
-      id: 'about',
-      title: '4. Про нас',
-      fields: [
-        { key: 'about_image', label: 'Фонове зображення розділу', type: 'image' },
-        { key: 'about_title', label: 'Заголовок', type: 'text' },
-        { key: 'about_text', label: 'Основний текст (можна використовувати <br />)', type: 'textarea' },
-      ]
-    },
-    {
-      id: 'directions',
-      title: '5. Напрями',
-      fields: [
-        { key: 'directions_bg', label: 'Фонове зображення', type: 'image' },
-        { key: 'directions_title', label: 'Заголовок', type: 'text' },
-        { key: 'directions_subtitle', label: 'Підзаголовок', type: 'textarea' },
-      ]
-    },
-    {
-      id: 'results',
-      title: '6. Результати',
-      fields: [
-        { key: 'results_bg', label: 'Фонове зображення', type: 'image' },
-        { key: 'results_image', label: 'Центральне фото (Системна підготовка)', type: 'image' },
-        { key: 'results_image_title', label: 'Заголовок на фото', type: 'text' },
-        { key: 'results_image_subtitle', label: 'Підзаголовок на фото', type: 'text' },
-        { key: 'results_title', label: 'Заголовок секції', type: 'text' },
-      ]
-    },
-    {
-      id: 'coaches',
-      title: '7. Тренери',
-      fields: []
-    },
-    {
-      id: 'schedule',
-      title: '8. Розклад',
-      fields: [
-        { key: 'schedule_bg', label: 'Фонове зображення', type: 'image' },
-      ]
-    },
-    {
-      id: 'reviews',
-      title: '9. Відгуки',
-      fields: [
-        { key: 'reviews_bg', label: 'Фонове зображення', type: 'image' },
-      ]
-    },
-    {
-      id: 'faq',
-      title: '10. FAQ',
-      fields: [
-        { key: 'faq_bg', label: 'Фонове зображення', type: 'image' },
-      ]
-    },
-    {
-      id: 'contacts',
-      title: '11. Контакти',
-      fields: [
-        { key: 'contact_bg', label: 'Фонове зображення', type: 'image' },
-        { key: 'contact_title', label: 'Заголовок форми', type: 'text' },
-        { key: 'social_instagram', label: 'Instagram Link', type: 'text' },
-        { key: 'social_facebook', label: 'Facebook Link', type: 'text' },
-      ]
-    },
-    {
-      id: 'analytics',
-      title: 'Аналітика',
-      fields: [
-        { key: 'google_pixel_code', label: 'Google Pixel Code', type: 'textarea' },
-        { key: 'meta_pixel_code', label: 'Meta Pixel Code', type: 'textarea' },
-      ]
-    }
+    { id: 'hero', title: 'Головна', icon: LayoutDashboard },
+    { id: 'about', title: 'Про нас', icon: Users },
+    { id: 'directions', title: 'Напрями', icon: MapPin },
+    { id: 'results', title: 'Результати', icon: Award },
+    { id: 'faq', title: 'FAQ', icon: MessageSquare },
+    { id: 'contacts', title: 'Контакти', icon: Settings },
   ];
 
-  const activeFields = sections.find(s => s.id === activeSection)?.fields || [];
+  const sectionFields: Record<string, any[]> = {
+    hero: [
+      { key: 'hero_bg', label: 'Фонове зображення', type: 'image' },
+      { key: 'hero_title', label: 'Заголовок', type: 'textarea' },
+      { key: 'hero_subtitle', label: 'Підзаголовок', type: 'textarea' },
+      { key: 'hero_button', label: 'Текст кнопки', type: 'text' },
+    ],
+    about: [
+      { key: 'about_image', label: 'Зображення', type: 'image' },
+      { key: 'about_title', label: 'Заголовок', type: 'text' },
+      { key: 'about_text', label: 'Основний текст', type: 'textarea' },
+      { key: 'about_quote', label: 'Цитата', type: 'textarea' },
+    ],
+    directions: [
+      { key: 'directions_bg', label: 'Фон секції', type: 'image' },
+      { key: 'directions_title', label: 'Заголовок', type: 'text' },
+      { key: 'dir1_title', label: 'Напрям 1: Назва', type: 'text' },
+      { key: 'dir1_text', label: 'Напрям 1: Опис', type: 'textarea' },
+      { key: 'dir2_title', label: 'Напрям 2: Назва', type: 'text' },
+      { key: 'dir2_text', label: 'Напрям 2: Опис', type: 'textarea' },
+    ],
+    results: [
+      { key: 'results_bg', label: 'Фон секції', type: 'image' },
+      { key: 'results_image', label: 'Центральне фото', type: 'image' },
+      { key: 'results_title', label: 'Заголовок', type: 'text' },
+    ],
+    faq: [
+      { key: 'faq_bg', label: 'Фон секції', type: 'image' },
+      { key: 'faq_title', label: 'Заголовок', type: 'text' },
+    ],
+    contacts: [
+      { key: 'contact_phone', label: 'Телефон', type: 'text' },
+      { key: 'contact_email', label: 'Email', type: 'text' },
+      { key: 'social_instagram', label: 'Instagram URL', type: 'text' },
+      { key: 'social_facebook', label: 'Facebook URL', type: 'text' },
+    ]
+  };
 
   return (
-    <div className="max-w-4xl">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold">Конструктор сайту</h2>
+    <div className="space-y-10">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Контент сайту</h2>
+          <p className="text-zinc-500 font-medium text-lg">Керуйте текстами та зображеннями на головній сторінці</p>
+        </div>
         <button 
           onClick={() => handleSave()}
-          disabled={saving}
-          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors disabled:opacity-50"
+          disabled={saving || dirtyFields.size === 0}
+          className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3 ${
+            dirtyFields.size > 0 
+              ? 'bg-red-600 text-white shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:bg-red-700' 
+              : 'bg-zinc-900 text-zinc-500 cursor-not-allowed'
+          }`}
         >
-          <Save size={18} />
-          {saving ? 'Збереження...' : 'Зберегти зміни'}
+          {saving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
+          {saving ? 'Збереження...' : `Зберегти зміни (${dirtyFields.size})`}
         </button>
       </div>
 
-      <div className="flex gap-8">
-        {/* Section Tabs */}
-        <div className="w-64 shrink-0 space-y-2">
-          {sections.map(section => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`w-full text-left px-4 py-3 rounded-xl font-bold transition-colors ${activeSection === section.id ? 'bg-zinc-800 text-white border border-white/10' : 'text-zinc-500 hover:bg-zinc-900 hover:text-white'}`}
-            >
-              {section.title}
-            </button>
-          ))}
-        </div>
-
-        {/* Fields */}
-        <div className="flex-1 space-y-6">
-          {activeSection === 'coaches' ? (
-            <CoachesEditor />
-          ) : (
-            activeFields.map(field => (
-              <div key={field.key} className="bg-zinc-900 p-6 rounded-2xl border border-white/5">
-                <label className="block text-sm font-bold text-zinc-300 mb-2">{field.label}</label>
-                {field.type === 'image' ? (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-4">
-                      <label className="flex-1 flex items-center justify-center gap-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 border-2 border-dashed border-red-600/30 rounded-2xl p-8 cursor-pointer transition-all group">
-                        <ImageIcon size={32} className="group-hover:scale-110 transition-transform" />
-                        <div className="text-left">
-                          <p className="font-bold uppercase tracking-widest text-xs">Завантажити нове фото</p>
-                          <p className="text-[10px] opacity-60">PNG, JPG до 15MB</p>
-                        </div>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleImageUpload(field.key, e)} />
-                      </label>
-                    </div>
-                    {content[field.key] && (
-                      <div className="relative rounded-2xl overflow-hidden border border-white/10 aspect-video bg-black">
-                        <img src={content[field.key]} alt="Preview" className="w-full h-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-white/80">Поточне зображення</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : field.type === 'textarea' ? (
-                  <textarea 
-                    value={content[field.key] || ''} 
-                    onChange={e => handleChange(field.key, e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white min-h-[100px] focus:border-red-600 outline-none transition-colors"
-                  />
-                ) : (
-                  <input 
-                    type="text" 
-                    value={content[field.key] || ''} 
-                    onChange={e => handleChange(field.key, e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none transition-colors"
-                  />
-                )}
-              </div>
-            ))
-          )}
-        </div>
+      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+        {sections.map(s => (
+          <button
+            key={s.id}
+            onClick={() => setActiveSection(s.id)}
+            className={`flex items-center gap-3 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] whitespace-nowrap transition-all border ${
+              activeSection === s.id 
+                ? 'bg-red-600 border-red-600 text-white shadow-lg' 
+                : 'bg-zinc-900/50 border-white/5 text-zinc-500 hover:border-white/10'
+            }`}
+          >
+            <s.icon size={16} />
+            {s.title}
+          </button>
+        ))}
       </div>
+
+      <motion.div 
+        key={activeSection}
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-10"
+      >
+        {sectionFields[activeSection].map(field => (
+          <div key={field.key} className={field.type === 'textarea' || field.type === 'image' ? 'md:col-span-2' : ''}>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">{field.label}</label>
+            {field.type === 'text' && (
+              <input 
+                type="text" 
+                value={content[field.key] || ''}
+                onChange={e => handleChange(field.key, e.target.value)}
+                className="w-full bg-zinc-950 border border-white/5 rounded-2xl p-5 text-white outline-none focus:border-red-600 transition-all font-medium"
+              />
+            )}
+            {field.type === 'textarea' && (
+              <textarea 
+                rows={4}
+                value={content[field.key] || ''}
+                onChange={e => handleChange(field.key, e.target.value)}
+                className="w-full bg-zinc-950 border border-white/5 rounded-2xl p-5 text-white outline-none focus:border-red-600 transition-all font-medium resize-none"
+              />
+            )}
+            {field.type === 'image' && (
+              <div className="space-y-4">
+                <div className="relative aspect-video w-full max-w-2xl bg-zinc-950 rounded-3xl overflow-hidden border border-white/5 group">
+                  {content[field.key] ? (
+                    <img src={content[field.key]} alt={field.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-zinc-600">
+                      <ImageIcon size={48} className="mb-4 opacity-20" />
+                      <p className="text-xs font-bold uppercase tracking-widest">Немає зображення</p>
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <label className="cursor-pointer bg-white text-black px-6 py-3 rounded-xl font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform">
+                      Змінити фото
+                      <input type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(field.key, e)} />
+                    </label>
+                  </div>
+                </div>
+                <p className="text-[10px] text-zinc-600 font-bold uppercase italic">Рекомендовано: 1920x1080px, до 5MB</p>
+              </div>
+            )}
+          </div>
+        ))}
+      </motion.div>
     </div>
   );
 };
@@ -408,9 +1224,23 @@ const ContentEditor = () => {
 const CoachesEditor = () => {
   const [coaches, setCoaches] = useState<any[]>([]);
   const [editingCoach, setEditingCoach] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchCoaches = () => {
-    fetch('/api/coaches').then(res => res.json()).then(setCoaches);
+    const token = localStorage.getItem('admin_token');
+    fetch('/api/coaches', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Unauthorized');
+        return res.json();
+      })
+      .then(data => setCoaches(Array.isArray(data) ? data : []))
+      .catch(err => {
+        console.error('Fetch coaches failed:', err);
+        setCoaches([]);
+      });
   };
 
   useEffect(() => {
@@ -420,44 +1250,47 @@ const CoachesEditor = () => {
   const handleSaveCoach = async (coach: any) => {
     try {
       const token = localStorage.getItem('admin_token');
-      if (coach.id) {
-        await fetch(`/api/coaches/${coach.id}`, {
-          method: 'PUT',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(coach)
-        });
+      const res = await fetch(coach.id ? `/api/coaches/${coach.id}` : '/api/coaches', {
+        method: coach.id ? 'PUT' : 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(coach)
+      });
+      
+      if (res.ok) {
+        setEditingCoach(null);
+        fetchCoaches();
+        toast.success('Дані тренера збережено');
       } else {
-        await fetch('/api/coaches', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(coach)
-        });
+        toast.error('Помилка збереження');
       }
-      setEditingCoach(null);
-      fetchCoaches();
     } catch (e) {
-      alert('Помилка збереження');
+      toast.error('Помилка збереження');
     }
   };
 
-  const handleDeleteCoach = async (id: number) => {
-    if (!confirm('Ви впевнені, що хочете видалити цього тренера?')) return;
+  const handleDeleteCoach = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
     try {
       const token = localStorage.getItem('admin_token');
-      await fetch(`/api/coaches/${id}`, {
+      const res = await fetch(`/api/coaches/${confirmDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      fetchCoaches();
+      if (res.ok) {
+        toast.success('Тренера видалено');
+        fetchCoaches();
+      } else {
+        toast.error('Помилка видалення');
+      }
     } catch (e) {
-      alert('Помилка видалення');
+      toast.error('Помилка видалення');
     }
+    setIsDeleting(false);
+    setConfirmDelete(null);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, coachId: number) => {
@@ -465,7 +1298,7 @@ const CoachesEditor = () => {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('Файл занадто великий. Максимальний розмір - 10 МБ.');
+      toast.error('Файл занадто великий. Максимальний розмір - 10 МБ.');
       return;
     }
 
@@ -579,7 +1412,16 @@ const CoachesEditor = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold">Тренери</h2>
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-bold">Тренери</h2>
+          <button 
+            onClick={fetchCoaches}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
+            title="Оновити"
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
         <button 
           onClick={() => setEditingCoach({ name: '', role: '', bio: '', achievements: [], photo: '' })}
           className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors"
@@ -590,7 +1432,7 @@ const CoachesEditor = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {coaches.map(coach => (
+        {Array.isArray(coaches) && coaches.map(coach => (
           <div key={coach.id} className="bg-zinc-900 p-6 rounded-[2rem] border border-white/5 flex flex-col">
             <div className="aspect-[4/3] rounded-xl overflow-hidden mb-6 bg-black relative group">
               {coach.photo ? (
@@ -601,7 +1443,7 @@ const CoachesEditor = () => {
                 </div>
               )}
               <button 
-                onClick={() => handleDeleteCoach(coach.id)}
+                onClick={() => setConfirmDelete({ id: coach.id, name: coach.name })}
                 className="absolute top-4 right-4 p-2 bg-black/60 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
               >
                 <Trash2 size={18} />
@@ -618,48 +1460,642 @@ const CoachesEditor = () => {
           </div>
         ))}
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDeleteCoach}
+        loading={isDeleting}
+        title="Видалити тренера?"
+        message={`Ви впевнені, що хочете видалити тренера ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
+      />
+    </div>
+  );
+};
+
+const LocationsEditor = () => {
+  const [locations, setLocations] = useState<any[]>([]);
+  const [editingLocation, setEditingLocation] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchLocations = () => {
+    const token = localStorage.getItem('admin_token');
+    fetch('/api/locations', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error('Unauthorized');
+        return res.json();
+      })
+      .then(data => setLocations(Array.isArray(data) ? data : []))
+      .catch(err => {
+        console.error('Fetch locations failed:', err);
+        setLocations([]);
+      });
+  };
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  const handleSaveLocation = async (location: any) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const method = location.id ? 'PUT' : 'POST';
+      const url = location.id ? `/api/locations/${location.id}` : '/api/locations';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(location)
+      });
+      
+      if (res.ok) {
+        setEditingLocation(null);
+        fetchLocations();
+        toast.success('Локацію збережено');
+      } else {
+        toast.error('Помилка збереження');
+      }
+    } catch (e) {
+      toast.error('Помилка збереження');
+    }
+  };
+
+  const handleDeleteLocation = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/locations/${confirmDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Локацію видалено');
+        fetchLocations();
+      } else {
+        toast.error('Помилка видалення');
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+    setIsDeleting(false);
+    setConfirmDelete(null);
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-bold">Локації</h2>
+          <button 
+            onClick={fetchLocations}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
+            title="Оновити"
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
+        <button 
+          onClick={() => setEditingLocation({ name: '', address: '', map_link: '', order_index: 0 })}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors"
+        >
+          <Plus size={18} />
+          Додати локацію
+        </button>
+      </div>
+
+      {editingLocation && (
+        <div className="bg-zinc-900 p-8 rounded-2xl border border-white/5 mb-8 space-y-4">
+          <h3 className="text-xl font-bold mb-4">{editingLocation.id ? 'Редагувати' : 'Нова'} локація</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Назва</label>
+              <input 
+                type="text" 
+                value={editingLocation.name} 
+                onChange={e => setEditingLocation({...editingLocation, name: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Адреса</label>
+              <input 
+                type="text" 
+                value={editingLocation.address} 
+                onChange={e => setEditingLocation({...editingLocation, address: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-bold text-zinc-300 mb-2">Посилання на Google Maps</label>
+            <input 
+              type="text" 
+              value={editingLocation.map_link} 
+              onChange={e => setEditingLocation({...editingLocation, map_link: e.target.value})}
+              className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+            />
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button 
+              onClick={() => handleSaveLocation(editingLocation)}
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+            >
+              Зберегти
+            </button>
+            <button 
+              onClick={() => setEditingLocation(null)}
+              className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+            >
+              Скасувати
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-4">
+        {Array.isArray(locations) && locations.map(loc => (
+          <div key={loc.id} className="bg-zinc-900 p-6 rounded-2xl border border-white/5 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-bold">{loc.name}</h3>
+              <p className="text-zinc-400">{loc.address}</p>
+            </div>
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setEditingLocation(loc)}
+                className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-colors"
+              >
+                Редагувати
+              </button>
+              <button 
+                onClick={() => setConfirmDelete({ id: loc.id, name: loc.name })}
+                className="p-3 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl transition-colors"
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDeleteLocation}
+        loading={isDeleting}
+        title="Видалити локацію?"
+        message={`Ви впевнені, що хочете видалити локацію ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
+      />
+    </div>
+  );
+};
+
+const ScheduleEditor = () => {
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<any[]>([]);
+  const [editingEntry, setEditingEntry] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, group_name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [sRes, lRes, cRes] = await Promise.all([
+        fetch('/api/schedule'),
+        fetch('/api/locations'),
+        fetch('/api/coaches')
+      ]);
+      const sData = await sRes.json();
+      const lData = await lRes.json();
+      const cData = await cRes.json();
+      
+      setSchedule(Array.isArray(sData) ? sData : []);
+      setLocations(Array.isArray(lData) ? lData : []);
+      setCoaches(Array.isArray(cData) ? cData : []);
+    } catch (e) {
+      setSchedule([]);
+      setLocations([]);
+      setCoaches([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSaveEntry = async (entry: any) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const method = entry.id ? 'PUT' : 'POST';
+      const url = entry.id ? `/api/schedule/${entry.id}` : '/api/schedule';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(entry)
+      });
+      
+      if (res.ok) {
+        setEditingEntry(null);
+        fetchData();
+        toast.success('Запис розкладу збережено');
+      } else {
+        toast.error('Помилка збереження');
+      }
+    } catch (e) {
+      toast.error('Помилка збереження');
+    }
+  };
+
+  const handleDeleteEntry = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/schedule/${confirmDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Запис видалено');
+        fetchData();
+      } else {
+        toast.error('Помилка видалення');
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+    setIsDeleting(false);
+    setConfirmDelete(null);
+  };
+
+  const days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"];
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-8">
+        <div className="flex items-center gap-4">
+          <h2 className="text-3xl font-bold">Розклад занять</h2>
+          <button 
+            onClick={fetchData}
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
+            title="Оновити"
+          >
+            <RefreshCw size={18} />
+          </button>
+        </div>
+        <button 
+          onClick={() => {
+            const defaultLocId = locations.length > 0 ? locations[0].id : null;
+            const defaultCoachId = coaches.length > 0 ? coaches[0].id : null;
+            setEditingEntry({ 
+              location_id: defaultLocId, 
+              coach_id: defaultCoachId, 
+              day_of_week: 'Пн', 
+              start_time: '16:00', 
+              end_time: '17:30', 
+              group_name: '', 
+              price: '2500',
+              order_index: 0 
+            });
+          }}
+          className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors"
+        >
+          <Plus size={18} />
+          Додати заняття
+        </button>
+      </div>
+
+      {editingEntry && (
+        <div className="bg-zinc-900 p-8 rounded-2xl border border-white/5 mb-8 space-y-4">
+          <h3 className="text-xl font-bold mb-4">{editingEntry.id ? 'Редагувати' : 'Нове'} заняття</h3>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Локація</label>
+              <select 
+                value={editingEntry.location_id} 
+                onChange={e => setEditingEntry({...editingEntry, location_id: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+              >
+                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Тренер</label>
+              <select 
+                value={editingEntry.coach_id} 
+                onChange={e => setEditingEntry({...editingEntry, coach_id: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+              >
+                {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">День тижня</label>
+              <select 
+                value={editingEntry.day_of_week} 
+                onChange={e => setEditingEntry({...editingEntry, day_of_week: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+              >
+                {days.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Група</label>
+              <input 
+                type="text" 
+                value={editingEntry.group_name} 
+                onChange={e => setEditingEntry({...editingEntry, group_name: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                placeholder="Молодша група"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Ціна (тільки число)</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={editingEntry.price || ''} 
+                  onChange={e => setEditingEntry({...editingEntry, price: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 pr-20 text-white outline-none"
+                  placeholder="2500"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-xs font-bold uppercase">грн/міс</div>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Час початку</label>
+              <input 
+                type="text" 
+                value={editingEntry.start_time} 
+                onChange={e => setEditingEntry({...editingEntry, start_time: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                placeholder="16:00"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Час завершення</label>
+              <input 
+                type="text" 
+                value={editingEntry.end_time} 
+                onChange={e => setEditingEntry({...editingEntry, end_time: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                placeholder="17:30"
+              />
+            </div>
+          </div>
+          <div className="flex gap-4 pt-4">
+            <button 
+              onClick={() => handleSaveEntry(editingEntry)}
+              className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+            >
+              Зберегти
+            </button>
+            <button 
+              onClick={() => setEditingEntry(null)}
+              className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+            >
+              Скасувати
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-8">
+        {locations.map(loc => {
+          const locSchedule = schedule.filter(s => s.location_id === loc.id);
+          if (locSchedule.length === 0) return null;
+          
+          return (
+            <div key={loc.id} className="bg-zinc-900 rounded-2xl border border-white/5 overflow-hidden">
+              <div className="bg-black/50 p-6 border-b border-white/5">
+                <h3 className="text-xl font-bold text-red-500">{loc.name}</h3>
+                <p className="text-sm text-zinc-500">{loc.address}</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-xs font-bold text-zinc-500 uppercase tracking-widest border-b border-white/5">
+                      <th className="p-4">День</th>
+                      <th className="p-4">Час</th>
+                      <th className="p-4">Група</th>
+                      <th className="p-4">Ціна</th>
+                      <th className="p-4">Тренер</th>
+                      <th className="p-4 text-right">Дії</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {locSchedule.map(entry => (
+                      <tr key={entry.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-4 font-bold">{entry.day_of_week}</td>
+                        <td className="p-4 text-zinc-300">{entry.start_time} - {entry.end_time}</td>
+                        <td className="p-4">{entry.group_name}</td>
+                        <td className="p-4 text-red-500 font-bold">{entry.price ? `${entry.price} грн/міс` : '—'}</td>
+                        <td className="p-4 text-sm text-zinc-400">{entry.coach_name}</td>
+                        <td className="p-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setEditingEntry(entry)} className="p-2 hover:text-red-500 transition-colors">
+                              Редагувати
+                            </button>
+                            <button onClick={() => setConfirmDelete({ id: entry.id, group_name: entry.group_name })} className="p-2 hover:text-red-500 transition-colors">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDeleteEntry}
+        loading={isDeleting}
+        title="Видалити запис розкладу?"
+        message={`Ви впевнені, що хочете видалити заняття для групи ${confirmDelete?.group_name}? Цю дію неможливо скасувати.`}
+      />
     </div>
   );
 };
 
 const LeadsViewer = () => {
   const [leads, setLeads] = useState<any[]>([]);
+  const [editingLead, setEditingLead] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchLeads = () => {
     const token = localStorage.getItem('admin_token');
     fetch('/api/leads', {
       headers: { 'Authorization': `Bearer ${token}` }
-    }).then(res => res.json()).then(setLeads);
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Unauthorized');
+      return res.json();
+    })
+    .then(data => setLeads(Array.isArray(data) ? data : []))
+    .catch(err => {
+      console.error('Fetch leads failed:', err);
+      setLeads([]);
+    });
   };
 
   useEffect(() => {
     fetchLeads();
   }, []);
 
-  const handleDelete = async (id: number) => {
-    if (!confirm('Ви впевнені, що хочете видалити цю заявку?')) return;
+  const handleSaveLead = async (lead: any) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(lead)
+      });
+      
+      if (res.ok) {
+        setEditingLead(null);
+        fetchLeads();
+        toast.success('Заявку оновлено');
+      } else {
+        toast.error('Помилка оновлення заявки');
+      }
+    } catch (e) {
+      toast.error('Помилка оновлення заявки');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
     
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch(`/api/leads/${id}`, {
+      const res = await fetch(`/api/leads/${confirmDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (res.ok) {
+        toast.success('Заявку видалено');
         fetchLeads();
       } else {
-        alert('Помилка видалення заявки');
+        toast.error('Помилка видалення заявки');
       }
     } catch (e) {
-      alert('Помилка видалення заявки');
+      toast.error('Помилка видалення заявки');
     }
+    setIsDeleting(false);
+    setConfirmDelete(null);
   };
 
   return (
     <div>
-      <h2 className="text-3xl font-bold mb-8">Заявки з сайту</h2>
+      <div className="flex items-center gap-4 mb-8">
+        <h2 className="text-3xl font-bold">Заявки з сайту</h2>
+        <button 
+          onClick={fetchLeads}
+          className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
+          title="Оновити"
+        >
+          <RefreshCw size={18} />
+        </button>
+      </div>
       
+      {editingLead && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-white/10 p-8 space-y-6">
+            <h3 className="text-2xl font-bold">Редагувати заявку</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">Ім'я</label>
+                <input 
+                  type="text" 
+                  value={editingLead.name} 
+                  onChange={e => setEditingLead({...editingLead, name: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">Телефон</label>
+                <input 
+                  type="text" 
+                  value={editingLead.phone} 
+                  onChange={e => setEditingLead({...editingLead, phone: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">Локація</label>
+                <input 
+                  type="text" 
+                  value={editingLead.location} 
+                  onChange={e => setEditingLead({...editingLead, location: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">Група</label>
+                <input 
+                  type="text" 
+                  value={editingLead.age_group} 
+                  onChange={e => setEditingLead({...editingLead, age_group: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-zinc-300 mb-2">Статус</label>
+                <select 
+                  value={editingLead.status} 
+                  onChange={e => setEditingLead({...editingLead, status: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                >
+                  <option value="new">Нова</option>
+                  <option value="contacted">Зв'язалися</option>
+                  <option value="trial">Призначено пробне</option>
+                  <option value="client">Клієнт</option>
+                  <option value="closed">Закрито</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-4 pt-4">
+              <button 
+                onClick={() => handleSaveLead(editingLead)}
+                className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+              >
+                Зберегти
+              </button>
+              <button 
+                onClick={() => setEditingLead(null)}
+                className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+              >
+                Скасувати
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-zinc-900 rounded-[2rem] border border-white/5 overflow-hidden">
         <table className="w-full text-left">
           <thead className="bg-black/50 border-b border-white/5">
@@ -687,18 +2123,37 @@ const LeadsViewer = () => {
                   <td className="p-6 text-sm">{lead.location || 'Не вказано'}</td>
                   <td className="p-6 text-sm">{lead.age_group}</td>
                   <td className="p-6">
-                    <span className="px-3 py-1 bg-zinc-800 text-xs font-bold rounded-full uppercase tracking-widest">
-                      {lead.status === 'new' ? 'Нова' : lead.status}
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-widest ${
+                      lead.status === 'new' ? 'bg-red-600/20 text-red-500' :
+                      lead.status === 'contacted' ? 'bg-blue-600/20 text-blue-500' :
+                      lead.status === 'trial' ? 'bg-amber-600/20 text-amber-500' :
+                      lead.status === 'client' ? 'bg-green-600/20 text-green-500' :
+                      'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {lead.status === 'new' ? 'Нова' : 
+                       lead.status === 'contacted' ? 'Зв\'язалися' :
+                       lead.status === 'trial' ? 'Пробне' :
+                       lead.status === 'client' ? 'Клієнт' :
+                       lead.status === 'closed' ? 'Закрито' : lead.status}
                     </span>
                   </td>
                   <td className="p-6">
-                    <button 
-                      onClick={() => handleDelete(lead.id)}
-                      className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Видалити заявку"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setEditingLead(lead)}
+                        className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                        title="Редагувати"
+                      >
+                        <Settings size={18} />
+                      </button>
+                      <button 
+                        onClick={() => setConfirmDelete({ id: lead.id, name: lead.name })}
+                        className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Видалити"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -706,6 +2161,15 @@ const LeadsViewer = () => {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        loading={isDeleting}
+        title="Видалити заявку?"
+        message={`Ви впевнені, що хочете видалити заявку від ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
+      />
     </div>
   );
 };

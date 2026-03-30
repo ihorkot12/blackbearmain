@@ -157,8 +157,12 @@ export const LoginPage = () => {
 
     if (res.ok) {
       const data = await res.json();
-      if (data.role === 'coach') navigate('/dashboard');
-      else navigate('/profile');
+      if (data.role === 'coach') {
+        if (data.token) localStorage.setItem('admin_token', data.token);
+        navigate('/dashboard');
+      } else {
+        navigate('/profile');
+      }
     } else {
       setError('Невірний логін або пароль');
     }
@@ -227,39 +231,67 @@ export const CoachDashboard = () => {
   }, [activeTab, selectedDate]);
 
   const fetchData = async () => {
-    if (activeTab === 'leads') {
-      const res = await fetch('/api/leads');
-      if (res.ok) setLeads(await res.json());
-    } else if (activeTab === 'participants') {
-      const [pRes, gRes] = await Promise.all([
-        fetch('/api/participants'),
-        fetch('/api/groups')
-      ]);
-      if (pRes.ok) setParticipants(await pRes.json());
-      if (gRes.ok) setGroups(await gRes.json());
-    } else if (activeTab === 'attendance') {
-      const [pRes, aRes] = await Promise.all([
-        fetch('/api/participants'),
-        fetch(`/api/attendance/${selectedDate}`)
-      ]);
-      if (pRes.ok) setParticipants(await pRes.json());
-      if (aRes.ok) setAttendance(await aRes.json());
-    } else if (activeTab === 'editor') {
-      const [contentRes, coachesRes] = await Promise.all([
-        fetch('/api/content'),
-        fetch('/api/coaches')
-      ]);
-      if (contentRes.ok) setSiteContent(await contentRes.json());
-      if (coachesRes.ok) setCoaches(await coachesRes.json());
+    const token = localStorage.getItem('admin_token');
+    const headers = { 'Authorization': `Bearer ${token}` };
+    try {
+      if (activeTab === 'leads') {
+        const res = await fetch('/api/leads', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          setLeads(Array.isArray(data) ? data : []);
+        }
+      } else if (activeTab === 'participants') {
+        const [pRes, gRes] = await Promise.all([
+          fetch('/api/participants', { headers }),
+          fetch('/api/groups')
+        ]);
+        if (pRes.ok) {
+          const data = await pRes.json();
+          setParticipants(Array.isArray(data) ? data : []);
+        }
+        if (gRes.ok) {
+          const data = await gRes.json();
+          setGroups(Array.isArray(data) ? data : []);
+        }
+      } else if (activeTab === 'attendance') {
+        const [pRes, aRes] = await Promise.all([
+          fetch('/api/participants', { headers }),
+          fetch(`/api/attendance/${selectedDate}`, { headers })
+        ]);
+        if (pRes.ok) {
+          const data = await pRes.json();
+          setParticipants(Array.isArray(data) ? data : []);
+        }
+        if (aRes.ok) {
+          const data = await aRes.json();
+          setAttendance(Array.isArray(data) ? data : []);
+        }
+      } else if (activeTab === 'editor') {
+        const [contentRes, coachesRes] = await Promise.all([
+          fetch('/api/content'),
+          fetch('/api/coaches')
+        ]);
+        if (contentRes.ok) setSiteContent(await contentRes.json());
+        if (coachesRes.ok) {
+          const data = await coachesRes.json();
+          setCoaches(Array.isArray(data) ? data : []);
+        }
+      }
+    } catch (e) {
+      console.error('Fetch error:', e);
     }
   };
 
   const handleSaveContent = async () => {
+    const token = localStorage.getItem('admin_token');
     setIsSaving(true);
     try {
       await fetch('/api/content', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify(siteContent)
       });
       alert('Зміни збережено!');
@@ -271,35 +303,59 @@ export const CoachDashboard = () => {
   };
 
   const handleAddCoach = async () => {
+    const token = localStorage.getItem('admin_token');
     const newCoach = { name: 'Новий Тренер', role: 'Посада', bio: 'Опис...', photo: '', achievements: [] };
     const res = await fetch('/api/coaches', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(newCoach)
     });
     if (res.ok) fetchData();
   };
 
   const handleUpdateCoach = async (id: number, data: any) => {
-    await fetch(`/api/coaches/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    setCoaches(coaches.map(c => c.id === id ? { ...c, ...data } : c));
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/coaches/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(data)
+      });
+      if (res.ok) {
+        setCoaches(Array.isArray(coaches) ? coaches.map(c => c.id === id ? { ...c, ...data } : c) : []);
+      } else {
+        alert('Помилка оновлення');
+      }
+    } catch (e) {
+      alert('Помилка оновлення');
+    }
   };
 
   const handleDeleteCoach = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
     if (!confirm('Видалити тренера?')) return;
-    await fetch(`/api/coaches/${id}`, { method: 'DELETE' });
+    await fetch(`/api/coaches/${id}`, { 
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
     fetchData();
   };
 
   const handleAddParticipant = async (e: React.FormEvent) => {
+    const token = localStorage.getItem('admin_token');
     e.preventDefault();
     const res = await fetch('/api/participants', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify(newParticipant)
     });
     if (res.ok) {
@@ -310,10 +366,14 @@ export const CoachDashboard = () => {
   };
 
   const handleToggleAttendance = async (participantId: number, currentStatus: string | null) => {
+    const token = localStorage.getItem('admin_token');
     const newStatus = currentStatus === 'present' ? 'absent' : 'present';
     const res = await fetch('/api/attendance', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({
         participant_id: participantId,
         date: selectedDate,
@@ -321,20 +381,33 @@ export const CoachDashboard = () => {
       })
     });
     if (res.ok) {
-      const aRes = await fetch(`/api/attendance/${selectedDate}`);
-      if (aRes.ok) setAttendance(await aRes.ok ? await aRes.json() : []);
+      const aRes = await fetch(`/api/attendance/${selectedDate}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (aRes.ok) {
+        const data = await aRes.json();
+        setAttendance(Array.isArray(data) ? data : []);
+      }
     }
   };
 
   const handleDeleteLead = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
     if (!confirm('Видалити заявку?')) return;
-    await fetch(`/api/leads/${id}`, { method: 'DELETE' });
+    await fetch(`/api/leads/${id}`, { 
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
     fetchData();
   };
 
   const handleDeleteParticipant = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
     if (!confirm('Видалити учня?')) return;
-    await fetch(`/api/participants/${id}`, { method: 'DELETE' });
+    await fetch(`/api/participants/${id}`, { 
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
     fetchData();
   };
 
@@ -371,6 +444,14 @@ export const CoachDashboard = () => {
             </button>
           ))}
         </nav>
+
+        <a
+          href="/admin"
+          className="flex items-center gap-3 px-4 py-3 text-zinc-500 hover:text-white hover:bg-white/5 transition-colors text-sm font-bold uppercase tracking-widest mt-4 border-t border-white/5 pt-4"
+        >
+          <Layout size={18} />
+          Повна Адмінка
+        </a>
 
         <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 text-zinc-500 hover:text-red-500 transition-colors text-sm font-bold uppercase tracking-widest">
           <LogOut size={18} />
@@ -505,7 +586,7 @@ export const CoachDashboard = () => {
               </div>
 
               <div className="space-y-6">
-                {coaches.map((coach) => (
+                {Array.isArray(coaches) && coaches.map((coach) => (
                   <div key={coach.id} className="bg-black/40 p-6 rounded-3xl border border-white/5 group relative">
                     <button 
                       onClick={() => handleDeleteCoach(coach.id)}

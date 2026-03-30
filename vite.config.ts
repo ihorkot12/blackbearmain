@@ -8,7 +8,8 @@ export default defineConfig(({mode}) => {
   return {
     plugins: [react(), tailwindcss()],
     define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      'process.env.GEMINI_API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'undefined',
+      'process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID': env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID ? JSON.stringify(env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID) : 'undefined',
     },
     resolve: {
       alias: {
