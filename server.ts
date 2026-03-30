@@ -963,7 +963,7 @@ async function startServer() {
     const login = (req.body.login || '').trim();
     const password = (req.body.password || '').trim();
     const expectedLogin = (process.env.ADMIN_LOGIN || 'ihorkot12').trim();
-    const expectedPassword = (process.env.ADMIN_PASSWORD || '4756500ihor').trim();
+    const expectedPassword = (process.env.ADMIN_PASSWORD || '4756500').trim();
     
     console.log(`Login attempt for: ${login}`);
     

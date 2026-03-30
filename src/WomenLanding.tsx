@@ -340,7 +340,7 @@ export const WomenLanding = () => {
             <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Facebook size={20} /></a>
           </div>
           <div className="text-zinc-600 text-[10px] uppercase tracking-widest">
-            © 2024 Black Bear Dojo. Всі права захищені.
+            © 2026 Black Bear Dojo. Всі права захищені.
           </div>
         </div>
       </footer>

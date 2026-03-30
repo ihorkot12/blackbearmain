@@ -217,7 +217,7 @@ export const JuniorLanding = () => {
 
             <div className="mt-12 flex items-center gap-8">
               <div className="flex flex-col">
-                <span className="text-3xl font-black text-white">500+</span>
+                <span className="text-3xl font-black text-white">+50</span>
                 <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold">Учнів пройшли школу</span>
               </div>
               <div className="w-px h-12 bg-white/10" />
@@ -428,7 +428,7 @@ export const JuniorLanding = () => {
             <span className="font-black tracking-tighter text-sm">BLACK BEAR DOJO</span>
           </Link>
           <div className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold">
-            © 2024 Black Bear Dojo. Всі права захищені.
+            © 2026 Black Bear Dojo. Всі права захищені.
           </div>
           <div className="flex gap-6">
             <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Instagram size={20} /></a>

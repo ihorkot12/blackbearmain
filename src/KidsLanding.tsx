@@ -464,7 +464,7 @@ export const KidsLanding = () => {
             <span className="font-black tracking-tighter text-sm">BLACK BEAR DOJO</span>
           </Link>
           <div className="text-zinc-600 text-[10px] uppercase tracking-widest font-bold">
-            © 2024 Black Bear Dojo. Всі права захищені.
+            © 2026 Black Bear Dojo. Всі права захищені.
           </div>
           <div className="flex gap-6">
             <a href="#" className="text-zinc-500 hover:text-white transition-colors"><Instagram size={20} /></a>

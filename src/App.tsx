@@ -669,7 +669,7 @@ function LandingPage() {
             </div>
             
             <p className="text-lg md:text-xl text-zinc-200 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
-              {content?.hero_subtitle || "Професійна секція карате Київ під керівництвом 3 дану. 20+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи."}
+              {content?.hero_subtitle || "Професійна секція карате Київ під керівництвом 3 дану. 5+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи."}
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-12">
@@ -695,7 +695,7 @@ function LandingPage() {
             <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-[11px] font-black uppercase tracking-[0.3em] text-zinc-500">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-red-600" />
-                <span>500+ учнів пройшли школу</span>
+                <span>+50 учнів пройшли школу</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-red-600" />
@@ -714,8 +714,8 @@ function LandingPage() {
           <div className="max-w-7xl mx-auto px-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
               {[
-                { label: "Досвід викладання", value: "20+ років", icon: <Award className="text-red-600" size={24} /> },
-                { label: "Вихованців клубу", value: "500+", icon: <Users className="text-red-600" size={24} /> },
+                { label: "Досвід викладання", value: "5+ років", icon: <Award className="text-red-600" size={24} /> },
+                { label: "Вихованців клубу", value: "+50", icon: <Users className="text-red-600" size={24} /> },
                 { label: "Філії у Києві", value: "2 локації", icon: <MapPin className="text-red-600" size={24} /> },
                 { label: "Чорні пояси", value: "3 дан", icon: <Shield className="text-red-600" size={24} /> },
               ].map((stat, i) => (
@@ -1172,7 +1172,7 @@ function LandingPage() {
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-16">
             {[
-              { top: '20+ років', bottom: 'тренерського досвіду' },
+              { top: '5+ років', bottom: 'тренерського досвіду' },
               { top: 'Чемпіони України', bottom: 'серед вихованців клубу' },
               { top: 'Призери та чемпіони Європи', bottom: 'міжнародний рівень підготовки' },
               { top: 'Міжнародні турніри', bottom: 'участь у змаганнях за межами України' },
@@ -1524,7 +1524,7 @@ function LandingPage() {
               },
               { 
                 q: 'Хто тренує дітей і який у вас досвід?', 
-                a: 'Тренування проводять Ігор Котляревський та Олег Крамаренко.\n\nІгор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 20 років у спорті та підготовці спортсменів.\n\nОлег Крамаренко — тренер клубу, який працює з дитячими та підлітковими групами, готує спортсменів до змагань і забезпечує системну підготовку відповідно до стандартів кіокушинкай.\n\nУ клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай та сучасну фізичну підготовку, з акцентом на дисципліну, техніку та поступовий розвиток спортсмена.' 
+                a: 'Тренування проводять Ігор Котляревський та Олег Крамаренко.\n\nІгор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 5 років у спорті та підготовці спортсменів.\n\nОлег Крамаренко — тренер клубу, який працює з дитячими та підлітковими групами, готує спортсменів до змагань і забезпечує системну підготовку відповідно до стандартів кіокушинкай.\n\nУ клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай та сучасну фізичну підготовку, з акцентом на дисципліну, техніку та поступовий розвиток спортсмена.' 
               },
               { 
                 q: 'Скільки коштує навчання і що входить у абонемент?', 
@@ -1626,7 +1626,7 @@ function LandingPage() {
 
             <div className="text-zinc-600 text-[10px] max-w-xs text-center md:text-right">
               Black Bear Dojo — найкраща секція карате Київ для дітей та дорослих. Професійне дитяче карате Київ на Шулявці. Тренування карате Київ за методикою Кіокушинкай.
-              <div className="mt-2">© 2024 Black Bear Dojo. Всі права захищені.</div>
+              <div className="mt-2">© 2026 Black Bear Dojo. Всі права захищені.</div>
             </div>
           </div>
         </footer>
