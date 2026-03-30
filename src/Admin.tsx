@@ -115,8 +115,228 @@ export const LoginPage = () => {
   );
 };
 
+const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: string) => void }) => {
+  const [stats, setStats] = useState<any>(null);
+  const [chartData, setChartData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const token = localStorage.getItem('admin_token');
+      try {
+        const [sRes, cRes] = await Promise.all([
+          fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+          fetch('/api/dashboard-charts', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        ]);
+        setStats(sRes);
+        setChartData(cRes);
+      } catch (e) {
+        console.error('Dashboard fetch failed', e);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-96">
+      <RefreshCw className="animate-spin text-red-600" size={48} />
+    </div>
+  );
+
+  const statCards = [
+    { title: 'Всього учнів', value: stats?.participantsCount || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { title: 'Нові заявки', value: stats?.newLeadsCount || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { title: 'Груп', value: stats?.groupsCount || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { title: 'Тренерів', value: stats?.coachesCount || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  ];
+
+  return (
+    <div className="space-y-12 pb-20">
+      <div className="flex justify-between items-end">
+        <div>
+          <h2 className="text-5xl font-black uppercase tracking-tighter mb-3">Головна</h2>
+          <p className="text-zinc-500 font-medium text-lg">Огляд активності та ключові показники клубу</p>
+        </div>
+        <div className="flex gap-4">
+          <div className="bg-zinc-900/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/5 text-right">
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Сьогодні</p>
+            <p className="text-white font-black uppercase tracking-tight">{new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {statCards.map((card, i) => (
+          <motion.div 
+            key={i}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            className="bg-zinc-900/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 relative group hover:border-white/10 transition-all"
+          >
+            <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
+              <card.icon size={28} />
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{card.title}</p>
+            <p className="text-4xl font-black uppercase tracking-tighter">{card.value}</p>
+            <div className="absolute top-8 right-8 opacity-5 group-hover:opacity-10 transition-opacity">
+              <card.icon size={64} />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
+            <Activity size={24} className="text-red-600" />
+            Динаміка заявок
+          </h3>
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData.leadsOverTime}>
+                <defs>
+                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  stroke="#ffffff20" 
+                  fontSize={10} 
+                  tickFormatter={(val) => new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                />
+                <YAxis stroke="#ffffff20" fontSize={10} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
+                  itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+                />
+                <Area type="monotone" dataKey="count" stroke="#dc2626" strokeWidth={4} fillOpacity={1} fill="url(#colorLeads)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
+            <MapPin size={24} className="text-red-600" />
+            Розподіл по групах
+          </h3>
+          <div className="h-80 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData.groupDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={8}
+                  dataKey="count"
+                  nameKey="name"
+                >
+                  {chartData.groupDistribution.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fee2e2'][index % 5]} stroke="none" />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8">
+        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-10">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <Activity size={24} className="text-red-600" />
+              Останні заявки
+            </h3>
+            <button 
+              onClick={() => onQuickAction('leads')}
+              className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+            >
+              Всі заявки →
+            </button>
+          </div>
+          <div className="space-y-4">
+            {chartData.recentLeads.map((lead: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
+                    {lead.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">{lead.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold">{lead.phone}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                    lead.status === 'new' ? 'bg-red-600/20 text-red-500' : 'bg-zinc-800 text-zinc-500'
+                  }`}>
+                    {lead.status === 'new' ? 'Нова' : lead.status}
+                  </span>
+                  <p className="text-[8px] text-zinc-600 font-bold uppercase mt-2">
+                    {new Date(lead.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {chartData.recentLeads.length === 0 && (
+              <div className="text-center py-10 text-zinc-500 font-bold italic">Заявок поки немає</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
+            <LayoutDashboard size={48} />
+          </div>
+          <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
+          <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
+          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+            <button 
+              onClick={() => onQuickAction('participants', 'add')}
+              className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+            >
+              Додати учня
+            </button>
+            <button 
+              onClick={() => onQuickAction('schedule', 'add')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Редагувати розклад
+            </button>
+            <button 
+              onClick={() => onQuickAction('content', 'video')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Контент сайту
+            </button>
+            <button 
+              onClick={() => onQuickAction('leads')}
+              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+            >
+              Звіти
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [initialAction, setInitialAction] = useState<string | null>(null);
   const [isFullAdmin, setIsFullAdmin] = useState(false);
   const navigate = useNavigate();
 
@@ -137,6 +357,13 @@ export const AdminPage = () => {
     };
     checkAuth();
   }, [navigate]);
+
+  const handleQuickAction = (tab: string, action?: string) => {
+    setActiveTab(tab);
+    if (action) {
+      setInitialAction(action);
+    }
+  };
 
   const menuGroups = [
     {
@@ -286,13 +513,13 @@ export const AdminPage = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'dashboard' && <Dashboard setActiveTab={setActiveTab} />}
-              {activeTab === 'content' && <ContentEditor />}
+              {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} />}
+              {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'leads' && <LeadsViewer />}
               {activeTab === 'coaches' && <CoachesEditor />}
               {activeTab === 'locations' && <LocationsEditor />}
-              {activeTab === 'schedule' && <ScheduleEditor />}
-              {activeTab === 'participants' && <ParticipantsEditor />}
+              {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
+              {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'attendance' && <AttendanceEditor />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'settings' && <SettingsEditor />}
@@ -936,326 +1163,7 @@ const SettingsEditor = () => {
   );
 };
 
-const Dashboard = ({ setActiveTab }: { setActiveTab: (tab: string) => void }) => {
-  const [stats, setStats] = useState({
-    leads: 0,
-    coaches: 0,
-    locations: 0,
-    participants: 0,
-    newLeads: 0
-  });
-  const [chartData, setChartData] = useState<any>({
-    leadsOverTime: [],
-    groupDistribution: [],
-    recentLeads: []
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      const token = localStorage.getItem('admin_token');
-      try {
-        const response = await fetch('/api/dashboard/stats', { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        });
-        const data = await response.json();
-
-        setStats({
-          leads: data.totals?.total_leads || 0,
-          newLeads: data.totals?.new_leads || 0,
-          coaches: data.totals?.total_coaches || 0,
-          locations: data.totals?.total_locations || 0,
-          participants: data.totals?.total_participants || 0
-        });
-
-        setChartData({
-          leadsOverTime: (data.leadsOverTime || []).map((d: any) => ({
-            date: new Date(d.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }),
-            count: parseInt(d.count)
-          })),
-          groupDistribution: (data.groupDistribution || []).map((g: any) => ({
-            name: g.group_name,
-            value: parseInt(g.count)
-          })),
-          recentLeads: data.recentLeads || []
-        });
-      } catch (e) {
-        console.error('Failed to fetch stats', e);
-      }
-      setLoading(false);
-    };
-    fetchStats();
-  }, []);
-
-  const COLORS = ['#DC2626', '#1D4ED8', '#059669', '#7C3AED', '#D97706'];
-
-  const statCards = [
-    { label: 'Нові заявки', value: stats.newLeads, icon: MessageSquare, color: 'text-red-500', bg: 'bg-red-500/10', trend: '+12%' },
-    { label: 'Всього заявок', value: stats.leads, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10', trend: '+5%' },
-    { label: 'Учасники клубу', value: stats.participants, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-500/10', trend: '+2%' },
-    { label: 'Тренери', value: stats.coaches, icon: Users, color: 'text-purple-500', bg: 'bg-purple-500/10', trend: '0%' },
-  ];
-
-  if (loading) return (
-    <div className="animate-pulse space-y-8">
-      <div className="h-12 w-64 bg-zinc-900/50 rounded-2xl" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[1,2,3,4].map(i => <div key={i} className="h-40 bg-zinc-900/50 rounded-[2.5rem]" />)}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="h-96 bg-zinc-900/50 rounded-[3rem]" />
-        <div className="h-96 bg-zinc-900/50 rounded-[3rem]" />
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-10">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-5xl font-black uppercase tracking-tighter leading-none mb-3">
-            Панель <span className="text-red-600">Керування</span>
-          </h2>
-          <p className="text-zinc-500 font-medium text-lg">Вітаємо, Ігоре. Ось що відбувається у вашому додзьо.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-zinc-900/50 border border-white/5 p-2 rounded-2xl flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white font-black italic">B</div>
-            <div className="pr-4">
-              <p className="text-xs font-black uppercase tracking-tighter leading-none">Admin</p>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Black Bear Dojo</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {statCards.map((stat, i) => (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            key={i} 
-            className="bg-zinc-900/40 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all group relative overflow-hidden"
-          >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl -mr-16 -mt-16 group-hover:bg-red-600/10 transition-colors" />
-            <div className={`w-14 h-14 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-              <stat.icon size={28} />
-            </div>
-            <div className="flex items-end justify-between">
-              <div>
-                <div className="text-5xl font-black tracking-tighter mb-1">{stat.value}</div>
-                <div className="text-[11px] font-black uppercase tracking-widest text-zinc-500">{stat.label}</div>
-              </div>
-              <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full ${stat.trend.startsWith('+') ? 'bg-green-500/10 text-green-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
-                {stat.trend.startsWith('+') ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                {stat.trend}
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-8">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5"
-        >
-          <div className="flex items-center justify-between mb-10">
-            <div>
-              <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                <BarChart3 className="text-red-600" size={24} />
-                Динаміка заявок
-              </h3>
-              <p className="text-zinc-500 text-sm font-medium">Кількість нових лідів за останні 14 днів</p>
-            </div>
-            <div className="flex gap-2">
-              <button className="px-4 py-2 bg-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-colors">Тиждень</button>
-              <button className="px-4 py-2 bg-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest text-white">Місяць</button>
-            </div>
-          </div>
-          
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData.leadsOverTime}>
-                <defs>
-                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#DC2626" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#DC2626" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#52525b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  axisLine={false}
-                  tick={{ fontWeight: 700 }}
-                />
-                <YAxis 
-                  stroke="#52525b" 
-                  fontSize={10} 
-                  tickLine={false} 
-                  axisLine={false}
-                  tick={{ fontWeight: 700 }}
-                />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
-                  itemStyle={{ color: '#fff', fontWeight: 900, fontSize: '12px' }}
-                  labelStyle={{ color: '#71717a', fontWeight: 700, fontSize: '10px', textTransform: 'uppercase', marginBottom: '4px' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="count" 
-                  stroke="#DC2626" 
-                  strokeWidth={4}
-                  fillOpacity={1} 
-                  fill="url(#colorLeads)" 
-                  animationDuration={2000}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        </motion.div>
-
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5"
-        >
-          <div className="mb-10">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-              <PieChartIcon className="text-red-600" size={24} />
-              Розподіл груп
-            </h3>
-            <p className="text-zinc-500 text-sm font-medium">Учні за віковими категоріями</p>
-          </div>
-
-          <div className="h-[250px] w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData.groupDistribution}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={8}
-                  dataKey="value"
-                  animationDuration={1500}
-                >
-                  {chartData.groupDistribution.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="transparent" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px' }}
-                  itemStyle={{ color: '#fff', fontWeight: 900, fontSize: '12px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-              <span className="text-3xl font-black tracking-tighter">{stats.participants}</span>
-              <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Учнів</span>
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-3">
-            {chartData.groupDistribution.map((group: any, i: number) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                  <span className="text-xs font-bold text-zinc-400">{group.name}</span>
-                </div>
-                <span className="text-xs font-black">{group.value}</span>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
-
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
-          <div className="flex items-center justify-between mb-10">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-              <Activity size={24} className="text-red-600" />
-              Останні заявки
-            </h3>
-            <button className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors">Всі заявки →</button>
-          </div>
-          <div className="space-y-4">
-            {chartData.recentLeads.map((lead: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
-                    {lead.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-tight">{lead.name}</p>
-                    <p className="text-[10px] text-zinc-500 font-bold">{lead.phone}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                    lead.status === 'new' ? 'bg-red-600/20 text-red-500' : 'bg-zinc-800 text-zinc-500'
-                  }`}>
-                    {lead.status === 'new' ? 'Нова' : lead.status}
-                  </span>
-                  <p className="text-[8px] text-zinc-600 font-bold uppercase mt-2">
-                    {new Date(lead.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-            {chartData.recentLeads.length === 0 && (
-              <div className="text-center py-10 text-zinc-500 font-bold italic">Заявок поки немає</div>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-          <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
-            <LayoutDashboard size={48} />
-          </div>
-          <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
-          <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
-          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-            <button 
-              onClick={() => setActiveTab('participants')}
-              className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
-            >
-              Додати учня
-            </button>
-            <button 
-              onClick={() => setActiveTab('schedule')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Редагувати розклад
-            </button>
-            <button 
-              onClick={() => setActiveTab('content')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Контент сайту
-            </button>
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Звіти
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ParticipantsEditor = () => {
+const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1282,6 +1190,13 @@ const ParticipantsEditor = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (initialAction === 'add' && groups.length > 0) {
+      setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' });
+      onActionComplete?.();
+    }
+  }, [initialAction, groups]);
 
   const handleSave = async (data: any) => {
     const token = localStorage.getItem('admin_token');
@@ -1613,7 +1528,7 @@ const AttendanceEditor = () => {
   );
 };
 
-const ContentEditor = () => {
+const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
   const [content, setContent] = useState<Record<string, string>>({});
   const [dirtyFields, setDirtyFields] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -1622,6 +1537,13 @@ const ContentEditor = () => {
   useEffect(() => {
     fetch(`/api/content?t=${Date.now()}`).then(res => res.json()).then(setContent);
   }, []);
+
+  useEffect(() => {
+    if (initialAction === 'video') {
+      setActiveSection('video_problems');
+      onActionComplete?.();
+    }
+  }, [initialAction]);
 
   const handleChange = (key: string, value: string) => {
     setContent(prev => ({ ...prev, [key]: value }));
@@ -1724,6 +1646,7 @@ const ContentEditor = () => {
     { id: 'faq', title: 'FAQ', icon: MessageSquare },
     { id: 'contacts', title: 'Контакти', icon: Settings },
     { id: 'video_problems', title: 'Відео та Проблеми', icon: Zap },
+    { id: 'modern_challenges', title: 'Виклики сучасності', icon: Shield },
     { id: 'kids_landing', title: 'Діти 4-7', icon: Smile },
     { id: 'junior_landing', title: 'Діти 7-12', icon: Trophy },
     { id: 'teen_landing', title: 'Підлітки', icon: Zap },
@@ -1779,6 +1702,17 @@ const ContentEditor = () => {
       { key: 'problem4', label: 'Проблема 4', type: 'text' },
       { key: 'problem5', label: 'Проблема 5', type: 'text' },
       { key: 'problem6', label: 'Проблема 6', type: 'text' },
+    ],
+    modern_challenges: [
+      { key: 'modern_label', label: 'Малий заголовок (червоний)', type: 'text' },
+      { key: 'modern_title', label: 'Головний заголовок', type: 'textarea' },
+      { key: 'modern_description', label: 'Опис', type: 'textarea' },
+      { key: 'modern_problem1', label: 'Пункт списку 1', type: 'text' },
+      { key: 'modern_problem2', label: 'Пункт списку 2', type: 'text' },
+      { key: 'modern_problem3', label: 'Пункт списку 3', type: 'text' },
+      { key: 'modern_problem4', label: 'Пункт списку 4', type: 'text' },
+      { key: 'modern_image', label: 'Зображення справа', type: 'image' },
+      { key: 'modern_quote', label: 'Цитата на фото', type: 'textarea' },
     ],
     kids_landing: [
       { key: 'kids_hero_bg', label: 'Hero: Фонове зображення', type: 'image' },
@@ -2394,7 +2328,7 @@ const LocationsEditor = () => {
   );
 };
 
-const ScheduleEditor = () => {
+const ScheduleEditor = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [coaches, setCoaches] = useState<any[]>([]);
@@ -2426,6 +2360,22 @@ const ScheduleEditor = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (initialAction === 'add' && locations.length > 0 && coaches.length > 0) {
+      setEditingEntry({ 
+        location_id: locations[0].id, 
+        coach_id: coaches[0].id, 
+        day_of_week: 'Пн', 
+        start_time: '16:00', 
+        end_time: '17:30', 
+        group_name: '', 
+        price: '2500',
+        order_index: 0 
+      });
+      onActionComplete?.();
+    }
+  }, [initialAction, locations, coaches]);
 
   const handleSaveEntry = async (entry: any) => {
     try {

@@ -203,10 +203,37 @@ async function initDb() {
         "social_instagram": "https://instagram.com/karate_kyiv",
         "social_facebook": "https://facebook.com/karate_kyiv",
         "meta_pixel_code": "<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init', '2370050340139768');fbq('track', 'PageView');</script>\n<noscript><img height=\"1\" width=\"1\" style=\"display:none\" src=\"https://www.facebook.com/tr?id=2370050340139768&ev=PageView&noscript=1\" /></noscript>",
-        "google_pixel_code": "<!-- Google tag (gtag.js) -->\n<script async src=\"https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX\"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n  gtag('config', 'G-XXXXXXXXXX');\n</script>"
+        "google_pixel_code": "<!-- Google tag (gtag.js) -->\n<script async src=\"https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX\"></script>\n<script>\n  window.dataLayer = window.dataLayer || [];\n  function gtag(){dataLayer.push(arguments);}\n  gtag('js', new Date());\n  gtag('config', 'G-XXXXXXXXXX');\n</script>",
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "video_title": "Відчуйте енергію тренувань",
+        "problems_title": "Ваша дитина:",
+        "problems_subtitle": "Наша секція карате Київ допомагає батькам виховувати сильних особистостей. <br /> <span class=\"text-red-500\">Ми перетворюємо слабкість на силу.</span>",
+        "problem1": "Невпевнена у власних силах?",
+        "problem2": "Багато часу проводить у телефоні?",
+        "problem3": "Потребує дисципліни та фізичного розвитку?",
+        "problem4": "Має труднощі у спілкуванні з однолітками?",
+        "problem5": "Відчуває брак фізичної активності?",
+        "problem6": "Потребує сильного оточення та наставника?"
       };
       for (const [key, value] of Object.entries(initialContent)) {
-        await client.query("INSERT INTO site_content (key, value) VALUES ($1, $2)", [key, value]);
+        await client.query("INSERT INTO site_content (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING", [key, value]);
+      }
+    } else {
+      // Ensure new keys are added even if content already exists
+      const newKeys = {
+        "video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "video_title": "Відчуйте енергію тренувань",
+        "problems_title": "Ваша дитина:",
+        "problems_subtitle": "Наша секція карате Київ допомагає батькам виховувати сильних особистостей. <br /> <span class=\"text-red-500\">Ми перетворюємо слабкість на силу.</span>",
+        "problem1": "Невпевнена у власних силах?",
+        "problem2": "Багато часу проводить у телефоні?",
+        "problem3": "Потребує дисципліни та фізичного розвитку?",
+        "problem4": "Має труднощі у спілкуванні з однолітками?",
+        "problem5": "Відчуває брак фізичної активності?",
+        "problem6": "Потребує сильного оточення та наставника?"
+      };
+      for (const [key, value] of Object.entries(newKeys)) {
+        await client.query("INSERT INTO site_content (key, value) VALUES ($1, $2) ON CONFLICT (key) DO NOTHING", [key, value]);
       }
     }
 
@@ -444,6 +471,17 @@ async function startServer() {
         return res.json([]);
       }
       res.status(500).json({ error: "Failed to fetch leads" });
+    }
+  });
+
+  // Delete all leads
+  app.delete('/api/leads/delete-all', requireAuth, async (req, res) => {
+    try {
+      await pool.query('DELETE FROM leads');
+      res.json({ message: 'All leads deleted' });
+    } catch (e) {
+      console.error('Delete all leads failed', e);
+      res.status(500).json({ error: 'Server error' });
     }
   });
 

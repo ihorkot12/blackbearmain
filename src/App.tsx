@@ -761,19 +761,22 @@ function LandingPage() {
               whileInView={{ opacity: 1, x: 0 }}
               viewport={{ once: true }}
             >
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Виклики сучасності</h2>
-              <h3 className="text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight">
-                Ваша дитина проводить занадто багато часу в <span className="text-zinc-600">гаджетах?</span>
-              </h3>
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
+                {content?.modern_label || "Виклики сучасності"}
+              </h2>
+              <h3 
+                className="text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
+                dangerouslySetInnerHTML={{ __html: content?.modern_title || 'Ваша дитина проводить занадто багато часу в <span class="text-zinc-600">гаджетах?</span>' }}
+              />
               <p className="text-zinc-400 text-lg mb-8 leading-relaxed">
-                Сучасний світ пропонує дітям пасивний відпочинок, що веде до слабкої дисципліни, невпевненості та відсутності фізичної активності. Батьки часто стикаються з тим, що дитина:
+                {content?.modern_description || "Сучасний світ пропонує дітям пасивний відпочинок, що веде до слабкої дисципліни, невпевненості та відсутності фізичної активності. Батьки часто стикаються з тим, що дитина:"}
               </p>
               <div className="space-y-4">
                 {[
-                  'Не вміє постояти за себе',
-                  'Має проблеми з концентрацією',
-                  'Швидко здається перед труднощами',
-                  'Потребує сильного прикладу для наслідування'
+                  content?.modern_problem1 || 'Не вміє постояти за себе',
+                  content?.modern_problem2 || 'Має проблеми з концентрацією',
+                  content?.modern_problem3 || 'Швидко здається перед труднощами',
+                  content?.modern_problem4 || 'Потребує сильного прикладу для наслідування'
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-4 text-zinc-300 font-medium">
                     <div className="w-1.5 h-1.5 bg-red-600 rounded-full" />
@@ -790,7 +793,7 @@ function LandingPage() {
               className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/5"
             >
               <img 
-                src="https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop" 
+                src={content?.modern_image || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop"} 
                 alt="Karate Discipline" 
                 className="w-full h-full object-cover grayscale brightness-75"
                 referrerPolicy="no-referrer"
@@ -798,7 +801,9 @@ function LandingPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
               <div className="absolute bottom-10 left-10 right-10">
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl">
-                  <p className="text-white font-bold italic">"Карате — це не про бійку. Це про перемогу над своєю слабкістю кожного дня."</p>
+                  <p className="text-white font-bold italic">
+                    {content?.modern_quote || '"Карате — це не про бійку. Це про перемогу над своєю слабкістю кожного дня."'}
+                  </p>
                 </div>
               </div>
             </motion.div>
