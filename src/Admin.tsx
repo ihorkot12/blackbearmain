@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
-  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -137,30 +137,37 @@ export const AdminPage = () => {
     checkAuth();
   }, [navigate]);
 
-  const coachMenuItems = [
-    { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard },
-    { id: 'leads', label: 'Заявки', icon: MessageSquare },
-    { id: 'participants', label: 'Учасники', icon: UserCheck },
-    { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
-    { id: 'rating', label: 'Рейтинг', icon: Award },
+  const menuGroups = [
+    {
+      title: 'Операційка',
+      items: [
+        { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard },
+        { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
+        { id: 'rating', label: 'Рейтинг', icon: Award },
+        { id: 'participants', label: 'Учасники', icon: UserCheck },
+        { id: 'schedule', label: 'Розклад', icon: Clock },
+      ]
+    },
+    {
+      title: 'Управління',
+      items: [
+        { id: 'leads', label: 'Заявки', icon: MessageSquare },
+        { id: 'content', label: 'Конструктор', icon: Settings },
+        { id: 'coaches', label: 'Тренери', icon: Users },
+        { id: 'locations', label: 'Локації', icon: MapPin },
+        { id: 'settings', label: 'Налаштування', icon: Activity },
+      ]
+    }
   ];
 
-  const fullAdminMenuItems = [
-    { id: 'content', label: 'Конструктор', icon: Settings },
-    { id: 'schedule', label: 'Розклад', icon: Clock },
-    { id: 'coaches', label: 'Тренери', icon: Users },
-    { id: 'locations', label: 'Локації', icon: MapPin },
-    { id: 'settings', label: 'Налаштування', icon: Activity },
-  ];
-
-  const currentMenuItems = isFullAdmin ? fullAdminMenuItems : coachMenuItems;
+  const visibleGroups = isFullAdmin ? menuGroups : [menuGroups[0]];
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
       {/* Sidebar */}
       <div className="w-72 bg-zinc-950 border-r border-white/5 flex flex-col sticky top-0 h-screen z-40">
-        <div className="p-8">
+        <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex items-center gap-3 mb-12">
             <div className="w-12 h-12 bg-red-600 flex items-center justify-center rotate-3 shadow-[0_0_30px_rgba(220,38,38,0.4)] rounded-xl">
               <span className="text-white font-black italic text-xl">B</span>
@@ -173,43 +180,54 @@ export const AdminPage = () => {
             </div>
           </div>
           
-          <nav className="space-y-2">
-            {currentMenuItems.map((item) => (
-              <button 
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-500 group relative ${
-                  activeTab === item.id 
-                    ? 'text-white' 
-                    : 'text-zinc-500 hover:bg-white/5 hover:text-white'
-                }`}
-              >
-                {activeTab === item.id && (
-                  <motion.div 
-                    layoutId="active-tab"
-                    className="absolute inset-0 bg-red-600 rounded-2xl shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
-                    transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                  />
-                )}
-                <item.icon size={20} className={`relative z-10 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110 transition-transform'}`} />
-                <span className="relative z-10 font-black uppercase tracking-widest text-[10px]">{item.label}</span>
-                {activeTab === item.id && <ChevronRight size={14} className="relative z-10 ml-auto opacity-50" />}
-              </button>
+          <nav className="space-y-8">
+            {visibleGroups.map((group, gIdx) => (
+              <div key={gIdx} className="space-y-3">
+                <h3 className="px-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">{group.title}</h3>
+                <div className="space-y-1">
+                  {group.items.map((item) => (
+                    <button 
+                      key={item.id}
+                      onClick={() => setActiveTab(item.id)}
+                      className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-500 group relative ${
+                        activeTab === item.id 
+                          ? 'text-white' 
+                          : 'text-zinc-500 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      {activeTab === item.id && (
+                        <motion.div 
+                          layoutId="active-tab"
+                          className="absolute inset-0 bg-red-600 rounded-2xl shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
+                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                        />
+                      )}
+                      <item.icon size={20} className={`relative z-10 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110 transition-transform'}`} />
+                      <span className="relative z-10 font-black uppercase tracking-widest text-[10px]">{item.label}</span>
+                      {activeTab === item.id && <ChevronRight size={14} className="relative z-10 ml-auto opacity-50" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
         </div>
 
-        <div className="mt-auto p-8 space-y-2">
+        <div className="p-8 space-y-2 border-t border-white/5 bg-zinc-950/50">
           <button 
             onClick={() => {
               setIsFullAdmin(!isFullAdmin);
-              setActiveTab(isFullAdmin ? 'dashboard' : 'content');
+              if (isFullAdmin) setActiveTab('dashboard');
             }}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-white transition-all duration-300 group border border-white/5"
+            className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group border ${
+              isFullAdmin 
+                ? 'bg-red-600/10 border-red-600/20 text-red-500' 
+                : 'text-zinc-500 hover:bg-white/5 hover:text-white border-white/5'
+            }`}
           >
             <BarChart3 size={20} className="group-hover:rotate-12 transition-transform" />
             <span className="font-black uppercase tracking-widest text-[10px]">
-              {isFullAdmin ? 'Панель тренера' : 'Повна адмінка'}
+              {isFullAdmin ? 'Вимкнути адмінку' : 'Повна адмінка'}
             </span>
           </button>
           
@@ -285,75 +303,637 @@ export const AdminPage = () => {
   );
 };
 
-const RatingEditor = () => (
-  <div className="space-y-8">
-    <div className="flex justify-between items-center">
-      <h2 className="text-4xl font-black uppercase tracking-tight">Рейтинг та досягнення</h2>
-      <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-red-600/20">
-        Оновити рейтинг
-      </button>
-    </div>
-    <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-12 flex flex-col items-center justify-center text-center min-h-[400px]">
-      <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8">
-        <Award size={48} />
-      </div>
-      <h3 className="text-2xl font-black uppercase tracking-tight mb-4">Модуль рейтингу в розробці</h3>
-      <p className="text-zinc-500 max-w-md font-medium">
-        Тут ви зможете керувати поясами, досягненнями та внутрішнім рейтингом учнів додзьо.
-      </p>
-    </div>
-  </div>
-);
+const RatingEditor = () => {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingRank, setEditingRank] = useState<any>(null);
+  const [showBadgeModal, setShowBadgeModal] = useState<any>(null);
+  const [showCompModal, setShowCompModal] = useState<any>(null);
+  const [showDetails, setShowDetails] = useState<any>(null);
+  const [badgeType, setBadgeType] = useState('');
+  const [compName, setCompName] = useState('');
+  const [compResult, setCompResult] = useState('');
+  const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
 
-const SettingsEditor = () => (
-  <div className="space-y-8">
-    <div className="flex justify-between items-center">
-      <h2 className="text-4xl font-black uppercase tracking-tight">Налаштування системи</h2>
-      <button className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-red-600/20">
-        Зберегти зміни
-      </button>
-    </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
-        <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
-          <Bell size={20} className="text-red-600" />
-          Сповіщення
-        </h3>
-        <div className="space-y-4">
-          {[
-            'Нові заявки на email',
-            'Звіти про відвідуваність',
-            'Нагадування про оплату',
-            'Системні оновлення'
-          ].map((item, i) => (
-            <div key={i} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
-              <span className="font-bold text-sm">{item}</span>
-              <div className="w-12 h-6 bg-red-600 rounded-full relative">
-                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+  const fetchParticipants = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/participants', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setParticipants(data);
+    } catch (e) {
+      toast.error('Помилка завантаження учасників');
+    }
+    setLoading(false);
+  };
+
+  const fetchDetails = async (participantId: number) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const [bRes, cRes] = await Promise.all([
+        fetch(`/api/participants/${participantId}/badges`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`/api/participants/${participantId}/competitions`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const badges = await bRes.json();
+      const competitions = await cRes.json();
+      setDetailsData({ badges, competitions });
+    } catch (e) {
+      toast.error('Помилка завантаження деталей');
+    }
+  };
+
+  useEffect(() => {
+    fetchParticipants();
+  }, []);
+
+  useEffect(() => {
+    if (showDetails) {
+      fetchDetails(showDetails.id);
+    }
+  }, [showDetails]);
+
+  const handleUpdateRank = async (id: number, belt: string, points: number) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/participants/${id}/rank`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ belt, rank_points: points })
+      });
+      if (res.ok) {
+        toast.success('Рейтинг оновлено');
+        setEditingRank(null);
+        fetchParticipants();
+      }
+    } catch (e) {
+      toast.error('Помилка оновлення');
+    }
+  };
+
+  const handleAddBadge = async (participantId: number) => {
+    if (!badgeType) return;
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/badges', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ participant_id: participantId, type: badgeType })
+      });
+      if (res.ok) {
+        toast.success('Досягнення додано');
+        setShowBadgeModal(null);
+        setBadgeType('');
+        fetchParticipants(); // Refresh main list for points
+        if (showDetails?.id === participantId) fetchDetails(participantId);
+      }
+    } catch (e) {
+      toast.error('Помилка');
+    }
+  };
+
+  const handleAddComp = async (participantId: number) => {
+    if (!compName) return;
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/competitions', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          participant_id: participantId, 
+          name: compName, 
+          result: compResult,
+          date: new Date().toISOString().split('T')[0]
+        })
+      });
+      if (res.ok) {
+        toast.success('Результат змагань додано');
+        setShowCompModal(null);
+        setCompName('');
+        setCompResult('');
+        fetchParticipants(); // Refresh main list for points
+        if (showDetails?.id === participantId) fetchDetails(participantId);
+      }
+    } catch (e) {
+      toast.error('Помилка');
+    }
+  };
+
+  const handleDeleteBadge = async (id: number) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/badges/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Досягнення видалено');
+        fetchParticipants(); // Refresh main list for points
+        if (showDetails) fetchDetails(showDetails.id);
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+  };
+
+  const handleDeleteComp = async (id: number) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/competitions/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Запис видалено');
+        fetchParticipants(); // Refresh main list for points
+        if (showDetails) fetchDetails(showDetails.id);
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+  };
+
+  const belts = [
+    'Білий', 'Оранжевий', 'Оранжевий з синьою смужкою', 
+    'Синій', 'Синій з жовтою смужкою', 
+    'Жовтий', 'Жовтий з зеленою смужкою', 
+    'Зелений', 'Зелений з коричневою смужкою', 
+    'Коричневий', 'Коричневий з золотою смужкою', 
+    'Чорний'
+  ];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-4xl font-black uppercase tracking-tight">Рейтинг та досягнення</h2>
+        <button 
+          onClick={fetchParticipants}
+          className="bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl transition-all border border-white/5"
+        >
+          <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+        </button>
+      </div>
+
+      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-black/50 border-b border-white/5">
+            <tr>
+              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Учень</th>
+              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Група</th>
+              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Пояс</th>
+              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Бали</th>
+              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дії</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {participants.map(p => (
+              <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                <td className="p-6 font-bold">{p.name}</td>
+                <td className="p-6 text-sm text-zinc-500">{p.group_name}</td>
+                <td className="p-6">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-8 rounded-full ${
+                      p.belt?.includes('Білий') ? 'bg-white' :
+                      p.belt?.includes('Оранжевий') ? 'bg-orange-500' :
+                      p.belt?.includes('Синій') ? 'bg-blue-600' :
+                      p.belt?.includes('Жовтий') ? 'bg-yellow-400' :
+                      p.belt?.includes('Зелений') ? 'bg-green-600' :
+                      p.belt?.includes('Коричневий') ? 'bg-amber-800' :
+                      p.belt?.includes('Чорний') ? 'bg-zinc-950 border border-white/20' : 'bg-zinc-700'
+                    }`} />
+                    <span className="font-bold text-sm">{p.belt || 'Білий'}</span>
+                  </div>
+                </td>
+                <td className="p-6 font-mono text-red-500 font-bold">{p.rank_points || 0}</td>
+                <td className="p-6">
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setShowDetails(p)}
+                      className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      title="Деталі"
+                    >
+                      <Eye size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setEditingRank(p)}
+                      className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                      title="Редагувати ранг"
+                    >
+                      <Award size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setShowBadgeModal(p)}
+                      className="p-2 text-zinc-500 hover:text-amber-500 hover:bg-amber-500/10 rounded-lg transition-colors"
+                      title="Додати досягнення"
+                    >
+                      <Plus size={18} />
+                    </button>
+                    <button 
+                      onClick={() => setShowCompModal(p)}
+                      className="p-2 text-zinc-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                      title="Додати змагання"
+                    >
+                      <TrendingUp size={18} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Details Modal */}
+      <AnimatePresence>
+        {showDetails && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-900 w-full max-w-2xl rounded-[2.5rem] border border-white/10 p-8 space-y-8 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="text-3xl font-black uppercase tracking-tight">{showDetails.name}</h3>
+                  <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs mt-1">{showDetails.group_name}</p>
+                </div>
+                <button onClick={() => setShowDetails(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X size={24} />
+                </button>
               </div>
-            </div>
-          ))}
-        </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <Award size={14} className="text-amber-500" />
+                    Досягнення
+                  </h4>
+                  <div className="space-y-2">
+                    {detailsData.badges.length === 0 ? (
+                      <p className="text-zinc-600 text-sm italic">Немає досягнень</p>
+                    ) : (
+                      detailsData.badges.map(b => (
+                        <div key={b.id} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
+                          <div>
+                            <p className="font-bold text-sm">{b.type}</p>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{new Date(b.date).toLocaleDateString()}</p>
+                          </div>
+                          <button onClick={() => handleDeleteBadge(b.id)} className="text-zinc-600 hover:text-red-500 p-2">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <TrendingUp size={14} className="text-blue-500" />
+                    Змагання
+                  </h4>
+                  <div className="space-y-2">
+                    {detailsData.competitions.length === 0 ? (
+                      <p className="text-zinc-600 text-sm italic">Немає записів</p>
+                    ) : (
+                      detailsData.competitions.map(c => (
+                        <div key={c.id} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
+                          <div>
+                            <p className="font-bold text-sm">{c.name}</p>
+                            <p className="text-xs text-blue-500 font-bold">{c.result}</p>
+                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{new Date(c.date).toLocaleDateString()}</p>
+                          </div>
+                          <button onClick={() => handleDeleteComp(c.id)} className="text-zinc-600 hover:text-red-500 p-2">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Rank Modal */}
+      <AnimatePresence>
+        {editingRank && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] border border-white/10 p-8 space-y-6"
+            >
+              <h3 className="text-2xl font-black uppercase tracking-tight">Ранг: {editingRank.name}</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Пояс</label>
+                  <select 
+                    value={editingRank.belt}
+                    onChange={e => setEditingRank({...editingRank, belt: e.target.value})}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  >
+                    {belts.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Бали рейтингу</label>
+                  <input 
+                    type="number"
+                    value={editingRank.rank_points}
+                    onChange={e => setEditingRank({...editingRank, rank_points: parseInt(e.target.value)})}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => handleUpdateRank(editingRank.id, editingRank.belt, editingRank.rank_points)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Зберегти
+                </button>
+                <button 
+                  onClick={() => setEditingRank(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Скасувати
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Badge Modal */}
+      <AnimatePresence>
+        {showBadgeModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] border border-white/10 p-8 space-y-6"
+            >
+              <h3 className="text-2xl font-black uppercase tracking-tight">Нове досягнення</h3>
+              <p className="text-zinc-500 text-sm font-medium">Додати нагороду для {showBadgeModal.name}</p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Тип досягнення</label>
+                  <input 
+                    type="text"
+                    placeholder="Наприклад: Кращий технік місяця"
+                    value={badgeType}
+                    onChange={e => setBadgeType(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => handleAddBadge(showBadgeModal.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Додати
+                </button>
+                <button 
+                  onClick={() => setShowBadgeModal(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Скасувати
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Competition Modal */}
+      <AnimatePresence>
+        {showCompModal && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] border border-white/10 p-8 space-y-6"
+            >
+              <h3 className="text-2xl font-black uppercase tracking-tight">Результат змагань</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Назва турніру</label>
+                  <input 
+                    type="text"
+                    value={compName}
+                    onChange={e => setCompName(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Результат (місце)</label>
+                  <input 
+                    type="text"
+                    placeholder="Наприклад: 1 місце"
+                    value={compResult}
+                    onChange={e => setCompResult(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button 
+                  onClick={() => handleAddComp(showCompModal.id)}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Зберегти
+                </button>
+                <button 
+                  onClick={() => setShowCompModal(null)}
+                  className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+                >
+                  Скасувати
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const SettingsEditor = () => {
+  const [settings, setSettings] = useState<any>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [passwords, setPasswords] = useState({ current: '', new: '', confirm: '' });
+
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/settings', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setSettings(data);
+    } catch (e) {
+      toast.error('Помилка завантаження налаштувань');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const handleSaveSettings = async () => {
+    setSaving(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(settings)
+      });
+      if (res.ok) {
+        toast.success('Налаштування збережено');
+      }
+    } catch (e) {
+      toast.error('Помилка збереження');
+    }
+    setSaving(false);
+  };
+
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      return toast.error('Паролі не співпадають');
+    }
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          currentPassword: passwords.current, 
+          newPassword: passwords.new 
+        })
+      });
+      if (res.ok) {
+        toast.success('Пароль змінено');
+        setPasswords({ current: '', new: '', confirm: '' });
+      } else {
+        const data = await res.json();
+        toast.error(data.error || 'Помилка зміни пароля');
+      }
+    } catch (e) {
+      toast.error('Помилка');
+    }
+  };
+
+  if (loading) return <div className="p-20 text-center text-zinc-500">Завантаження...</div>;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h2 className="text-4xl font-black uppercase tracking-tight">Налаштування системи</h2>
+        <button 
+          onClick={handleSaveSettings}
+          disabled={saving}
+          className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-lg shadow-red-600/20 disabled:opacity-50"
+        >
+          {saving ? 'Збереження...' : 'Зберегти зміни'}
+        </button>
       </div>
-      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
-        <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
-          <Activity size={20} className="text-red-600" />
-          Безпека
-        </h3>
-        <div className="space-y-4">
-          <button className="w-full text-left p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-red-600/30 transition-all">
-            <p className="font-bold text-sm mb-1">Змінити пароль адміністратора</p>
-            <p className="text-xs text-zinc-500">Останні зміни: 2 тижні тому</p>
-          </button>
-          <button className="w-full text-left p-4 bg-black/20 rounded-2xl border border-white/5 hover:border-red-600/30 transition-all">
-            <p className="font-bold text-sm mb-1">Двофакторна автентифікація</p>
-            <p className="text-xs text-red-600 font-bold uppercase tracking-widest">Вимкнено</p>
-          </button>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
+            <Bell size={20} className="text-red-600" />
+            Сповіщення
+          </h3>
+          <div className="space-y-4">
+            {[
+              { key: 'notify_email', label: 'Нові заявки на email' },
+              { key: 'notify_attendance', label: 'Звіти про відвідуваність' },
+              { key: 'notify_payments', label: 'Нагадування про оплату' },
+              { key: 'notify_updates', label: 'Системні оновлення' }
+            ].map((item) => (
+              <div key={item.key} className="flex items-center justify-between p-4 bg-black/20 rounded-2xl border border-white/5">
+                <span className="font-bold text-sm">{item.label}</span>
+                <button 
+                  onClick={() => setSettings({...settings, [item.key]: settings[item.key] === 'true' ? 'false' : 'true'})}
+                  className={`w-12 h-6 rounded-full relative transition-colors ${settings[item.key] === 'true' ? 'bg-red-600' : 'bg-zinc-700'}`}
+                >
+                  <motion.div 
+                    animate={{ x: settings[item.key] === 'true' ? 24 : 4 }}
+                    className="absolute top-1 w-4 h-4 bg-white rounded-full" 
+                  />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-6 flex items-center gap-3">
+            <Activity size={20} className="text-red-600" />
+            Безпека
+          </h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Поточний пароль</label>
+              <input 
+                type="password"
+                value={passwords.current}
+                onChange={e => setPasswords({...passwords, current: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Новий пароль</label>
+              <input 
+                type="password"
+                value={passwords.new}
+                onChange={e => setPasswords({...passwords, new: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Підтвердіть пароль</label>
+              <input 
+                type="password"
+                value={passwords.confirm}
+                onChange={e => setPasswords({...passwords, confirm: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+              />
+            </div>
+            <button 
+              onClick={handleChangePassword}
+              className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all mt-2"
+            >
+              Оновити пароль
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -685,8 +1265,11 @@ const ParticipantsEditor = () => {
   const handleSave = async (data: any) => {
     const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/participants', {
-        method: 'POST',
+      const url = data.id ? `/api/participants/${data.id}` : '/api/participants';
+      const method = data.id ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -696,7 +1279,7 @@ const ParticipantsEditor = () => {
       if (res.ok) {
         setEditingParticipant(null);
         fetchData();
-        toast.success('Учасника збережено');
+        toast.success(data.id ? 'Дані оновлено' : 'Учасника збережено');
       }
     } catch (e) {
       toast.error('Помилка збереження');
@@ -794,7 +1377,10 @@ const ParticipantsEditor = () => {
                     <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-3 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
                       <Trash2 size={18} />
                     </button>
-                    <button className="p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors">
+                    <button 
+                      onClick={() => setEditingParticipant(p)}
+                      className="p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors"
+                    >
                       <Edit2 size={18} />
                     </button>
                   </div>
@@ -817,7 +1403,9 @@ const ParticipantsEditor = () => {
       {editingParticipant && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
           <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
-            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Новий учень</h3>
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">
+              {editingParticipant.id ? 'Редагувати учня' : 'Новий учень'}
+            </h3>
             <div className="space-y-6">
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">ПІБ учня</label>
@@ -1090,6 +1678,7 @@ const ContentEditor = () => {
     { id: 'results', title: 'Результати', icon: Award },
     { id: 'faq', title: 'FAQ', icon: MessageSquare },
     { id: 'contacts', title: 'Контакти', icon: Settings },
+    { id: 'analytics', title: 'Аналітика', icon: Shield },
   ];
 
   const sectionFields: Record<string, any[]> = {
@@ -1127,6 +1716,10 @@ const ContentEditor = () => {
       { key: 'contact_email', label: 'Email', type: 'text' },
       { key: 'social_instagram', label: 'Instagram URL', type: 'text' },
       { key: 'social_facebook', label: 'Facebook URL', type: 'text' },
+    ],
+    analytics: [
+      { key: 'meta_pixel_code', label: 'Meta Pixel Code (Facebook)', type: 'textarea', placeholder: 'Вставте повний код пікселя <script>...</script>' },
+      { key: 'google_pixel_code', label: 'Google Analytics / Tag Manager Code', type: 'textarea', placeholder: 'Вставте код відстеження Google' },
     ]
   };
 
@@ -1187,10 +1780,11 @@ const ContentEditor = () => {
             )}
             {field.type === 'textarea' && (
               <textarea 
-                rows={4}
+                rows={field.key.includes('pixel') ? 12 : 4}
                 value={content[field.key] || ''}
+                placeholder={field.placeholder}
                 onChange={e => handleChange(field.key, e.target.value)}
-                className="w-full bg-zinc-950 border border-white/5 rounded-2xl p-5 text-white outline-none focus:border-red-600 transition-all font-medium resize-none"
+                className={`w-full bg-zinc-950 border border-white/5 rounded-2xl p-5 text-white outline-none focus:border-red-600 transition-all font-medium resize-none ${field.key.includes('pixel') ? 'font-mono text-xs' : ''}`}
               />
             )}
             {field.type === 'image' && (

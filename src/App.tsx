@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, Suspense, lazy } from 'react';
+import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import { AIChat } from './components/AIChat';
@@ -49,6 +49,75 @@ declare global {
 }
 
 // --- Components ---
+
+const PixelManager = () => {
+  const [content, setContent] = useState<any>(null);
+
+  useEffect(() => {
+    fetch(`/api/content?t=${Date.now()}`)
+      .then(res => res.json())
+      .then(data => setContent(data && !data.error ? data : null))
+      .catch(() => setContent(null));
+  }, []);
+
+  useEffect(() => {
+    if (!content) return;
+
+    const injectScript = (code: string | undefined, id: string) => {
+      if (!code || typeof code !== 'string' || code.trim().length === 0) return [];
+      
+      const elements: HTMLElement[] = [];
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = code;
+      
+      const scripts = tempDiv.querySelectorAll('script');
+      if (scripts.length > 0) {
+        scripts.forEach((s, idx) => {
+          const newScript = document.createElement('script');
+          newScript.id = `${id}-script-${idx}`;
+          if (s.src) {
+            newScript.src = s.src;
+            newScript.async = s.async;
+          } else {
+            newScript.innerHTML = s.innerHTML;
+          }
+          document.head.appendChild(newScript);
+          elements.push(newScript);
+        });
+      } else if (code.trim().length > 0) {
+        if (tempDiv.children.length === 0) {
+          const script = document.createElement('script');
+          script.id = id;
+          script.innerHTML = code;
+          document.head.appendChild(script);
+          elements.push(script);
+        }
+      }
+      
+      const noscripts = tempDiv.querySelectorAll('noscript');
+      noscripts.forEach((ns, idx) => {
+        const newNoScript = document.createElement('noscript');
+        newNoScript.id = `${id}-noscript-${idx}`;
+        newNoScript.innerHTML = ns.innerHTML;
+        document.body.appendChild(newNoScript);
+        elements.push(newNoScript);
+      });
+
+      return elements;
+    };
+
+    const googleElements = injectScript(content?.google_pixel_code, 'google-pixel');
+    const metaElements = injectScript(content?.meta_pixel_code, 'meta-pixel');
+
+    return () => {
+      [...googleElements, ...metaElements].forEach(el => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      });
+    };
+  }, [content?.google_pixel_code, content?.meta_pixel_code]);
+
+  return null;
+};
 
 const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
   <motion.div 
@@ -192,6 +261,7 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 export default function App() {
   return (
     <BrowserRouter>
+      <PixelManager />
       <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
@@ -342,64 +412,6 @@ function LandingPage() {
       window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
-
-  React.useEffect(() => {
-    const injectScript = (code: string, id: string) => {
-      if (!code || typeof code !== 'string') return [];
-      
-      const elements: HTMLElement[] = [];
-      const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = code;
-      
-      const scripts = tempDiv.querySelectorAll('script');
-      if (scripts.length > 0) {
-        scripts.forEach((s, idx) => {
-          const newScript = document.createElement('script');
-          newScript.id = `${id}-script-${idx}`;
-          if (s.src) {
-            newScript.src = s.src;
-            newScript.async = s.async;
-          } else {
-            newScript.innerHTML = s.innerHTML;
-          }
-          document.head.appendChild(newScript);
-          elements.push(newScript);
-        });
-      } else if (code.trim().length > 0) {
-        // If no script tags found, but there is content
-        // Check if it looks like HTML (contains tags)
-        if (tempDiv.children.length === 0) {
-          // It's just text/comments, assume it's raw JS
-          const script = document.createElement('script');
-          script.id = id;
-          script.innerHTML = code;
-          document.head.appendChild(script);
-          elements.push(script);
-        }
-      }
-      
-      // Handle noscript tags separately
-      const noscripts = tempDiv.querySelectorAll('noscript');
-      noscripts.forEach((ns, idx) => {
-        const newNoScript = document.createElement('noscript');
-        newNoScript.id = `${id}-noscript-${idx}`;
-        newNoScript.innerHTML = ns.innerHTML;
-        document.body.appendChild(newNoScript);
-        elements.push(newNoScript);
-      });
-
-      return elements;
-    };
-
-    const googleElements = injectScript(content?.google_pixel_code, 'google-pixel');
-    const metaElements = injectScript(content?.meta_pixel_code, 'meta-pixel');
-
-    return () => {
-      [...googleElements, ...metaElements].forEach(el => {
-        if (el.parentNode) el.parentNode.removeChild(el);
-      });
-    };
-  }, [content?.google_pixel_code, content?.meta_pixel_code]);
 
   const navLinks = [
     { name: 'Про клуб', href: '#about' },

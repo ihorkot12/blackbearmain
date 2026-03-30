@@ -93,6 +93,8 @@ async function initDb() {
         group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
         parent_login TEXT UNIQUE,
         parent_password TEXT,
+        belt TEXT DEFAULT 'Білий',
+        rank_points INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -119,7 +121,14 @@ async function initDb() {
         date DATE
       );
 
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT
+      );
+
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS rank_points INTEGER DEFAULT 0;
     `);
 
     // Seed initial groups if empty
@@ -728,6 +737,18 @@ async function startServer() {
     res.json({ isAdmin: true });
   });
 
+  app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!newPassword) return res.status(400).json({ error: 'New password required' });
+    
+    // In this environment, we use process.env for the password.
+    // However, for a "real" app we'd update a database.
+    // Since we can't update process.env permanently, we'll just mock success
+    // or tell the user how to do it.
+    console.log(`Password change requested to: ${newPassword}`);
+    res.json({ success: true, message: 'Password change simulated. Please update ADMIN_PASSWORD in your environment variables for a permanent change.' });
+  });
+
   // Participants
   app.get("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
@@ -761,6 +782,20 @@ async function startServer() {
     }
   });
 
+  app.put("/api/participants/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { name, age, birthday, group_id, parent_login, parent_password } = req.body;
+    try {
+      await pool.query(
+        "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6 WHERE id = $7",
+        [name, age, birthday || null, group_id || null, parent_login, parent_password, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update participant" });
+    }
+  });
+
   app.delete("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
@@ -768,6 +803,148 @@ async function startServer() {
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete participant" });
+    }
+  });
+
+  app.put("/api/participants/:id/rank", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { belt, rank_points } = req.body;
+    try {
+      await pool.query(
+        "UPDATE participants SET belt = $1, rank_points = $2 WHERE id = $3",
+        [belt, rank_points, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update rank" });
+    }
+  });
+
+  // Badges (Achievements)
+  app.get("/api/badges", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query(`
+        SELECT b.*, p.name as participant_name 
+        FROM badges b 
+        JOIN participants p ON b.participant_id = p.id 
+        ORDER BY b.date DESC
+      `);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch badges" });
+    }
+  });
+
+  app.get("/api/participants/:id/badges", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query("SELECT * FROM badges WHERE participant_id = $1 ORDER BY date DESC", [req.params.id]);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch participant badges" });
+    }
+  });
+
+  app.post("/api/badges", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { participant_id, type, date } = req.body;
+    try {
+      await pool.query("BEGIN");
+      await pool.query(
+        "INSERT INTO badges (participant_id, type, date) VALUES ($1, $2, $3)",
+        [participant_id, type, date || new Date()]
+      );
+      // Increment rank points by 10 for a badge
+      await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
+      await pool.query("COMMIT");
+      res.json({ success: true });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      res.status(500).json({ error: "Failed to create badge" });
+    }
+  });
+
+  app.delete("/api/badges/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      await pool.query("BEGIN");
+      const badgeRes = await pool.query("SELECT participant_id FROM badges WHERE id = $1", [req.params.id]);
+      if (badgeRes.rows.length > 0) {
+        const participantId = badgeRes.rows[0].participant_id;
+        await pool.query("DELETE FROM badges WHERE id = $1", [req.params.id]);
+        // Decrement rank points by 10
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 10) WHERE id = $1", [participantId]);
+      }
+      await pool.query("COMMIT");
+      res.json({ success: true });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      res.status(500).json({ error: "Failed to delete badge" });
+    }
+  });
+
+  // Competitions
+  app.get("/api/competitions", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query(`
+        SELECT c.*, p.name as participant_name 
+        FROM competitions c 
+        JOIN participants p ON c.participant_id = p.id 
+        ORDER BY c.date DESC
+      `);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch competitions" });
+    }
+  });
+
+  app.get("/api/participants/:id/competitions", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query("SELECT * FROM competitions WHERE participant_id = $1 ORDER BY date DESC", [req.params.id]);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch participant competitions" });
+    }
+  });
+
+  app.post("/api/competitions", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { participant_id, name, result, date } = req.body;
+    try {
+      await pool.query("BEGIN");
+      await pool.query(
+        "INSERT INTO competitions (participant_id, name, result, date) VALUES ($1, $2, $3, $4)",
+        [participant_id, name, result, date]
+      );
+      // Increment rank points by 20 for a competition
+      await pool.query("UPDATE participants SET rank_points = rank_points + 20 WHERE id = $1", [participant_id]);
+      await pool.query("COMMIT");
+      res.json({ success: true });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      res.status(500).json({ error: "Failed to create competition entry" });
+    }
+  });
+
+  app.delete("/api/competitions/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      await pool.query("BEGIN");
+      const compRes = await pool.query("SELECT participant_id FROM competitions WHERE id = $1", [req.params.id]);
+      if (compRes.rows.length > 0) {
+        const participantId = compRes.rows[0].participant_id;
+        await pool.query("DELETE FROM competitions WHERE id = $1", [req.params.id]);
+        // Decrement rank points by 20
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 20) WHERE id = $1", [participantId]);
+      }
+      await pool.query("COMMIT");
+      res.json({ success: true });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      res.status(500).json({ error: "Failed to delete competition entry" });
     }
   });
 
@@ -827,6 +1004,37 @@ async function startServer() {
     } catch (e) {
       console.error('Dashboard stats error:', e);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // Settings
+  app.get("/api/settings", requireAuth, async (req, res) => {
+    if (!pool) return res.json({});
+    try {
+      const result = await pool.query("SELECT * FROM settings");
+      const settings: any = {};
+      result.rows.forEach(row => {
+        settings[row.key] = row.value;
+      });
+      res.json(settings);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  app.post("/api/settings", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const settings = req.body;
+    try {
+      for (const [key, value] of Object.entries(settings)) {
+        await pool.query(
+          "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+          [key, String(value)]
+        );
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to save settings" });
     }
   });
 
