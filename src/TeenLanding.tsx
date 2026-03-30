@@ -5,6 +5,8 @@ import {
   Trophy, 
   Users, 
   ChevronRight, 
+  Award,
+  MapPin,
   Star, 
   Instagram, 
   Facebook, 
@@ -209,6 +211,37 @@ export const TeenLanding = () => {
               </Button>
             </div>
           </motion.div>
+        </div>
+
+        {/* Trust Bar */}
+        <div className="absolute bottom-0 left-0 w-full z-20 border-y border-white/5 bg-zinc-950/50 backdrop-blur-md py-8">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12">
+              {[
+                { label: "Досвід викладання", value: "5+ років", icon: <Award className="text-red-600" size={20} /> },
+                { label: "Вихованців клубу", value: "+50", icon: <Users className="text-red-600" size={20} /> },
+                { label: "Філії у Києві", value: "2 локації", icon: <MapPin className="text-red-600" size={20} /> },
+                { label: "Чорні пояси", value: "3 дан", icon: <Shield className="text-red-600" size={20} /> },
+              ].map((stat, i) => (
+                <motion.div 
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="flex items-center gap-4"
+                >
+                  <div className="p-2 rounded-xl bg-red-600/10 border border-red-600/20 shrink-0">
+                    {stat.icon}
+                  </div>
+                  <div>
+                    <div className="text-lg md:text-xl font-black text-white leading-none mb-1">{stat.value}</div>
+                    <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{stat.label}</div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
