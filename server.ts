@@ -22,8 +22,10 @@ const pool = new Pool({
     rejectUnauthorized: false
   }
 });
+let dbInitialized = false;
 
 async function initDb() {
+    if (dbInitialized) return;
   if (!process.env.DATABASE_URL) {
     console.warn("DATABASE_URL is not set. Database features will be disabled.");
     return;
