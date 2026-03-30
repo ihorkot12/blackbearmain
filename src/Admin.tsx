@@ -124,14 +124,26 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
     const fetchData = async () => {
       const token = localStorage.getItem('admin_token');
       try {
-        const [sRes, cRes] = await Promise.all([
-          fetch('/api/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-          fetch('/api/dashboard-charts', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
-        ]);
-        setStats(sRes);
-        setChartData(cRes);
+        const res = await fetch('/api/dashboard/stats', { 
+          headers: { 'Authorization': `Bearer ${token}` } 
+        }).then(r => r.json());
+        
+        if (res.error) throw new Error(res.error);
+        
+        setStats(res.totals || {});
+        setChartData({
+          leadsOverTime: res.leadsOverTime || [],
+          groupDistribution: res.groupDistribution || [],
+          recentLeads: res.recentLeads || []
+        });
       } catch (e) {
         console.error('Dashboard fetch failed', e);
+        setStats({});
+        setChartData({
+          leadsOverTime: [],
+          groupDistribution: [],
+          recentLeads: []
+        });
       }
       setLoading(false);
     };
@@ -145,10 +157,10 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
   );
 
   const statCards = [
-    { title: 'Всього учнів', value: stats?.participantsCount || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Нові заявки', value: stats?.newLeadsCount || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10' },
-    { title: 'Груп', value: stats?.groupsCount || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Тренерів', value: stats?.coachesCount || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10' },
   ];
 
   return (
@@ -195,7 +207,7 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
           </h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData.leadsOverTime}>
+              <AreaChart data={chartData?.leadsOverTime || []}>
                 <defs>
                   <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3}/>
@@ -207,7 +219,7 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
                   dataKey="date" 
                   stroke="#ffffff20" 
                   fontSize={10} 
-                  tickFormatter={(val) => new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+                  tickFormatter={(val) => val ? new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) : ''}
                 />
                 <YAxis stroke="#ffffff20" fontSize={10} />
                 <Tooltip 
@@ -229,16 +241,16 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
-                  data={chartData.groupDistribution}
+                  data={chartData?.groupDistribution || []}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
                   outerRadius={100}
                   paddingAngle={8}
                   dataKey="count"
-                  nameKey="name"
+                  nameKey="group_name"
                 >
-                  {chartData.groupDistribution.map((entry: any, index: number) => (
+                  {(chartData?.groupDistribution || []).map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fee2e2'][index % 5]} stroke="none" />
                   ))}
                 </Pie>
@@ -266,11 +278,11 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
             </button>
           </div>
           <div className="space-y-4">
-            {chartData.recentLeads.map((lead: any, i: number) => (
+            {(chartData?.recentLeads || []).map((lead: any, i: number) => (
               <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
-                    {lead.name[0]}
+                    {lead.name ? lead.name[0] : '?'}
                   </div>
                   <div>
                     <p className="text-sm font-black uppercase tracking-tight">{lead.name}</p>
@@ -284,12 +296,12 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
                     {lead.status === 'new' ? 'Нова' : lead.status}
                   </span>
                   <p className="text-[8px] text-zinc-600 font-bold uppercase mt-2">
-                    {new Date(lead.created_at).toLocaleDateString()}
+                    {lead.created_at ? new Date(lead.created_at).toLocaleDateString() : ''}
                   </p>
                 </div>
               </div>
             ))}
-            {chartData.recentLeads.length === 0 && (
+            {(!chartData?.recentLeads || chartData.recentLeads.length === 0) && (
               <div className="text-center py-10 text-zinc-500 font-bold italic">Заявок поки немає</div>
             )}
           </div>
