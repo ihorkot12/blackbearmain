@@ -7,7 +7,7 @@ import {
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield,
-  Smile, Trophy, Zap, Target, Heart
+  Smile, Trophy, Zap, Target, Heart, FileUp, Link
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -79,8 +79,13 @@ export const LoginPage = () => {
     });
     if (res.ok) {
       const data = await res.json();
-      localStorage.setItem('admin_token', data.token);
-      navigate('/admin');
+      if (data.role === 'coach' || data.role === 'admin') {
+        localStorage.setItem('admin_token', data.token);
+        navigate('/admin');
+      } else {
+        localStorage.setItem('parent_token', data.token);
+        navigate('/profile');
+      }
     } else {
       setError('Неправильний логін або пароль');
     }
@@ -100,7 +105,9 @@ export const LoginPage = () => {
             <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg px-4 py-2 text-white" />
           </div>
           {error && <p className="text-red-500 text-sm">{error}</p>}
-          <button type="submit" className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors">Увійти</button>
+          <div className="flex flex-col gap-4">
+            <button type="submit" className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">Увійти</button>
+          </div>
         </form>
         <div className="mt-6 pt-6 border-t border-white/5">
           <button 
@@ -308,7 +315,7 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
         </div>
 
         <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
           <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
             <LayoutDashboard size={48} />
           </div>
@@ -349,7 +356,6 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
 export const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [initialAction, setInitialAction] = useState<string | null>(null);
-  const [isFullAdmin, setIsFullAdmin] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -400,7 +406,7 @@ export const AdminPage = () => {
     }
   ];
 
-  const visibleGroups = isFullAdmin ? menuGroups : [menuGroups[0]];
+  const visibleGroups = menuGroups;
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex font-sans selection:bg-red-600/30">
@@ -415,7 +421,7 @@ export const AdminPage = () => {
             <div className="flex flex-col">
               <span className="font-black tracking-tighter text-xl uppercase leading-none">Black Bear</span>
               <span className="text-red-600 font-bold text-[10px] uppercase tracking-[0.4em] mt-1">
-                {isFullAdmin ? 'Full Admin' : 'Coach Panel'}
+                Панель управління
               </span>
             </div>
           </div>
@@ -454,23 +460,6 @@ export const AdminPage = () => {
         </div>
 
         <div className="p-8 space-y-2 border-t border-white/5 bg-zinc-950/50">
-          <button 
-            onClick={() => {
-              setIsFullAdmin(!isFullAdmin);
-              if (isFullAdmin) setActiveTab('dashboard');
-            }}
-            className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group border ${
-              isFullAdmin 
-                ? 'bg-red-600/10 border-red-600/20 text-red-500' 
-                : 'text-zinc-500 hover:bg-white/5 hover:text-white border-white/5'
-            }`}
-          >
-            <BarChart3 size={20} className="group-hover:rotate-12 transition-transform" />
-            <span className="font-black uppercase tracking-widest text-[10px]">
-              {isFullAdmin ? 'Вимкнути адмінку' : 'Повна адмінка'}
-            </span>
-          </button>
-          
           <button 
             onClick={() => {
               localStorage.removeItem('admin_token');
@@ -1183,6 +1172,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
   const [search, setSearch] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importUrl, setImportUrl] = useState('');
+  const [importGroupId, setImportGroupId] = useState('');
 
   const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
@@ -1252,6 +1246,40 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
     setConfirmDelete(null);
   };
 
+  const handleImport = async () => {
+    if (!importFile && !importUrl) {
+      toast.error('Оберіть файл або вкажіть посилання');
+      return;
+    }
+    setImportLoading(true);
+    const token = localStorage.getItem('admin_token');
+    const formData = new FormData();
+    if (importFile) formData.append('file', importFile);
+    if (importUrl) formData.append('sheetUrl', importUrl);
+    formData.append('group_id', importGroupId);
+
+    try {
+      const res = await fetch('/api/participants/import', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Імпортовано ${data.count} учасників`);
+        setShowImportModal(false);
+        setImportFile(null);
+        setImportUrl('');
+        fetchData();
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Помилка імпорту');
+    }
+    setImportLoading(false);
+  };
+
   const filtered = participants.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -1261,13 +1289,22 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
           <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Учасники</h2>
           <p className="text-zinc-500 font-medium">Керування базою учнів клубу</p>
         </div>
-        <button 
-          onClick={() => setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' })}
-          className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center gap-3"
-        >
-          <Plus size={18} />
-          Додати учня
-        </button>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setShowImportModal(true)}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-white/5 flex items-center gap-3"
+          >
+            <FileUp size={18} />
+            Імпорт
+          </button>
+          <button 
+            onClick={() => setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' })}
+            className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center gap-3"
+          >
+            <Plus size={18} />
+            Додати учня
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4">
@@ -1347,6 +1384,98 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
         title="Видалити учасника?"
         message={`Ви впевнені, що хочете видалити учня ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
       />
+
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+          <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 flex items-center gap-4">
+              <FileUp className="text-red-600" size={32} />
+              Імпорт учасників
+            </h3>
+            
+            <div className="space-y-6">
+              <div className="p-6 bg-white/[0.03] rounded-3xl border border-dashed border-white/10 text-center group hover:border-red-600/50 transition-colors">
+                <input 
+                  type="file" 
+                  id="excel-upload" 
+                  className="hidden" 
+                  accept=".xlsx, .xls, .csv"
+                  onChange={e => setImportFile(e.target.files?.[0] || null)}
+                />
+                <label htmlFor="excel-upload" className="cursor-pointer block">
+                  <div className="w-16 h-16 bg-red-600/10 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                    <FileUp size={32} />
+                  </div>
+                  <p className="text-sm font-black uppercase tracking-tight mb-1">
+                    {importFile ? importFile.name : 'Оберіть Excel або CSV файл'}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                    Натисніть або перетягніть файл сюди
+                  </p>
+                </label>
+              </div>
+
+              <div className="relative">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-zinc-500">
+                  <Link size={18} />
+                </div>
+                <input 
+                  type="text" 
+                  placeholder="Або вставте посилання на Google Таблицю..." 
+                  value={importUrl}
+                  onChange={e => setImportUrl(e.target.value)}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Цільова група (необов'язково)</label>
+                <select 
+                  value={importGroupId}
+                  onChange={e => setImportGroupId(e.target.value)}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                >
+                  <option value="">Без групи (автоматично)</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+
+              <div className="bg-red-600/5 p-6 rounded-2xl border border-red-600/10">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2 flex items-center gap-2">
+                  <AlertCircle size={14} />
+                  Вимоги до формату
+                </p>
+                <p className="text-[11px] text-zinc-400 leading-relaxed font-medium">
+                  Файл має містити колонки: <span className="text-white font-bold">Ім'я</span> (обов'язково), 
+                  <span className="text-white font-bold"> Вік</span>, 
+                  <span className="text-white font-bold"> Логін</span>, 
+                  <span className="text-white font-bold"> Пароль</span>.
+                </p>
+              </div>
+
+              <div className="flex gap-4 pt-6">
+                <button 
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportUrl('');
+                  }}
+                  className="flex-1 py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors uppercase tracking-widest text-[10px]"
+                >
+                  Скасувати
+                </button>
+                <button 
+                  onClick={handleImport}
+                  disabled={importLoading || (!importFile && !importUrl)}
+                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center justify-center gap-2"
+                >
+                  {importLoading ? <RefreshCw className="animate-spin" size={16} /> : 'Імпортувати'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingParticipant && (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
@@ -1655,6 +1784,8 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
     { id: 'about', title: 'Про нас', icon: Users },
     { id: 'directions', title: 'Напрями', icon: MapPin },
     { id: 'results', title: 'Результати', icon: Award },
+    { id: 'transformation', title: 'Трансформація', icon: TrendingUp },
+    { id: 'how_it_works', title: 'Як почати', icon: Clock },
     { id: 'faq', title: 'FAQ', icon: MessageSquare },
     { id: 'contacts', title: 'Контакти', icon: Settings },
     { id: 'video_problems', title: 'Відео та Проблеми', icon: Zap },
@@ -1683,15 +1814,38 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
     directions: [
       { key: 'directions_bg', label: 'Фон секції', type: 'image' },
       { key: 'directions_title', label: 'Заголовок', type: 'text' },
+      { key: 'directions_subtitle', label: 'Підзаголовок', type: 'textarea' },
       { key: 'dir1_title', label: 'Напрям 1: Назва', type: 'text' },
       { key: 'dir1_text', label: 'Напрям 1: Опис', type: 'textarea' },
       { key: 'dir2_title', label: 'Напрям 2: Назва', type: 'text' },
       { key: 'dir2_text', label: 'Напрям 2: Опис', type: 'textarea' },
+      { key: 'dir3_title', label: 'Напрям 3: Назва', type: 'text' },
+      { key: 'dir3_text', label: 'Напрям 3: Опис', type: 'textarea' },
+      { key: 'dir4_title', label: 'Напрям 4: Назва', type: 'text' },
+      { key: 'dir4_text', label: 'Напрям 4: Опис', type: 'textarea' },
+      { key: 'dir5_title', label: 'Напрям 5: Назва', type: 'text' },
+      { key: 'dir5_text', label: 'Напрям 5: Опис', type: 'textarea' },
     ],
     results: [
       { key: 'results_bg', label: 'Фон секції', type: 'image' },
       { key: 'results_image', label: 'Центральне фото', type: 'image' },
       { key: 'results_title', label: 'Заголовок', type: 'text' },
+      { key: 'results_subtitle', label: 'Підзаголовок', type: 'textarea' },
+    ],
+    transformation: [
+      { key: 'transformation_bg', label: 'Фон секції', type: 'image' },
+      { key: 'transformation_title', label: 'Заголовок', type: 'text' },
+      { key: 'transformation_subtitle', label: 'Підзаголовок', type: 'textarea' },
+    ],
+    how_it_works: [
+      { key: 'how_bg', label: 'Фон секції', type: 'image' },
+      { key: 'how_title', label: 'Заголовок', type: 'text' },
+      { key: 'how_step1_title', label: 'Крок 1: Заголовок', type: 'text' },
+      { key: 'how_step1_text', label: 'Крок 1: Опис', type: 'textarea' },
+      { key: 'how_step2_title', label: 'Крок 2: Заголовок', type: 'text' },
+      { key: 'how_step2_text', label: 'Крок 2: Опис', type: 'textarea' },
+      { key: 'how_step3_title', label: 'Крок 3: Заголовок', type: 'text' },
+      { key: 'how_step3_text', label: 'Крок 3: Опис', type: 'textarea' },
     ],
     faq: [
       { key: 'faq_bg', label: 'Фон секції', type: 'image' },

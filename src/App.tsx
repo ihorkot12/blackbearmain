@@ -11,8 +11,7 @@ import SEO from './components/SEO';
 import { ContactForm } from './components/ContactForm';
 
 const AdminPage = lazy(() => import('./Admin').then(m => ({ default: m.AdminPage })));
-const LoginPage = lazy(() => import('./CRM').then(m => ({ default: m.LoginPage })));
-const CoachDashboard = lazy(() => import('./CRM').then(m => ({ default: m.CoachDashboard })));
+const LoginPage = lazy(() => import('./Admin').then(m => ({ default: m.LoginPage })));
 const ParentProfile = lazy(() => import('./CRM').then(m => ({ default: m.ParentProfile })));
 const KidsLanding = lazy(() => import('./KidsLanding').then(m => ({ default: m.KidsLanding })));
 const JuniorLanding = lazy(() => import('./JuniorLanding').then(m => ({ default: m.JuniorLanding })));
@@ -267,7 +266,7 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
-          <Route path="/dashboard" element={<CoachDashboard />} />
+          <Route path="/dashboard" element={<AdminPage />} />
           <Route path="/profile" element={<ParentProfile />} />
           <Route path="/kids-4-7" element={<KidsLanding />} />
           <Route path="/juniors-7-12" element={<JuniorLanding />} />
@@ -1099,8 +1098,8 @@ function LandingPage() {
               { age: '4–7 років', title: content?.dir1_title || 'Перші кроки', desc: content?.dir1_text || 'Розвиток координації, ігрова форма, база дисципліни.', result: 'Координація', link: '/kids-4-7', badge: 'Популярно' },
               { age: '7–12 років', title: content?.dir2_title || 'Формування', desc: content?.dir2_text || 'Техніка, фізична підготовка, перші змагання.', result: 'База сили', link: '/juniors-7-12', badge: 'Набір' },
               { age: 'Підлітки', title: content?.dir3_title || 'Впевненість', desc: content?.dir3_text || 'Професійні турніри, самооборона та лідерство.', result: 'Лідерство', link: '/teens-12-plus' },
-              { age: 'Для жінок', title: 'Естетика та Сила', desc: 'Гнучкість, самооборона та зняття стресу без травм.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
-              { age: 'Персональні', title: 'Шлях майстра', desc: 'Максимальний результат, індивідуальний графік та 100% уваги.', result: 'Результат x3', link: '/personal-training', badge: 'VIP' },
+              { age: 'Для жінок', title: content?.dir4_title || 'Естетика та Сила', desc: content?.dir4_text || 'Гнучкість, самооборона та зняття стресу без травм.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
+              { age: 'Персональні', title: content?.dir5_title || 'Шлях майстра', desc: content?.dir5_text || 'Максимальний результат, індивідуальний графік та 100% уваги.', result: 'Результат x3', link: '/personal-training', badge: 'VIP' },
             ].map((item, idx) => {
               const CardContent = (
                 <motion.div 
@@ -1191,7 +1190,7 @@ function LandingPage() {
               transition={{ delay: 0.3 }}
               className="text-zinc-400 text-lg md:text-xl"
             >
-              Фактичні досягнення клубу та його вихованців
+              {content?.results_subtitle || "Фактичні досягнення клубу та його вихованців"}
             </motion.p>
           </div>
 

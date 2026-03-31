@@ -8,6 +8,8 @@ import pkg from 'pg';
 import compression from 'compression';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
+import * as xlsx from 'xlsx';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -1007,7 +1009,7 @@ async function startServer() {
     
     if (login === expectedLogin && password === expectedPassword) {
       console.log('Login successful (Admin)');
-      res.json({ success: true, token: ADMIN_TOKEN, role: 'coach' });
+      res.json({ success: true, token: ADMIN_TOKEN, role: 'admin' });
     } else {
       if (!pool) return res.status(401).json({ error: 'Invalid credentials' });
       // Check if it's a parent login
@@ -1055,6 +1057,80 @@ async function startServer() {
   });
 
   // Participants
+  const upload = multer({ storage: multer.memoryStorage() });
+
+  app.post("/api/participants/import", requireAuth, upload.single('file'), async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    
+    let data: any[] = [];
+    const { sheetUrl, group_id } = req.body;
+
+    try {
+      if (req.file) {
+        // Handle file upload
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        data = xlsx.utils.sheet_to_json(worksheet);
+      } else if (sheetUrl) {
+        // Handle Google Sheets URL
+        let fetchUrl = sheetUrl;
+        if (sheetUrl.includes('docs.google.com/spreadsheets')) {
+          // Try to convert to CSV export URL if it's a standard sharing link
+          const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+          if (match) {
+            fetchUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+          }
+        }
+        
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error('Failed to fetch Google Sheet');
+        const buffer = await response.arrayBuffer();
+        const workbook = xlsx.read(new Uint8Array(buffer), { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        data = xlsx.utils.sheet_to_json(worksheet);
+      } else {
+        return res.status(400).json({ error: "No file or URL provided" });
+      }
+
+      if (data.length === 0) {
+        return res.status(400).json({ error: "No data found in file or URL" });
+      }
+
+      // Map data to database fields
+      // Expected columns: "Name" or "Ім'я", "Age" or "Вік", "Login" or "Логін", "Password" or "Пароль"
+      const participantsToInsert = data.map(row => ({
+        name: row["Name"] || row["Ім'я"] || row["name"] || row["ім'я"] || "",
+        age: parseInt(row["Age"] || row["Вік"] || row["age"] || row["вік"] || "0"),
+        parent_login: row["Login"] || row["Логін"] || row["login"] || row["логін"] || `user_${Math.random().toString(36).substring(2, 7)}`,
+        parent_password: row["Password"] || row["Пароль"] || row["password"] || row["пароль"] || Math.random().toString(36).substring(2, 10),
+        group_id: group_id || null
+      })).filter(p => p.name);
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        for (const p of participantsToInsert) {
+          await client.query(
+            "INSERT INTO participants (name, age, parent_login, parent_password, group_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (parent_login) DO NOTHING",
+            [p.name, p.age, p.parent_login, p.parent_password, p.group_id]
+          );
+        }
+        await client.query('COMMIT');
+        res.json({ success: true, count: participantsToInsert.length });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error("Import failed:", e);
+      res.status(500).json({ error: `Failed to import participants: ${e.message}` });
+    }
+  });
+
   app.get("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
     try {
