@@ -1,0 +1,228 @@
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Menu, X, ChevronDown, User } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
+import { Button } from './Button';
+
+export const Navbar = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const location = useLocation();
+  const isMainPage = location.pathname === '/';
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { name: 'Про клуб', href: '#about' },
+    { 
+      name: 'Програми', 
+      href: '#directions',
+      subItems: [
+        { name: 'Діти 4-7 років', href: '/kids-4-7' },
+        { name: 'Діти 7-12 років', href: '/juniors-7-12' },
+        { name: 'Підлітки 12+', href: '/teens-12-plus' },
+        { name: 'Для жінок', href: '/women-karate' },
+        { name: 'Персональні', href: '/personal-training' },
+      ]
+    },
+    { name: 'Тренери', href: '#coach' },
+    { name: 'Розклад', href: '#schedule' },
+    { name: 'Контакти', href: '#contact' },
+  ];
+
+  const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    if (isMainPage && href.startsWith('#')) {
+      e.preventDefault();
+      const element = document.querySelector(href);
+      if (element) {
+        const headerOffset = 80;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
+      }
+    }
+  };
+
+  const getHref = (href: string) => {
+    if (!isMainPage && href.startsWith('#')) {
+      return `/${href}`;
+    }
+    return href;
+  };
+
+  return (
+    <>
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
+        isScrolled 
+          ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black' 
+          : 'bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between">
+          <Link 
+            to="/" 
+            className="flex items-center shrink-0 cursor-pointer" 
+            onClick={() => {
+              if (isMainPage) window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
+            <BrandLogo size="sm" align="start" />
+          </Link>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center lg:gap-10 md:gap-6">
+            {navLinks.map((link) => {
+              if (link.subItems) {
+                return (
+                  <div key={link.name} className="relative group/dropdown">
+                    <a 
+                      href={getHref(link.href)}
+                      onClick={(e) => handleAnchorClick(e, link.href)}
+                      className="relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-1 group text-[#EAEAEA] hover:text-red-500"
+                    >
+                      {link.name}
+                      <ChevronDown size={12} className="group-hover/dropdown:rotate-180 transition-transform duration-300" />
+                      <span className="absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 w-0 group-hover:w-full" />
+                    </a>
+                    
+                    {/* Dropdown Menu */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 z-50">
+                      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-2 min-w-[200px] shadow-2xl backdrop-blur-xl">
+                        {link.subItems.map((sub) => (
+                          <Link 
+                            key={sub.name}
+                            to={sub.href}
+                            className="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-red-600/10 rounded-xl transition-all"
+                          >
+                            {sub.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              return (
+                <a 
+                  key={link.name} 
+                  href={getHref(link.href)}
+                  onClick={(e) => handleAnchorClick(e, link.href)}
+                  className="relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 group text-[#EAEAEA] hover:text-red-500"
+                >
+                  {link.name}
+                  <span className="absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 w-0 group-hover:w-full" />
+                </a>
+              );
+            })}
+            <Link to="/login" className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#EAEAEA] hover:text-red-500 transition-all duration-300 flex items-center gap-2">
+              <User size={14} />
+              Вхід
+            </Link>
+            <Button 
+              variant="primary" 
+              className="h-[48px] px-8 text-[11px]" 
+              onClick={() => {
+                const contactSection = document.getElementById('contact');
+                if (contactSection) {
+                  contactSection.scrollIntoView({ behavior: 'smooth' });
+                } else if (!isMainPage) {
+                  window.location.href = '/#contact';
+                }
+              }}
+            >
+              Записатись
+            </Button>
+          </div>
+
+          {/* Mobile Menu Toggle */}
+          <div className="flex items-center gap-3 md:hidden">
+            <button 
+              className="bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(220,38,38,0.4)]"
+              onClick={() => {
+                const contactSection = document.getElementById('contact');
+                if (contactSection) {
+                  contactSection.scrollIntoView({ behavior: 'smooth' });
+                } else if (!isMainPage) {
+                  window.location.href = '/#contact';
+                }
+              }}
+            >
+              Записатися
+            </button>
+            <button className="text-white p-1" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile Menu */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed inset-0 z-40 bg-black pt-24 px-6 md:hidden overflow-y-auto"
+          >
+            <div className="flex flex-col gap-6 text-center pb-12">
+              {navLinks.map((link) => {
+                if (link.subItems) {
+                  return (
+                    <div key={link.name} className="space-y-4">
+                      <div className="text-sm font-black text-red-600 uppercase tracking-widest">{link.name}</div>
+                      <div className="flex flex-col gap-4">
+                        {link.subItems.map(sub => (
+                          <Link 
+                            key={sub.name}
+                            to={sub.href}
+                            onClick={() => setIsMenuOpen(false)}
+                            className="text-2xl font-bold text-white"
+                          >
+                            {sub.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <a 
+                    key={link.name} 
+                    href={getHref(link.href)}
+                    onClick={(e) => {
+                      handleAnchorClick(e, link.href);
+                      setIsMenuOpen(false);
+                    }}
+                    className="text-2xl font-bold text-white uppercase tracking-tighter"
+                  >
+                    {link.name}
+                  </a>
+                );
+              })}
+              <Link 
+                to="/login" 
+                onClick={() => setIsMenuOpen(false)}
+                className="text-2xl font-bold text-white uppercase tracking-tighter flex items-center justify-center gap-2"
+              >
+                <User size={20} />
+                Вхід
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};

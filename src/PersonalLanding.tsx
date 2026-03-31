@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { Navbar } from './components/Navbar';
 import { 
   Shield, 
   Trophy, 
@@ -48,14 +49,10 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const PersonalLanding = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-
     // Check session storage for cached data
     const cachedData = sessionStorage.getItem('site_init_data');
     if (cachedData) {
@@ -79,8 +76,6 @@ export const PersonalLanding = () => {
         }
       })
       .catch(err => console.error('Error fetching init data:', err));
-
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const advantages = [
@@ -114,31 +109,13 @@ export const PersonalLanding = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title={content?.personal_seo_title || "Персональні тренування з карате"}
         description={content?.personal_seo_description || "Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Швидкий результат для дорослих та дітей."}
         keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ"}
       />
-      {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-red-600/20 shadow-2xl shadow-black' : 'bg-transparent h-[80px]'
-      }`}>
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-red-600 flex items-center justify-center rotate-3 group-hover:rotate-0 transition-transform shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-              <span className="text-white font-black italic">B</span>
-            </div>
-            <span className="font-black tracking-tighter text-xl uppercase">Black Bear <span className="text-red-600">Dojo</span></span>
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-[11px] font-bold uppercase tracking-[0.2em] hover:text-red-500 transition-colors">Головна</Link>
-            <Button variant="primary" className="h-10 px-6 text-[10px]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-              Записатись
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
@@ -186,36 +163,6 @@ export const PersonalLanding = () => {
           </motion.div>
         </div>
 
-        {/* Trust Bar */}
-        <div className="absolute bottom-0 left-0 w-full z-20 border-y border-white/5 bg-zinc-950/50 backdrop-blur-md py-8">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12">
-              {[
-                { label: "Досвід викладання", value: "5+ років", icon: <Award className="text-red-600" size={20} /> },
-                { label: "Вихованців клубу", value: "+50", icon: <Users className="text-red-600" size={20} /> },
-                { label: "Філії у Києві", value: "2 локації", icon: <MapPin className="text-red-600" size={20} /> },
-                { label: "Чорні пояси", value: "3 дан", icon: <Shield className="text-red-600" size={20} /> },
-              ].map((stat, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-4"
-                >
-                  <div className="p-2 rounded-xl bg-red-600/10 border border-red-600/20 shrink-0">
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <div className="text-lg md:text-xl font-black text-white leading-none mb-1">{stat.value}</div>
-                    <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* Advantages Section */}

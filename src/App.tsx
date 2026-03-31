@@ -5,7 +5,7 @@
 
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { AIChat } from './components/AIChat';
 import SEO from './components/SEO';
 import { ContactForm } from './components/ContactForm';
@@ -18,6 +18,10 @@ const JuniorLanding = lazy(() => import('./JuniorLanding').then(m => ({ default:
 const TeenLanding = lazy(() => import('./TeenLanding').then(m => ({ default: m.TeenLanding })));
 const PersonalLanding = lazy(() => import('./PersonalLanding').then(m => ({ default: m.PersonalLanding })));
 const WomenLanding = lazy(() => import('./WomenLanding').then(m => ({ default: m.WomenLanding })));
+
+import { Navbar } from './components/Navbar';
+import { BrandLogo } from './components/BrandLogo';
+import { Button } from './components/Button';
 
 import { 
   Shield, 
@@ -48,6 +52,18 @@ declare global {
 }
 
 // --- Components ---
+
+const ScrollToTop = () => {
+  const { pathname, hash } = useLocation();
+
+  useEffect(() => {
+    if (!hash) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [pathname, hash]);
+
+  return null;
+};
 
 const PixelManager = () => {
   const [content, setContent] = useState<any>(null);
@@ -159,69 +175,6 @@ const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
   </motion.div>
 );
 
-const BrandLogo = ({ size = 'md', showKanji = false, align = 'center' }: { size?: 'sm' | 'md' | 'lg', showKanji?: boolean, align?: 'start' | 'center' }) => {
-  const sizes = {
-    sm: { text: 'text-[28px]', b: 'w-6 h-6 text-xs', spacing: 'gap-3', kanji: 'text-[7px]', line: 'h-[2px]' },
-    md: { text: 'text-[36px]', b: 'w-8 h-8 text-sm', spacing: 'gap-4', kanji: 'text-[9px]', line: 'h-[2px]' },
-    lg: { text: 'text-[42px] md:text-[56px]', b: 'w-10 h-10 md:w-14 md:h-14 text-lg md:text-2xl', spacing: 'gap-5 md:gap-6', kanji: 'text-[10px] md:text-sm', line: 'h-[2px]' },
-  };
-  const s = sizes[size];
-
-  return (
-    <div className={`flex flex-col ${align === 'center' ? 'items-center' : 'items-start'} ${size === 'lg' ? 'mb-10' : ''}`}>
-      <div className={`flex items-center ${s.spacing} font-sans uppercase group cursor-pointer`}>
-        {/* Skewed B Icon */}
-        <div 
-          className={`${s.b} bg-[#C10000] flex items-center justify-center shrink-0 shadow-[inset_0_0_10px_rgba(0,0,0,0.3)]`}
-          style={{ clipPath: 'polygon(15% 0, 100% 0, 85% 100%, 0 100%)' }}
-        >
-          <span className="text-white font-black italic tracking-tighter">B</span>
-        </div>
-        
-        {/* Text Part */}
-        <div className={`${s.text} flex items-baseline gap-3 md:gap-4 whitespace-nowrap font-black tracking-tight leading-none`}>
-          <div className="flex flex-col items-start relative pb-1">
-            <span className="text-[#FFFFFF]">BLACK BEAR</span>
-            <div className={`absolute bottom-0 left-0 w-full ${s.line} bg-gradient-to-r from-[#C8A400] to-[#E8C547]`} />
-          </div>
-          
-          <div className="text-[#C10000] tracking-[0.06em] group-hover:drop-shadow-[0_0_10px_rgba(193,0,0,0.5)] transition-all duration-200" style={{ textShadow: '0 0 10px rgba(255,0,0,0.3)' }}>
-            DOJO
-          </div>
-        </div>
-      </div>
-      
-      {showKanji && (
-        <div className={`${s.kanji} text-zinc-500 font-medium tracking-[1.5em] mt-6 uppercase opacity-50 select-none`}>
-          極 真 空 手
-        </div>
-      )}
-    </div>
-  );
-};
-
-const Button = ({ children, variant = 'primary', className = '', showIcon = true, ...props }: any) => {
-  const variants = {
-    primary: 'bg-gradient-to-b from-[#D10000] to-[#A80000] text-white shadow-[0_8px_24px_rgba(209,0,0,0.35)] hover:shadow-[0_12px_28px_rgba(209,0,0,0.45)] active:shadow-[0_4px_12px_rgba(209,0,0,0.4)]',
-    secondary: 'bg-transparent border-2 border-white/20 text-white hover:bg-white/10 hover:border-white',
-    gold: 'bg-amber-500 hover:bg-amber-600 text-black',
-  };
-  
-  const baseStyles = "h-[58px] px-10 rounded-[18px] font-bold uppercase tracking-[0.05em] transition-all duration-300 flex items-center justify-center gap-3";
-  const hoverStyles = variant === 'primary' ? "hover:translate-y-[-2px]" : "hover:translate-y-[-1px]";
-  const activeStyles = "active:translate-y-[1px]";
-
-  return (
-    <button 
-      className={`${baseStyles} ${hoverStyles} ${activeStyles} ${variants[variant as keyof typeof variants]} ${className}`}
-      {...props}
-    >
-      <span>{children}</span>
-      {variant === 'primary' && showIcon && <ChevronRight size={18} className="shrink-0" />}
-    </button>
-  );
-};
-
 const SectionTitle = ({ title, subtitle, light = false }: { title: string, subtitle?: string, light?: boolean }) => (
   <div className="mb-16 text-center">
     <motion.div
@@ -260,6 +213,7 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 export default function App() {
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <PixelManager />
       <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
         <Routes>
@@ -279,9 +233,6 @@ export default function App() {
   );
 }
 function LandingPage() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = React.useState(false);
-  const [activeHash, setActiveHash] = React.useState(typeof window !== 'undefined' ? window.location.hash : '');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [content, setContent] = useState<any>(null);
@@ -320,6 +271,25 @@ function LandingPage() {
     { id: 4, location_id: 2, coach_name: "Олег Крамаренко", day_of_week: "Пн, Ср, Пт", start_time: "17:00", end_time: "18:00", group_name: "Група (5–7 років)", price: "2500" },
     { id: 5, location_id: 2, coach_name: "Олег Крамаренко", day_of_week: "Пн, Ср, Пт", start_time: "18:00", end_time: "19:00", group_name: "Група (8–12 років)", price: "2500" }
   ];
+
+  React.useEffect(() => {
+    if (window.location.hash) {
+      const id = window.location.hash.substring(1);
+      const element = document.getElementById(id);
+      if (element) {
+        setTimeout(() => {
+          const headerOffset = 80;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }, 300); // Increased timeout to ensure content is rendered
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
     // Check session storage for cached data
@@ -413,41 +383,8 @@ function LandingPage() {
     }
   };
 
-  React.useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    const handleHashChange = () => {
-      setActiveHash(window.location.hash);
-    };
-    window.addEventListener('scroll', handleScroll);
-    window.addEventListener('hashchange', handleHashChange);
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, []);
-
-  const navLinks = [
-    { name: 'Про клуб', href: '#about' },
-    { 
-      name: 'Програми', 
-      href: '#directions',
-      subItems: [
-        { name: 'Діти 4-7 років', href: '/kids-4-7' },
-        { name: 'Діти 7-12 років', href: '/juniors-7-12' },
-        { name: 'Підлітки 12+', href: '/teens-12-plus' },
-        { name: 'Для жінок', href: '/women-karate' },
-        { name: 'Персональні', href: '/personal-training' },
-      ]
-    },
-    { name: 'Тренери', href: '#coach' },
-    { name: 'Розклад', href: '#schedule' },
-    { name: 'Контакти', href: '#contact' },
-  ];
-
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title="Головна"
         description="Black Bear Dojo — професійна школа карате Кіокушинкай у Києві. Тренування для дітей від 4 років, підлітків та дорослих. Локації: Шулявка та Відрадний. Перше тренування безкоштовно!"
@@ -458,172 +395,7 @@ function LandingPage() {
         {isSubmitted && <ThankYouPage onBack={() => setIsSubmitted(false)} />}
       </AnimatePresence>
 
-      {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled 
-          ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black' 
-          : 'bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10'
-      }`}>
-        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between">
-          <div 
-            className="flex items-center shrink-0 cursor-pointer" 
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          >
-            <BrandLogo size="sm" align="start" />
-          </div>
-
-          {/* Desktop Nav */}
-            <div className="hidden md:flex items-center lg:gap-10 md:gap-6">
-              {navLinks.map((link) => {
-                const isActive = activeHash === link.href;
-                
-                if (link.subItems) {
-                  return (
-                    <div key={link.name} className="relative group/dropdown">
-                      <a 
-                        href={link.href}
-                        className={`relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-1 group ${
-                          isActive ? 'text-red-500' : 'text-[#EAEAEA] hover:text-red-500'
-                        }`}
-                      >
-                        {link.name}
-                        <ChevronDown size={12} className="group-hover/dropdown:rotate-180 transition-transform duration-300" />
-                        <span className={`absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 ${
-                          isActive ? 'w-full' : 'w-0 group-hover:w-full'
-                        }`} />
-                      </a>
-                      
-                      {/* Dropdown Menu */}
-                      <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 z-50">
-                        <div className="bg-zinc-900 border border-white/10 rounded-2xl p-2 min-w-[200px] shadow-2xl backdrop-blur-xl">
-                          {link.subItems.map((sub) => (
-                            <Link 
-                              key={sub.name}
-                              to={sub.href}
-                              className="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-red-600/10 rounded-xl transition-all"
-                            >
-                              {sub.name}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <a 
-                    key={link.name} 
-                    href={link.href} 
-                    className={`relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 group ${
-                      isActive ? 'text-red-500' : 'text-[#EAEAEA] hover:text-red-500'
-                    }`}
-                  >
-                    {link.name}
-                    <span className={`absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 ${
-                      isActive ? 'w-full' : 'w-0 group-hover:w-full'
-                    }`} />
-                  </a>
-                );
-              })}
-              <Link to="/login" className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#EAEAEA] hover:text-red-500 transition-all duration-300 flex items-center gap-2">
-                <User size={14} />
-                Вхід
-              </Link>
-              <Button 
-                id="cta-button-header"
-                variant="primary" 
-                className="h-[48px] px-8 text-[11px] shadow-[0_8px_24px_rgba(196,0,0,0.35)] hover:translate-y-[-2px] hover:shadow-[0_12px_28px_rgba(196,0,0,0.45)]" 
-                onClick={() => {
-                  if (window.fbq) window.fbq('track', 'Lead');
-                  document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-                }}
-              >
-                Записатись
-              </Button>
-            </div>
-
-          {/* Mobile Actions */}
-          <div className="flex items-center gap-3 md:hidden">
-            <button 
-              className="bg-red-600 text-white text-[10px] font-bold uppercase tracking-widest px-4 py-2 rounded-full shadow-[0_4px_12px_rgba(220,38,38,0.4)] hover:bg-red-500 transition-colors"
-              onClick={() => {
-                if (window.fbq) window.fbq('track', 'Lead');
-                document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-              }}
-            >
-              Записатися
-            </button>
-            <button className="text-white p-1" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-      </nav>
-
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-40 bg-black pt-24 px-6 md:hidden overflow-y-auto"
-          >
-              <div className="flex flex-col gap-6 text-center pb-12">
-                {navLinks.map((link) => {
-                  if (link.subItems) {
-                    return (
-                      <div key={link.name} className="space-y-4">
-                        <div className="text-sm font-black text-red-600 uppercase tracking-widest">{link.name}</div>
-                        <div className="flex flex-col gap-4">
-                          {link.subItems.map(sub => (
-                            <Link 
-                              key={sub.name}
-                              to={sub.href}
-                              onClick={() => setIsMenuOpen(false)}
-                              className="text-2xl font-bold text-white"
-                            >
-                              {sub.name}
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  }
-                  return (
-                    <a 
-                      key={link.name} 
-                      href={link.href} 
-                      onClick={() => setIsMenuOpen(false)}
-                      className="text-2xl font-bold text-white"
-                    >
-                      {link.name}
-                    </a>
-                  );
-                })}
-                <Link 
-                  to="/login" 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="text-2xl font-bold text-red-500"
-                >
-                  Вхід до CRM
-                </Link>
-                <Button 
-                  id="cta-button-mobile"
-                  variant="primary" 
-                  onClick={() => { 
-                    if (window.fbq) window.fbq('track', 'Lead');
-                    setIsMenuOpen(false); 
-                    document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' }); 
-                  }}
-                >
-                  Записатися на пробне
-                </Button>
-              </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden pt-24">
@@ -706,37 +478,6 @@ function LandingPage() {
               </div>
             </div>
           </motion.div>
-        </div>
-
-        {/* Trust Bar */}
-        <div className="relative z-10 border-y border-white/5 bg-zinc-950/50 backdrop-blur-md py-12">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
-              {[
-                { label: "Досвід викладання", value: "5+ років", icon: <Award className="text-red-600" size={24} /> },
-                { label: "Вихованців клубу", value: "+50", icon: <Users className="text-red-600" size={24} /> },
-                { label: "Філії у Києві", value: "2 локації", icon: <MapPin className="text-red-600" size={24} /> },
-                { label: "Чорні пояси", value: "3 дан", icon: <Shield className="text-red-600" size={24} /> },
-              ].map((stat, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex flex-col items-center md:items-start text-center md:text-left gap-4"
-                >
-                  <div className="p-3 rounded-2xl bg-red-600/10 border border-red-600/20">
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <div className="text-2xl md:text-3xl font-black text-white mb-1">{stat.value}</div>
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Scroll Indicator */}

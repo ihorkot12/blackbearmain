@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { Navbar } from './components/Navbar';
 import { 
   Shield, 
   Trophy, 
@@ -77,14 +78,10 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 );
 
 export const KidsLanding = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll);
-
     // Check session storage for cached data
     const cachedData = sessionStorage.getItem('site_init_data');
     if (cachedData) {
@@ -108,8 +105,6 @@ export const KidsLanding = () => {
         }
       })
       .catch(err => console.error('Error fetching init data:', err));
-
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const painPoints = [
@@ -173,31 +168,13 @@ export const KidsLanding = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title={content?.kids_seo_title || "Карате для дітей 4-7 років"}
         description={content?.kids_seo_description || "Секція карате для дітей 4-7 років у Києві (Шулявка, Відрадний). Ігрова форма навчання, розвиток координації та дисципліни. Перше тренування безкоштовно!"}
         keywords={content?.kids_seo_keywords || "карате для дітей 4 роки київ, карате для дітей 5 років київ, дитяче карате шулявка, карате для малюків київ, секція карате для дітей відрадний"}
       />
-      {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-red-600/20 shadow-2xl shadow-black' : 'bg-transparent h-[80px]'
-      }`}>
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-red-600 flex items-center justify-center rotate-3 group-hover:rotate-0 transition-transform shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-              <span className="text-white font-black italic">B</span>
-            </div>
-            <span className="font-black tracking-tighter text-xl uppercase">Black Bear <span className="text-red-600">Dojo</span></span>
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-[11px] font-bold uppercase tracking-[0.2em] hover:text-red-500 transition-colors">Головна</Link>
-            <Button variant="primary" className="h-10 px-6 text-[10px]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-              Записатись
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
@@ -252,36 +229,6 @@ export const KidsLanding = () => {
           </motion.div>
         </div>
 
-        {/* Trust Bar */}
-        <div className="absolute bottom-0 left-0 w-full z-20 border-y border-white/5 bg-zinc-950/50 backdrop-blur-md py-8">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12">
-              {[
-                { label: "Досвід викладання", value: "5+ років", icon: <Award className="text-red-600" size={20} /> },
-                { label: "Вихованців клубу", value: "+50", icon: <Users className="text-red-600" size={20} /> },
-                { label: "Філії у Києві", value: "2 локації", icon: <MapPin className="text-red-600" size={20} /> },
-                { label: "Чорні пояси", value: "3 дан", icon: <Shield className="text-red-600" size={20} /> },
-              ].map((stat, i) => (
-                <motion.div 
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.1 }}
-                  className="flex items-center gap-4"
-                >
-                  <div className="p-2 rounded-xl bg-red-600/10 border border-red-600/20 shrink-0">
-                    {stat.icon}
-                  </div>
-                  <div>
-                    <div className="text-lg md:text-xl font-black text-white leading-none mb-1">{stat.value}</div>
-                    <div className="text-[8px] font-bold uppercase tracking-widest text-zinc-500">{stat.label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
       </section>
 
       {/* Pain Points Section */}
@@ -326,56 +273,6 @@ export const KidsLanding = () => {
               Записати дитину на безкоштовний тест
             </Button>
           </motion.div>
-        </div>
-      </section>
-
-      {/* Unique Advantages Section */}
-      <section className="py-32 bg-black relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-24 items-center">
-            <div className="relative order-2 lg:order-1">
-              <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
-              <div className="absolute -inset-6 border border-zinc-800 rounded-[4rem] rotate-1" />
-              <img 
-                src={content?.kids_advantages_image || "https://images.unsplash.com/photo-1509563268479-0f004cf3f58b?q=80&w=1000&auto=format&fit=crop"} 
-                alt="Training" 
-                className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute bottom-12 -right-12 bg-red-600 p-8 rounded-[2rem] shadow-2xl hidden md:block">
-                <div className="text-4xl font-black text-white leading-none mb-1">WKO</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-white/80">Світовий стандарт</div>
-              </div>
-            </div>
-
-            <div className="order-1 lg:order-2">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Наші УТП</h2>
-              <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter mb-10 leading-[0.9]">
-                Чому обирають <br /> <span className="text-red-600">Black Bear Dojo</span>
-              </h3>
-              
-              <div className="space-y-10">
-                {advantages.map((adv, i) => (
-                  <motion.div 
-                    key={i} 
-                    initial={{ opacity: 0, x: 20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1 }}
-                    className="flex gap-6 group"
-                  >
-                    <div className="shrink-0 w-14 h-14 bg-zinc-900 rounded-2xl flex items-center justify-center text-red-600 border border-white/5 group-hover:border-red-600/50 transition-colors">
-                      {adv.icon}
-                    </div>
-                    <div>
-                      <h4 className="text-xl font-black uppercase tracking-tight mb-2">{adv.title}</h4>
-                      <p className="text-zinc-500 text-sm leading-relaxed max-w-md font-medium">{adv.desc}</p>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 

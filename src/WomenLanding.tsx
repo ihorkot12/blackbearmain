@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { Navbar } from './components/Navbar';
 import { 
   Shield, 
   Trophy, 
@@ -80,8 +81,6 @@ export const WomenLanding = () => {
         }
       })
       .catch(err => console.error('Error fetching init data:', err));
-
-    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const benefits = [
@@ -130,32 +129,14 @@ export const WomenLanding = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white scroll-smooth">
+    <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title={content?.women_seo_title || "Карате для жінок та дівчат"}
         description={content?.women_seo_description || "Секція карате для жінок у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс для дівчат? Запишіться на безкоштовне тренування!"}
         keywords={content?.women_seo_keywords || "карате для жінок київ, карате для дівчат київ, жіноча самооборона київ, фітнес карате київ, секція карате шулявка жінки"}
       />
       
-      {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
-        isScrolled ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-red-600/20 shadow-2xl shadow-black' : 'bg-transparent h-[80px]'
-      }`}>
-        <div className="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 bg-red-600 flex items-center justify-center rotate-3 group-hover:rotate-0 transition-transform shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-              <span className="text-white font-black italic">B</span>
-            </div>
-            <span className="font-black tracking-tighter text-xl uppercase">Black Bear <span className="text-red-600">Dojo</span></span>
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-[11px] font-bold uppercase tracking-[0.2em] hover:text-red-500 transition-colors">Головна</Link>
-            <Button variant="primary" className="h-10 px-6 text-[10px]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-              Записатись
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">

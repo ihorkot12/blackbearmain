@@ -315,7 +315,7 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
         </div>
 
         <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
           <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
             <LayoutDashboard size={48} />
           </div>
@@ -1386,7 +1386,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
       />
 
       {showImportModal && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 overflow-y-auto">
           <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
             <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 flex items-center gap-4">
               <FileUp className="text-red-600" size={32} />
@@ -1478,7 +1478,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
       )}
 
       {editingParticipant && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 overflow-y-auto">
           <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
             <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">
               {editingParticipant.id ? 'Редагувати учня' : 'Новий учень'}
