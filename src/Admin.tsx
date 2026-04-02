@@ -786,7 +786,7 @@ const RatingEditor = () => {
       {/* Details Modal */}
       <AnimatePresence>
         {showDetails && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -860,7 +860,7 @@ const RatingEditor = () => {
       {/* Edit Rank Modal */}
       <AnimatePresence>
         {editingRank && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -910,7 +910,7 @@ const RatingEditor = () => {
       {/* Badge Modal */}
       <AnimatePresence>
         {showBadgeModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -952,7 +952,7 @@ const RatingEditor = () => {
       {/* Competition Modal */}
       <AnimatePresence>
         {showCompModal && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -2922,7 +2922,7 @@ const LeadsViewer = () => {
       />
       
       {editingLead && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
           <div className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-white/10 p-8 space-y-6">
             <h3 className="text-2xl font-bold">Редагувати заявку</h3>
             <div className="space-y-4">

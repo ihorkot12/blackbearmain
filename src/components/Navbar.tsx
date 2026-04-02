@@ -85,15 +85,15 @@ export const Navbar = () => {
               if (link.subItems) {
                 return (
                   <div key={link.name} className="relative group/dropdown">
-                    <a 
-                      href={getHref(link.href)}
+                    <Link 
+                      to={getHref(link.href)}
                       onClick={(e) => handleAnchorClick(e, link.href)}
                       className="relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-1 group text-[#EAEAEA] hover:text-red-500"
                     >
                       {link.name}
                       <ChevronDown size={12} className="group-hover/dropdown:rotate-180 transition-transform duration-300" />
                       <span className="absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 w-0 group-hover:w-full" />
-                    </a>
+                    </Link>
                     
                     {/* Dropdown Menu */}
                     <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 z-50">
@@ -114,15 +114,15 @@ export const Navbar = () => {
               }
 
               return (
-                <a 
+                <Link 
                   key={link.name} 
-                  href={getHref(link.href)}
+                  to={getHref(link.href)}
                   onClick={(e) => handleAnchorClick(e, link.href)}
                   className="relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 group text-[#EAEAEA] hover:text-red-500"
                 >
                   {link.name}
                   <span className="absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 w-0 group-hover:w-full" />
-                </a>
+                </Link>
               );
             })}
             <Link to="/login" className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#EAEAEA] hover:text-red-500 transition-all duration-300 flex items-center gap-2">
@@ -198,9 +198,9 @@ export const Navbar = () => {
                   );
                 }
                 return (
-                  <a 
+                  <Link 
                     key={link.name} 
-                    href={getHref(link.href)}
+                    to={getHref(link.href)}
                     onClick={(e) => {
                       handleAnchorClick(e, link.href);
                       setIsMenuOpen(false);
@@ -208,7 +208,7 @@ export const Navbar = () => {
                     className="text-2xl font-bold text-white uppercase tracking-tighter"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 );
               })}
               <Link 

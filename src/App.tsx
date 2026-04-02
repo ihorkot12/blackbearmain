@@ -58,7 +58,9 @@ const ScrollToTop = () => {
 
   useEffect(() => {
     if (!hash) {
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      setTimeout(() => {
+        window.scrollTo(0, 0);
+      }, 10);
     }
   }, [pathname, hash]);
 
@@ -211,8 +213,22 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 // --- Main App ---
 
 export default function App() {
+  const [content, setContent] = useState<any>(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    fetch(`/api/content?t=${Date.now()}`)
+      .then(res => res.json())
+      .then(data => setContent(data && !data.error ? data : null))
+      .catch(() => setContent(null));
+  }, []);
+
+  const isAdminPage = location.pathname.startsWith('/admin') || 
+                      location.pathname.startsWith('/dashboard') || 
+                      location.pathname.startsWith('/login');
+
   return (
-    <BrowserRouter>
+    <>
       <ScrollToTop />
       <PixelManager />
       <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
@@ -229,7 +245,8 @@ export default function App() {
           <Route path="/women-karate" element={<WomenLanding />} />
         </Routes>
       </Suspense>
-    </BrowserRouter>
+      {!isAdminPage && <AIChat content={content} />}
+    </>
   );
 }
 function LandingPage() {
@@ -272,9 +289,11 @@ function LandingPage() {
     { id: 5, location_id: 2, coach_name: "Олег Крамаренко", day_of_week: "Пн, Ср, Пт", start_time: "18:00", end_time: "19:00", group_name: "Група (8–12 років)", price: "2500" }
   ];
 
+  const location = useLocation();
+
   React.useEffect(() => {
-    if (window.location.hash) {
-      const id = window.location.hash.substring(1);
+    if (location.hash) {
+      const id = location.hash.substring(1);
       const element = document.getElementById(id);
       if (element) {
         setTimeout(() => {
@@ -286,10 +305,10 @@ function LandingPage() {
             top: offsetPosition,
             behavior: 'smooth'
           });
-        }, 300); // Increased timeout to ensure content is rendered
+        }, 600);
       }
     }
-  }, []);
+  }, [location.hash]);
 
   React.useEffect(() => {
     // Check session storage for cached data
@@ -1410,8 +1429,6 @@ function LandingPage() {
           Записатись на пробне
         </motion.button>
       </div>
-
-      <AIChat content={content} />
     </div>
   );
 }

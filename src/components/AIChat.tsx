@@ -122,8 +122,8 @@ export const AIChat = ({ content }: { content: any }) => {
   // Initialize Gemini API
   useEffect(() => {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.error("Gemini API key is missing");
+    if (!apiKey || apiKey === 'undefined') {
+      console.error("Gemini API key is missing or undefined");
       return;
     }
     try {
@@ -193,7 +193,7 @@ export const AIChat = ({ content }: { content: any }) => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end">
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end">
       <AnimatePresence>
         {isOpen && (
           <motion.div
