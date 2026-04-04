@@ -2454,6 +2454,7 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
       { key: 'hide_section_problem', label: 'Приховати секцію "Виклики сучасності"', type: 'checkbox' },
       { key: 'hide_section_transformation', label: 'Приховати секцію "Як дитяче карате змінює дитину"', type: 'checkbox' },
       { key: 'hide_section_video', label: 'Приховати секцію "Атмосфера додзьо" (Відео)', type: 'checkbox' },
+      { key: 'hide_section_how', label: 'Приховати секцію "Як почати тренування"', type: 'checkbox' },
       { key: 'hide_section_directions', label: 'Приховати секцію "Напрями"', type: 'checkbox' },
       { key: 'hide_section_results', label: 'Приховати секцію "Результати"', type: 'checkbox' },
       { key: 'hide_section_coaches', label: 'Приховати секцію "Наші майстри"', type: 'checkbox' },

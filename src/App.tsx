@@ -510,7 +510,7 @@ function LandingPage() {
       </section>
 
       {/* Problem Section */}
-      {!content?.hide_section_problem && (
+      {content?.hide_section_problem !== 'true' && (
         <section className="py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
@@ -571,7 +571,7 @@ function LandingPage() {
       )}
 
       {/* Transformation Section (Dark Professional Style) */}
-      {!content?.hide_section_transformation && (
+      {content?.hide_section_transformation !== 'true' && (
         <section className="py-8 md:py-10 bg-black relative overflow-hidden">
         {/* Subtle Background Accents */}
         {content?.transformation_bg ? (
@@ -685,10 +685,10 @@ function LandingPage() {
       )}
 
       {/* Video Section */}
-      {!content?.hide_section_video && (
-        <section className="py-12 bg-black relative overflow-hidden">
-          <div className="max-w-4xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-10">
+      {content?.hide_section_video !== 'true' && (
+        <section className="py-8 bg-black relative overflow-hidden">
+          <div className="max-w-3xl mx-auto px-6 relative z-10">
+            <div className="text-center mb-6">
               <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Атмосфера додзьо</h2>
               <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
                 {content?.video_title || "Відчуйте енергію тренувань"}
@@ -737,18 +737,16 @@ function LandingPage() {
       </section>
       )}
 
-      {/* Coach Authority Section */}
-      {!content?.hide_section_coaches && (
-        <section id="coach" className="py-12 bg-black relative overflow-hidden">
+      {/* How to start Section */}
+      {content?.hide_section_how !== 'true' && (
+        <section id="how" className="py-12 bg-black relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
             <div className="text-center mb-10">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Експертність та досвід</h2>
-              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Процес навчання</h2>
+              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
+                {content?.how_title || "Як почати тренування"}
+              </h3>
             </div>
-            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Процес навчання</h2>
-            <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
-              {content?.how_title || "Як почати тренування"}
-            </h3>
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -827,7 +825,7 @@ function LandingPage() {
       </section>
 
       {/* Directions Section */}
-      {!content?.hide_section_directions && (
+      {content?.hide_section_directions !== 'true' && (
         <section id="directions" className="py-8 md:py-10 bg-black relative overflow-hidden">
         {content?.directions_bg && (
           <div className="absolute inset-0 z-0">
@@ -907,7 +905,7 @@ function LandingPage() {
       )}
 
       {/* Results Section */}
-      {!content?.hide_section_results && (
+      {content?.hide_section_results !== 'true' && (
         <section id="results" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
         {content?.results_bg && (
           <div className="absolute inset-0 z-0">
@@ -1022,11 +1020,11 @@ function LandingPage() {
       )}
 
       {/* Coaches Section (Authority) */}
-      {!content?.hide_section_coaches && (
-        <section id="coach" className="py-12 bg-black relative overflow-hidden">
+      {content?.hide_section_coaches !== 'true' && (
+        <section id="coach" className="py-8 bg-black relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-10">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Експертність та досвід</h2>
+            <div className="text-center mb-6">
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-2">Експертність та досвід</h2>
               <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
             </div>
 
@@ -1087,7 +1085,7 @@ function LandingPage() {
       )}
 
       {/* Schedule Section */}
-      {!content?.hide_section_schedule && (
+      {content?.hide_section_schedule !== 'true' && (
         <section id="schedule" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
         {content?.schedule_bg && (
           <div className="absolute inset-0 z-0">
@@ -1237,7 +1235,7 @@ function LandingPage() {
       )}
 
       {/* Reviews Section */}
-      {!content?.hide_section_reviews && (
+      {content?.hide_section_reviews !== 'true' && (
         <section className="py-8 md:py-10 bg-black relative overflow-hidden">
         {content?.reviews_bg && (
           <div className="absolute inset-0 z-0">
