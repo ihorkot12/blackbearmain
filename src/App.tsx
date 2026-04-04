@@ -56,26 +56,20 @@ const ScrollToTop = () => {
   const { pathname, hash } = useLocation();
 
   useEffect(() => {
+    // Force scroll to top on refresh or path change
+    if (window.history.scrollRestoration) {
+      window.history.scrollRestoration = 'manual';
+    }
+    
     if (!hash) {
-      setTimeout(() => {
-        window.scrollTo(0, 0);
-      }, 10);
+      window.scrollTo(0, 0);
     }
   }, [pathname, hash]);
 
   return null;
 };
 
-const PixelManager = () => {
-  const [content, setContent] = useState<any>(null);
-
-  useEffect(() => {
-    fetch(`/api/content?t=${Date.now()}`)
-      .then(res => res.json())
-      .then(data => setContent(data && !data.error ? data : null))
-      .catch(() => setContent(null));
-  }, []);
-
+const PixelManager = ({ content }: { content: any }) => {
   useEffect(() => {
     if (!content) return;
 
@@ -212,14 +206,30 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
 // --- Main App ---
 
 export default function App() {
-  const [content, setContent] = useState<any>(null);
+  const [content, setContent] = useState<any>(() => {
+    const cached = sessionStorage.getItem('site_init_data');
+    if (cached) {
+      try {
+        return JSON.parse(cached).content || null;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  });
   const location = useLocation();
 
   useEffect(() => {
-    fetch(`/api/content?t=${Date.now()}`)
+    fetch(`/api/init?t=${Date.now()}`)
       .then(res => res.json())
-      .then(data => setContent(data && !data.error ? data : null))
-      .catch(() => setContent(null));
+      .then(data => {
+        if (data && !data.error) {
+          setContent(data.content || null);
+          // Save to session storage for other components
+          sessionStorage.setItem('site_init_data', JSON.stringify(data));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const isAdminPage = location.pathname.startsWith('/admin') || 
@@ -229,10 +239,10 @@ export default function App() {
   return (
     <>
       <ScrollToTop />
-      <PixelManager />
+      <PixelManager content={content} />
       <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<LandingPage initialContent={content} />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/dashboard" element={<AdminPage />} />
@@ -247,14 +257,11 @@ export default function App() {
     </>
   );
 }
-function LandingPage() {
+function LandingPage({ initialContent }: { initialContent: any }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [content, setContent] = useState<any>(null);
-  const [coaches, setCoaches] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
-  const [schedule, setSchedule] = useState<any[]>([]);
-
+  const [isInitialLoading, setIsInitialLoading] = useState(() => !sessionStorage.getItem('site_init_data') && !initialContent);
+  
   const defaultCoaches = [
     {
       id: 1,
@@ -287,10 +294,51 @@ function LandingPage() {
     { id: 5, location_id: 2, coach_name: "Олег Крамаренко", day_of_week: "Пн, Ср, Пт", start_time: "18:00", end_time: "19:00", group_name: "Група (8–12 років)", price: "2500" }
   ];
 
+  const [content, setContent] = useState<any>(initialContent);
+  const [coaches, setCoaches] = useState<any[]>(() => {
+    const cached = sessionStorage.getItem('site_init_data');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        return Array.isArray(data.coaches) && data.coaches.length > 0 ? data.coaches : defaultCoaches;
+      } catch (e) {
+        return defaultCoaches;
+      }
+    }
+    return defaultCoaches;
+  });
+  const [locations, setLocations] = useState<any[]>(() => {
+    const cached = sessionStorage.getItem('site_init_data');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        return Array.isArray(data.locations) && data.locations.length > 0 ? data.locations : defaultLocations;
+      } catch (e) {
+        return defaultLocations;
+      }
+    }
+    return defaultLocations;
+  });
+  const [schedule, setSchedule] = useState<any[]>(() => {
+    const cached = sessionStorage.getItem('site_init_data');
+    if (cached) {
+      try {
+        const data = JSON.parse(cached);
+        return Array.isArray(data.schedule) && data.schedule.length > 0 ? data.schedule : defaultSchedule;
+      } catch (e) {
+        return defaultSchedule;
+      }
+    }
+    return defaultSchedule;
+  });
+
   const location = useLocation();
 
   React.useEffect(() => {
-    if (location.hash) {
+    const navigation = window.performance?.getEntriesByType('navigation')[0] as any;
+    const isReload = navigation?.type === 'reload';
+
+    if (location.hash && !isReload) {
       const id = location.hash.substring(1);
       const element = document.getElementById(id);
       if (element) {
@@ -305,25 +353,12 @@ function LandingPage() {
           });
         }, 600);
       }
+    } else if (isReload || !location.hash) {
+      window.scrollTo(0, 0);
     }
   }, [location.hash]);
 
   React.useEffect(() => {
-    // Check session storage for cached data
-    const cachedData = sessionStorage.getItem('site_init_data');
-    if (cachedData) {
-      try {
-        const data = JSON.parse(cachedData);
-        setContent(data.content || null);
-        setCoaches(Array.isArray(data.coaches) && data.coaches.length > 0 ? data.coaches : defaultCoaches);
-        setLocations(Array.isArray(data.locations) && data.locations.length > 0 ? data.locations : defaultLocations);
-        setSchedule(Array.isArray(data.schedule) && data.schedule.length > 0 ? data.schedule : defaultSchedule);
-        // Still fetch in background to update cache if needed
-      } catch (e) {
-        console.error('Error parsing cached data', e);
-      }
-    }
-
     fetch('/api/init')
       .then(res => res.json())
       .then(data => {
@@ -336,13 +371,9 @@ function LandingPage() {
           sessionStorage.setItem('site_init_data', JSON.stringify(data));
         }
       })
-      .catch(() => {
-        if (!sessionStorage.getItem('site_init_data')) {
-          setContent(null);
-          setCoaches(defaultCoaches);
-          setLocations(defaultLocations);
-          setSchedule(defaultSchedule);
-        }
+      .catch(err => console.error('Init fetch failed', err))
+      .finally(() => {
+        setIsInitialLoading(false);
       });
   }, []);
 
@@ -399,6 +430,16 @@ function LandingPage() {
       }
     }
   };
+
+  if (isInitialLoading && !content) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-6">
+        <BrandLogo size="lg" />
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs animate-pulse">Завантаження додзьо...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">

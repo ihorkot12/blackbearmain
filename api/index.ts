@@ -152,10 +152,13 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
         points INTEGER NOT NULL,
-        reason TEXT NOT NULL, -- 'attendance', 'competition_1st', 'competition_2nd', 'competition_3rd', etc.
+        reason TEXT NOT NULL,
         date DATE DEFAULT CURRENT_DATE,
+        reference_id TEXT, -- To link to specific badge or competition
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
@@ -286,7 +289,7 @@ async function initDb() {
           name: "Олег Крамаренко",
           role: "Провідний тренер",
           bio: "Кожне тренування — це перемога над собою. Ми вчимо дітей не здаватися перед труднощами.",
-          photo: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop",
+          photo: "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop",
           achievements: JSON.stringify(["10 років тренерської практики", "Підготовка до змагань", "Всеукраїнський та міжнародний рівень"])
         }
       ];
@@ -603,18 +606,18 @@ async function startServer() {
 
   // Caches for Optimization
   let initCache: any = null;
-  let lastInitUpdate = 0;
+  let lastInitUpdate = Date.now();
   let contentCache: any = null;
-  let lastCacheUpdate = 0;
+  let lastCacheUpdate = Date.now();
   const imageCache = new Map<string, { contentType: string, buffer: Buffer, timestamp: number }>();
   const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache
   const IMAGE_CACHE_TTL = 60 * 60 * 1000; // 1 hour server-side cache
 
   const invalidateInitCache = () => {
     initCache = null;
-    lastInitUpdate = 0;
+    lastInitUpdate = Date.now();
     contentCache = null;
-    lastCacheUpdate = 0;
+    lastCacheUpdate = Date.now();
     imageCache.clear();
   };
 
@@ -742,8 +745,14 @@ async function startServer() {
 
       const coaches = coachesRes.rows.map(coach => {
         const c = { ...coach };
+        
+        // One-time fix for Oleg Kramarenko if photo is missing or broken
+        if (c.name === "Олег Крамаренко" && (!c.photo || c.photo.includes('unsplash.com/photo-1544367567-0f2fcb009e0b'))) {
+          c.photo = "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop";
+        }
+
         if (c.photo_type === 'IMAGE') {
-          c.photo = `/api/images/coaches/${c.id}?v=${lastInitUpdate || now}`;
+          c.photo = `/api/images/coaches/${c.id}?v=${lastInitUpdate}`;
         }
         delete c.photo_type;
         return c;
@@ -851,8 +860,14 @@ async function startServer() {
         }
         
         const coach = { ...c, achievements: parsedAchievements };
+        
+        // One-time fix for Oleg Kramarenko if photo is missing or broken
+        if (coach.name === "Олег Крамаренко" && (!coach.photo || coach.photo.includes('unsplash.com/photo-1544367567-0f2fcb009e0b'))) {
+          coach.photo = "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop";
+        }
+
         if (coach.photo_type === 'IMAGE') {
-          coach.photo = `/api/images/coaches/${coach.id}?v=${lastInitUpdate || Date.now()}`;
+          coach.photo = `/api/images/coaches/${coach.id}?v=${lastInitUpdate}`;
         }
         delete coach.photo_type;
         return coach;
@@ -910,13 +925,25 @@ async function startServer() {
   app.put('/api/coaches/:id', requireAuth, async (req, res) => {
     const { name, role, bio, achievements, photo } = req.body;
     try {
-      await pool.query('UPDATE coaches SET name = $1, role = $2, bio = $3, achievements = $4, photo = $5 WHERE id = $6', [
-        name, role, bio, JSON.stringify(achievements || []), photo, req.params.id
-      ]);
+      let query = 'UPDATE coaches SET name = $1, role = $2, bio = $3, achievements = $4';
+      let params = [name, role, bio, JSON.stringify(achievements || [])];
+      
+      // Only update photo if it's not a generated URL that points back to the base64 data
+      // This prevents overwriting the base64 data with its own serving URL
+      if (photo && !photo.startsWith('/api/images/coaches/')) {
+        query += ', photo = $5 WHERE id = $6';
+        params.push(photo, req.params.id);
+      } else {
+        query += ' WHERE id = $5';
+        params.push(req.params.id);
+      }
+      
+      await pool.query(query, params);
       // Invalidate cache
       invalidateInitCache();
       res.json({ success: true });
     } catch (e) {
+      console.error('Failed to update coach', e);
       res.status(500).json({ error: 'Failed to update coach' });
     }
   });
@@ -1374,13 +1401,20 @@ async function startServer() {
   app.post("/api/badges", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participant_id, type, date } = req.body;
+    const badgeDate = date || new Date();
     try {
       await pool.query("BEGIN");
-      await pool.query(
-        "INSERT INTO badges (participant_id, type, date) VALUES ($1, $2, $3)",
-        [participant_id, type, date || new Date()]
+      const result = await pool.query(
+        "INSERT INTO badges (participant_id, type, date) VALUES ($1, $2, $3) RETURNING id",
+        [participant_id, type, badgeDate]
       );
+      const badgeId = result.rows[0].id;
+
       // Increment rank points by 10 for a badge
+      await pool.query(
+        "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, $3, $4, $5)",
+        [participant_id, 10, 'badge', badgeDate, `badge_${badgeId}`]
+      );
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
       res.json({ success: true });
@@ -1398,8 +1432,13 @@ async function startServer() {
       if (badgeRes.rows.length > 0) {
         const participantId = badgeRes.rows[0].participant_id;
         await pool.query("DELETE FROM badges WHERE id = $1", [req.params.id]);
-        // Decrement rank points by 10
-        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 10) WHERE id = $1", [participantId]);
+        
+        // Find points from log to decrement correctly
+        const logRes = await pool.query("SELECT points FROM points_log WHERE reference_id = $1", [`badge_${req.params.id}`]);
+        const pointsToSubtract = logRes.rows.length > 0 ? logRes.rows[0].points : 10;
+
+        await pool.query("DELETE FROM points_log WHERE reference_id = $1", [`badge_${req.params.id}`]);
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - $1) WHERE id = $2", [pointsToSubtract, participantId]);
       }
       await pool.query("COMMIT");
       res.json({ success: true });
@@ -1440,20 +1479,24 @@ async function startServer() {
     const { participant_id, name, result, date } = req.body;
     try {
       await pool.query("BEGIN");
-      await pool.query(
-        "INSERT INTO competitions (participant_id, name, result, date) VALUES ($1, $2, $3, $4)",
+      const insertRes = await pool.query(
+        "INSERT INTO competitions (participant_id, name, result, date) VALUES ($1, $2, $3, $4) RETURNING id",
         [participant_id, name, result, date]
       );
+      const compId = insertRes.rows[0].id;
       
       // Points logic for competitions
       let points = 5; // Participation
-      if (result === '1' || result?.toLowerCase()?.includes('1')) points = 15;
-      else if (result === '2' || result?.toLowerCase()?.includes('2')) points = 10;
-      else if (result === '3' || result?.toLowerCase()?.includes('3')) points = 7;
+      const normalizedResult = result?.toLowerCase()?.trim() || "";
+      
+      // Better parsing: check if it starts with 1, 2, or 3 or contains "1 місце" etc.
+      if (normalizedResult.startsWith('1') || normalizedResult.includes('1 місце') || normalizedResult.includes('1 місце')) points = 15;
+      else if (normalizedResult.startsWith('2') || normalizedResult.includes('2 місце') || normalizedResult.includes('2 місце')) points = 10;
+      else if (normalizedResult.startsWith('3') || normalizedResult.includes('3 місце') || normalizedResult.includes('3 місце')) points = 7;
 
       await pool.query(
-        "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
-        [participant_id, points, `competition_${result}`, date]
+        "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, $3, $4, $5)",
+        [participant_id, points, `competition_${result}`, date, `comp_${compId}`]
       );
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
@@ -1472,9 +1515,14 @@ async function startServer() {
       const compRes = await pool.query("SELECT participant_id FROM competitions WHERE id = $1", [req.params.id]);
       if (compRes.rows.length > 0) {
         const participantId = compRes.rows[0].participant_id;
+        
+        // Find points from log to decrement correctly
+        const logRes = await pool.query("SELECT points FROM points_log WHERE reference_id = $1", [`comp_${req.params.id}`]);
+        const pointsToSubtract = logRes.rows.length > 0 ? logRes.rows[0].points : 5;
+
         await pool.query("DELETE FROM competitions WHERE id = $1", [req.params.id]);
-        // Decrement rank points by 20
-        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 20) WHERE id = $1", [participantId]);
+        await pool.query("DELETE FROM points_log WHERE reference_id = $1", [`comp_${req.params.id}`]);
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - $1) WHERE id = $2", [pointsToSubtract, participantId]);
       }
       await pool.query("COMMIT");
       res.json({ success: true });
@@ -1728,7 +1776,8 @@ async function startServer() {
         dateFilter = "AND pl.date >= date_trunc('year', CURRENT_DATE)";
       } else if (period === 'season') {
         dateFilter = `AND pl.date >= CASE 
-          WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (12, 1, 2) THEN date_trunc('year', CURRENT_DATE) - INTERVAL '1 month'
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) = 12 THEN date_trunc('year', CURRENT_DATE) + INTERVAL '11 months'
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (1, 2) THEN date_trunc('year', CURRENT_DATE) - INTERVAL '1 month'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (3, 4, 5) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '2 months'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (6, 7, 8) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '5 months'
           ELSE date_trunc('year', CURRENT_DATE) + INTERVAL '8 months'

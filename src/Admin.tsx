@@ -2240,6 +2240,9 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
       setDirtyFields(new Set());
       toast.success('Контент успішно збережено');
       
+      // Invalidate landing page cache
+      sessionStorage.removeItem('site_init_data');
+      
       // Re-fetch content to get URLs instead of base64 strings
       const freshContent = await fetch(`/api/content?t=${Date.now()}`).then(res => res.json());
       setContent(freshContent);
