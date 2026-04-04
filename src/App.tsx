@@ -6,7 +6,6 @@
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import { AIChat } from './components/AIChat';
 import SEO from './components/SEO';
 import { ContactForm } from './components/ContactForm';
 
@@ -245,7 +244,6 @@ export default function App() {
           <Route path="/women-karate" element={<WomenLanding />} />
         </Routes>
       </Suspense>
-      {!isAdminPage && <AIChat content={content} />}
     </>
   );
 }

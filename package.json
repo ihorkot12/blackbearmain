@@ -15,7 +15,6 @@
     "start": "tsx api/index.ts"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
     "@neondatabase/serverless": "^1.0.2",
     "@types/multer": "^2.1.0",
     "compression": "^1.8.1",
