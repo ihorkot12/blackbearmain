@@ -91,7 +91,7 @@ export const WomenLanding = () => {
     },
     {
       title: "Розумна Самооборона",
-      desc: "Ви вчитеся використовувати силу супротивника проти нього самого. Це ідеально для жінок будь-якої комплекції.",
+      desc: "Ви вчитеся використовувати силу супротивника проти нього самого. Це ідеально для дівчат будь-якої комплекції.",
       icon: <Shield className="text-red-500" size={24} />
     },
     {
@@ -107,16 +107,16 @@ export const WomenLanding = () => {
   ];
 
   const comparison = [
-    { karate: "Гармонійний розвиток всього тіла", boxing: "Акцент на плечовий пояс та руки" },
-    { karate: "Робота ногами для ідеальних сідниць", boxing: "Мінімальна робота ногами" },
-    { karate: "Філософія та контроль емоцій", boxing: "Висока агресія та ризик травм голови" },
-    { karate: "Естетика рухів та розтяжка", boxing: "Жорсткі, прямолінійні рухи" }
+    { karate: "Гармонійний розвиток всього тіла" },
+    { karate: "Робота ногами" },
+    { karate: "Філософія та контроль емоцій" },
+    { karate: "Естетика рухів та розтяжка" }
   ];
 
   const fears = [
     {
-      q: "Чи це не надто жорстко для жінки?",
-      a: "Ми практикуємо Кіокушинкай з акцентом на техніку та контроль. У жіночих групах панує атмосфера підтримки, а не агресії."
+      q: "Чи це не надто жорстко для дівчини?",
+      a: "Ми практикуємо Кіокушинкай з акцентом на техніку та контроль. У наших групах панує атмосфера підтримки, а не агресії."
     },
     {
       q: "Я боюсь отримати синці на обличчі",
@@ -131,9 +131,9 @@ export const WomenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.women_seo_title || "Карате для жінок та дівчат"}
-        description={content?.women_seo_description || "Секція карате для жінок у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс для дівчат? Запишіться на безкоштовне тренування!"}
-        keywords={content?.women_seo_keywords || "карате для жінок київ, карате для дівчат київ, жіноча самооборона київ, фітнес карате київ, секція карате шулявка жінки"}
+        title={content?.women_seo_title || "Карате для дівчат"}
+        description={content?.women_seo_description || "Секція карате для дівчат у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс? Запишіться на безкоштовне тренування!"}
+        keywords={content?.women_seo_keywords || "карате для дівчат київ, самооборона для дівчат київ, фітнес карате київ, секція карате шулявка"}
       />
       
       <Navbar />
@@ -163,7 +163,7 @@ export const WomenLanding = () => {
             </div>
             <h1 
               className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] mb-8"
-              dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Сильних Жінок</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Дівчат</span>' }}
             />
             <p 
               className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed max-w-xl"
@@ -198,7 +198,7 @@ export const WomenLanding = () => {
               Чому Карате <span className="text-red-600">краще за Бокс?</span>
             </h2>
             <p className="text-zinc-500 max-w-2xl mx-auto">
-              Ми поважаємо всі види спорту, але для жіночого організму карате пропонує більш гармонійний підхід.
+              Ми поважаємо всі види спорту, але для організму дівчат карате пропонує більш гармонійний підхід.
             </p>
           </div>
 
@@ -217,7 +217,6 @@ export const WomenLanding = () => {
                   </div>
                   <div>
                     <div className="font-bold text-white mb-1">{item.karate}</div>
-                    <div className="text-xs text-zinc-500 line-through opacity-50">Бокс: {item.boxing}</div>
                   </div>
                 </motion.div>
               ))}
@@ -234,9 +233,9 @@ export const WomenLanding = () => {
               <div className="absolute -bottom-6 -right-6 p-8 bg-red-600 rounded-3xl shadow-2xl max-w-[240px]">
                 <Quote className="text-white/30 mb-4" size={32} />
                 <p className="text-white font-bold italic text-sm">
-                  "Я шукала спорт для душі та тіла. В карате я знайшла набагато більше — впевненість, якої мені не вистачало."
+                  "Я шукала спорт для душі та тіла. В карате я знайшла набагато більше."
                 </p>
-                <div className="mt-4 text-[10px] uppercase tracking-widest font-black text-white/70">— Олена, 32 роки</div>
+                <div className="mt-4 text-[10px] uppercase tracking-widest font-black text-white/70">— Єва, 17 років</div>
               </div>
             </div>
           </div>
@@ -300,7 +299,7 @@ export const WomenLanding = () => {
         title="Запишіться на перше безкоштовне тренування"
         subtitle="Ми зателефонуємо вам, щоб підібрати зручний час та відповісти на всі запитання."
         ageGroups={[
-          { value: "Жіноча група", label: "Жіноча група" },
+          { value: "Група для дівчат", label: "Група для дівчат" },
           { value: "Дівчата (підлітки)", label: "Дівчата (підлітки)" },
           { value: "Індивідуально", label: "Індивідуальні тренування" }
         ]}

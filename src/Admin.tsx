@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
-  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield,
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield, ShieldCheck,
   Smile, Trophy, Zap, Target, Heart, FileUp, Link
 } from 'lucide-react';
 import { 
@@ -356,6 +356,8 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
 export const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [initialAction, setInitialAction] = useState<string | null>(null);
+  const [role, setRole] = useState<string>('admin');
+  const [userName, setUserName] = useState<string>('Адміністратор');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -365,10 +367,24 @@ export const AdminPage = () => {
         navigate('/login');
         return;
       }
-      const res = await fetch('/api/check-auth', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (!res.ok) {
+      try {
+        const res = await fetch('/api/check-auth', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          localStorage.removeItem('admin_token');
+          navigate('/login');
+          return;
+        }
+        const data = await res.json();
+        setRole(data.role || 'admin');
+        setUserName(data.name || 'Адміністратор');
+        
+        // If coach and activeTab is restricted, switch to first allowed tab
+        if (data.role === 'coach' && ['dashboard', 'leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
+          setActiveTab('attendance');
+        }
+      } catch (e) {
         localStorage.removeItem('admin_token');
         navigate('/login');
       }
@@ -387,26 +403,30 @@ export const AdminPage = () => {
     {
       title: 'Операційка',
       items: [
-        { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard },
-        { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
-        { id: 'rating', label: 'Рейтинг', icon: Award },
-        { id: 'participants', label: 'Учасники', icon: UserCheck },
-        { id: 'schedule', label: 'Розклад', icon: Clock },
+        { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin'] },
+        { id: 'attendance', label: 'Відвідуваність', icon: Calendar, roles: ['admin', 'coach'] },
+        { id: 'rating', label: 'Рейтинг', icon: Award, roles: ['admin'] },
+        { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
+        { id: 'schedule', label: 'Розклад', icon: Clock, roles: ['admin', 'coach'] },
       ]
     },
     {
       title: 'Управління',
       items: [
-        { id: 'leads', label: 'Заявки', icon: MessageSquare },
-        { id: 'content', label: 'Конструктор', icon: Settings },
-        { id: 'coaches', label: 'Тренери', icon: Users },
-        { id: 'locations', label: 'Локації', icon: MapPin },
-        { id: 'settings', label: 'Налаштування', icon: Activity },
+        { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin'] },
+        { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },
+        { id: 'coaches', label: 'Тренери', icon: Users, roles: ['admin'] },
+        { id: 'locations', label: 'Локації', icon: MapPin, roles: ['admin', 'coach'] },
+        { id: 'admin_users', label: 'Акаунти', icon: ShieldCheck, roles: ['admin'] },
+        { id: 'settings', label: 'Налаштування', icon: Activity, roles: ['admin'] },
       ]
     }
   ];
 
-  const visibleGroups = menuGroups;
+  const visibleGroups = menuGroups.map(group => ({
+    ...group,
+    items: group.items.filter(item => item.roles.includes(role))
+  })).filter(group => group.items.length > 0);
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex font-sans selection:bg-red-600/30">
@@ -495,11 +515,11 @@ export const AdminPage = () => {
             <div className="h-10 w-px bg-white/10" />
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <p className="text-sm font-black uppercase tracking-tight">Ігор Котляревський</p>
-                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Головний тренер</p>
+                <p className="text-sm font-black uppercase tracking-tight">{userName}</p>
+                <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{role === 'admin' ? 'Головний тренер' : 'Тренер'}</p>
               </div>
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/20">
-                І
+                {userName.charAt(0)}
               </div>
             </div>
           </div>
@@ -524,6 +544,7 @@ export const AdminPage = () => {
               {activeTab === 'attendance' && <AttendanceEditor />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'settings' && <SettingsEditor />}
+              {activeTab === 'admin_users' && <AdminUsersEditor />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -1160,6 +1181,244 @@ const SettingsEditor = () => {
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+const AdminUsersEditor = () => {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    login: '',
+    password: '',
+    role: 'coach',
+    name: ''
+  });
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch('/api/admin/users', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setUsers(data);
+    } catch (e) {
+      toast.error('Помилка завантаження акаунтів');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const token = localStorage.getItem('admin_token');
+      const url = editingUser ? `/api/admin/users/${editingUser.id}` : '/api/admin/users';
+      const method = editingUser ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (res.ok) {
+        toast.success(editingUser ? 'Акаунт оновлено' : 'Акаунт створено');
+        setShowModal(false);
+        setEditingUser(null);
+        setFormData({ login: '', password: '', role: 'coach', name: '' });
+        fetchUsers();
+      } else {
+        toast.error('Помилка при збереженні');
+      }
+    } catch (e) {
+      toast.error('Помилка сервера');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Ви впевнені, що хочете видалити цей акаунт?')) return;
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Акаунт видалено');
+        fetchUsers();
+      }
+    } catch (e) {
+      toast.error('Помилка при видаленні');
+    }
+  };
+
+  return (
+    <div className="space-y-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Керування акаунтами</h1>
+          <p className="text-zinc-500 font-medium max-w-2xl">Створення та редагування акаунтів для тренерів та адміністраторів.</p>
+        </div>
+        <button 
+          onClick={() => {
+            setEditingUser(null);
+            setFormData({ login: '', password: '', role: 'coach', name: '' });
+            setShowModal(true);
+          }}
+          className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 rounded-3xl font-black uppercase tracking-widest text-xs transition-all shadow-2xl shadow-red-600/20 flex items-center gap-4 group"
+        >
+          <Plus size={20} className="group-hover:scale-110 transition-transform" />
+          Додати акаунт
+        </button>
+      </div>
+
+      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-hidden backdrop-blur-xl">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/5">
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Ім'я</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Логін</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Роль</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {users.map((user) => (
+              <tr key={user.id} className="group hover:bg-white/[0.02] transition-colors">
+                <td className="px-10 py-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-red-600/10 flex items-center justify-center text-red-600 font-black">
+                      {user.name?.charAt(0) || 'U'}
+                    </div>
+                    <span className="font-bold">{user.name}</span>
+                  </div>
+                </td>
+                <td className="px-10 py-8 font-mono text-sm text-zinc-400">{user.login}</td>
+                <td className="px-10 py-8">
+                  <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
+                    user.role === 'admin' ? 'bg-red-600/10 text-red-500' : 'bg-blue-600/10 text-blue-500'
+                  }`}>
+                    {user.role === 'admin' ? 'Адмін' : 'Тренер'}
+                  </span>
+                </td>
+                <td className="px-10 py-8 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => {
+                        setEditingUser(user);
+                        setFormData({ ...user, password: '' });
+                        setShowModal(true);
+                      }}
+                      className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(user.id)}
+                      className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-red-600/10 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative w-full max-w-xl bg-zinc-900 border border-white/10 rounded-[3rem] p-12 shadow-2xl"
+          >
+            <h3 className="text-3xl font-black uppercase tracking-tight mb-8">
+              {editingUser ? 'Редагувати акаунт' : 'Новий акаунт'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-8">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Ім'я</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+                    placeholder="Ім'я тренера..."
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Роль</label>
+                  <select 
+                    value={formData.role}
+                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all appearance-none"
+                  >
+                    <option value="coach">Тренер</option>
+                    <option value="admin">Адміністратор</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Логін</label>
+                  <input 
+                    type="text"
+                    required
+                    value={formData.login}
+                    onChange={(e) => setFormData({...formData, login: e.target.value})}
+                    className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+                    placeholder="Логін..."
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">
+                    {editingUser ? 'Новий пароль (необов.)' : 'Пароль'}
+                  </label>
+                  <input 
+                    type="password"
+                    required={!editingUser}
+                    value={formData.password}
+                    onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+                    placeholder="Пароль..."
+                  />
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all"
+                >
+                  Скасувати
+                </button>
+                <button 
+                  type="submit"
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all shadow-lg shadow-red-600/20"
+                >
+                  Зберегти
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2654,14 +2913,65 @@ const ScheduleEditor = ({ initialAction, onActionComplete }: { initialAction?: s
               </select>
             </div>
             <div>
-              <label className="block text-sm font-bold text-zinc-300 mb-2">День тижня</label>
-              <select 
-                value={editingEntry.day_of_week} 
-                onChange={e => setEditingEntry({...editingEntry, day_of_week: e.target.value})}
-                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
-              >
-                {days.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">День тижня (вільний формат)</label>
+              <div className="space-y-2">
+                <input 
+                  type="text" 
+                  value={editingEntry.day_of_week} 
+                  onChange={e => setEditingEntry({...editingEntry, day_of_week: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none focus:border-red-600 transition-all"
+                  placeholder="Пн, Ср, Пт або Щодня"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {days.map(d => {
+                    const isSelected = editingEntry.day_of_week?.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          const current = editingEntry.day_of_week || '';
+                          let newValue;
+                          if (current.includes(d)) {
+                            newValue = current.split(',').map(s => s.trim()).filter(s => s !== d).join(', ');
+                          } else {
+                            newValue = current ? `${current}, ${d}` : d;
+                          }
+                          setEditingEntry({...editingEntry, day_of_week: newValue});
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border ${
+                          isSelected 
+                            ? 'bg-red-600 border-red-600 text-white shadow-lg shadow-red-600/20' 
+                            : 'bg-white/5 border-white/5 text-zinc-500 hover:border-white/10 hover:text-white'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry({...editingEntry, day_of_week: 'Пн, Вт, Ср, Чт, Пт'})}
+                    className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-lg text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:border-white/10 hover:text-white transition-all"
+                  >
+                    Пн-Пт
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry({...editingEntry, day_of_week: 'Щодня'})}
+                    className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-lg text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:border-white/10 hover:text-white transition-all"
+                  >
+                    Щодня
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingEntry({...editingEntry, day_of_week: ''})}
+                    className="px-3 py-1.5 bg-white/5 border border-white/5 rounded-lg text-[10px] font-black uppercase tracking-widest text-red-500/50 hover:text-red-500 transition-all"
+                  >
+                    Очистити
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
               <label className="block text-sm font-bold text-zinc-300 mb-2">Група</label>

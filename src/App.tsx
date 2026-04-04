@@ -819,7 +819,7 @@ function LandingPage() {
               <Link to="/kids-4-7" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 4–7 років</Link>
               <Link to="/juniors-7-12" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 7–12 років</Link>
               <Link to="/teens-12-plus" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для підлітків 12+</Link>
-              <Link to="/women-karate" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для жінок</Link>
+              <Link to="/women-karate" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Карате для дівчат</Link>
             </div>
 
             <Button variant="primary" className="px-10 py-5 text-sm" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
@@ -856,7 +856,7 @@ function LandingPage() {
               { age: '4–7 років', title: content?.dir1_title || 'Перші кроки', desc: content?.dir1_text || 'Розвиток координації, ігрова форма, база дисципліни.', result: 'Координація', link: '/kids-4-7', badge: 'Популярно' },
               { age: '7–12 років', title: content?.dir2_title || 'Формування', desc: content?.dir2_text || 'Техніка, фізична підготовка, перші змагання.', result: 'База сили', link: '/juniors-7-12', badge: 'Набір' },
               { age: 'Підлітки', title: content?.dir3_title || 'Впевненість', desc: content?.dir3_text || 'Професійні турніри, самооборона та лідерство.', result: 'Лідерство', link: '/teens-12-plus' },
-              { age: 'Для жінок', title: content?.dir4_title || 'Естетика та Сила', desc: content?.dir4_text || 'Гнучкість, самооборона та зняття стресу без травм.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
+              { age: 'Карате для дівчат', title: content?.dir4_title || 'Естетика та Сила', desc: content?.dir4_text || 'Гнучкість, самооборона та зняття стресу без травм.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
               { age: 'Персональні', title: content?.dir5_title || 'Шлях майстра', desc: content?.dir5_text || 'Максимальний результат, індивідуальний графік та 100% уваги.', result: 'Результат x3', link: '/personal-training', badge: 'VIP' },
             ].map((item, idx) => {
               const CardContent = (
@@ -1178,9 +1178,15 @@ function LandingPage() {
                         >
                           <div className="space-y-1">
                             <div className="text-lg font-black text-white group-hover/item:text-red-500 transition-colors uppercase tracking-tight">{item.group_name}</div>
-                            <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
-                              <span>Тренер:</span>
-                              <span className="text-zinc-300">{item.coach_name}</span>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                <span>Тренер:</span>
+                                <span className="text-zinc-300">{item.coach_name}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                                <span>Дні:</span>
+                                <span className="text-red-500/80">{item.day_of_week}</span>
+                              </div>
                             </div>
                           </div>
 

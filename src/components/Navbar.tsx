@@ -28,7 +28,7 @@ export const Navbar = () => {
         { name: 'Діти 4-7 років', href: '/kids-4-7' },
         { name: 'Діти 7-12 років', href: '/juniors-7-12' },
         { name: 'Підлітки 12+', href: '/teens-12-plus' },
-        { name: 'Для жінок', href: '/women-karate' },
+        { name: 'Карате для дівчат', href: '/women-karate' },
         { name: 'Персональні', href: '/personal-training' },
       ]
     },

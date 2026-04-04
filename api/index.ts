@@ -38,6 +38,14 @@ async function initDb() {
   try {
     client = await pool.connect();
     await client.query(`
+      CREATE TABLE IF NOT EXISTS admin_users (
+        id SERIAL PRIMARY KEY,
+        login TEXT UNIQUE NOT NULL,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'coach', -- 'admin' or 'coach'
+        name TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS leads (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -142,6 +150,17 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS rank_points INTEGER DEFAULT 0;
     `);
+
+    // Seed initial admin if empty
+    const adminRes = await client.query("SELECT COUNT(*) as count FROM admin_users");
+    if (parseInt(adminRes.rows[0].count) === 0) {
+      const initialLogin = (process.env.ADMIN_LOGIN || 'ihorkot12').trim();
+      const initialPassword = (process.env.ADMIN_PASSWORD || '4756500').trim();
+      await client.query(
+        "INSERT INTO admin_users (login, password, role, name) VALUES ($1, $2, $3, $4)",
+        [initialLogin, initialPassword, 'admin', 'Ігор Котляревський']
+      );
+    }
 
     // Seed initial groups if empty
     const groupRes = await client.query("SELECT COUNT(*) as count FROM groups");
@@ -364,14 +383,29 @@ async function startServer() {
 
   const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
 
-  const requireAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
     if (authHeader === `Bearer ${ADMIN_TOKEN}`) {
-      next();
-    } else {
-      console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}... Expected: Bearer ${ADMIN_TOKEN.substring(0, 10)}...`);
-      res.status(401).json({ error: 'Unauthorized' });
+      (req as any).user = { role: 'admin', login: 'system' };
+      return next();
     }
+
+    // Check for custom tokens (simple implementation for now)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      try {
+        const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [token.split('-')[0]]);
+        if (result.rows.length > 0) {
+          (req as any).user = result.rows[0];
+          return next();
+        }
+      } catch (e) {
+        console.error('Auth error:', e);
+      }
+    }
+
+    console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}...`);
+    res.status(401).json({ error: 'Unauthorized' });
   };
 
   async function sendTelegramMessage(text: string) {
@@ -999,7 +1033,7 @@ async function startServer() {
   });
 
   // Auth
-  const loginHandler = (req: express.Request, res: express.Response) => {
+  const loginHandler = async (req: express.Request, res: express.Response) => {
     const login = (req.body.login || '').trim();
     const password = (req.body.password || '').trim();
     const expectedLogin = (process.env.ADMIN_LOGIN || 'ihorkot12').trim();
@@ -1009,25 +1043,35 @@ async function startServer() {
     
     if (login === expectedLogin && password === expectedPassword) {
       console.log('Login successful (Admin)');
-      res.json({ success: true, token: ADMIN_TOKEN, role: 'admin' });
-    } else {
-      if (!pool) return res.status(401).json({ error: 'Invalid credentials' });
+      return res.json({ success: true, token: ADMIN_TOKEN, role: 'admin', name: 'Ігор Котляревський' });
+    }
+
+    if (!pool) return res.status(401).json({ error: 'Invalid credentials' });
+
+    try {
+      // Check admin_users table
+      const adminUser = await pool.query("SELECT * FROM admin_users WHERE login = $1 AND password = $2", [login, password]);
+      if (adminUser.rows.length > 0) {
+        const user = adminUser.rows[0];
+        console.log(`Login successful (${user.role})`);
+        // Simple token: id-role
+        const token = `${user.id}-${user.role}`;
+        return res.json({ success: true, token, role: user.role, name: user.name });
+      }
+
       // Check if it's a parent login
-      pool.query("SELECT id, name FROM participants WHERE parent_login = $1 AND parent_password = $2", [login, password])
-        .then(result => {
-          if (result.rows.length > 0) {
-            console.log('Login successful (Parent)');
-            (req.session as any).participantId = result.rows[0].id;
-            res.json({ success: true, role: 'parent' });
-          } else {
-            console.log('Login failed: Invalid credentials');
-            res.status(401).json({ error: 'Invalid credentials' });
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          res.status(500).json({ error: 'Auth error' });
-        });
+      const parentUser = await pool.query("SELECT id, name FROM participants WHERE parent_login = $1 AND parent_password = $2", [login, password]);
+      if (parentUser.rows.length > 0) {
+        console.log('Login successful (Parent)');
+        (req.session as any).participantId = parentUser.rows[0].id;
+        return res.json({ success: true, role: 'parent', name: parentUser.rows[0].name });
+      }
+
+      console.log('Login failed: Invalid credentials');
+      res.status(401).json({ error: 'Invalid credentials' });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: 'Auth error' });
     }
   };
 
@@ -1041,7 +1085,64 @@ async function startServer() {
   });
 
   app.get('/api/check-auth', requireAuth, (req, res) => {
-    res.json({ isAdmin: true });
+    const user = (req as any).user;
+    res.json({ isAdmin: true, role: user?.role || 'admin', name: user?.name });
+  });
+
+  // Admin Users Management
+  app.get("/api/admin/users", requireAuth, async (req, res) => {
+    if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+    try {
+      const result = await pool.query("SELECT id, login, role, name FROM admin_users ORDER BY id ASC");
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch admin users" });
+    }
+  });
+
+  app.post("/api/admin/users", requireAuth, async (req, res) => {
+    if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+    const { login, password, role, name } = req.body;
+    try {
+      await pool.query(
+        "INSERT INTO admin_users (login, password, role, name) VALUES ($1, $2, $3, $4)",
+        [login, password, role || 'coach', name]
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create admin user" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", requireAuth, async (req, res) => {
+    if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+    const { login, password, role, name } = req.body;
+    try {
+      if (password) {
+        await pool.query(
+          "UPDATE admin_users SET login = $1, password = $2, role = $3, name = $4 WHERE id = $5",
+          [login, password, role, name, req.params.id]
+        );
+      } else {
+        await pool.query(
+          "UPDATE admin_users SET login = $1, role = $2, name = $3 WHERE id = $4",
+          [login, role, name, req.params.id]
+        );
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update admin user" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", requireAuth, async (req, res) => {
+    if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+    try {
+      await pool.query("DELETE FROM admin_users WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete admin user" });
+    }
   });
 
   app.post('/api/auth/change-password', requireAuth, async (req, res) => {
