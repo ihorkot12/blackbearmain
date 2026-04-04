@@ -43,7 +43,8 @@ async function initDb() {
         login TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         role TEXT NOT NULL DEFAULT 'coach', -- 'admin' or 'coach'
-        name TEXT
+        name TEXT,
+        coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL
       );
 
       CREATE TABLE IF NOT EXISTS leads (
@@ -95,6 +96,7 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+        coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
         order_index INTEGER DEFAULT 0
       );
 
@@ -146,8 +148,19 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS points_log (
+        id SERIAL PRIMARY KEY,
+        participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+        points INTEGER NOT NULL,
+        reason TEXT NOT NULL, -- 'attendance', 'competition_1st', 'competition_2nd', 'competition_3rd', etc.
+        date DATE DEFAULT CURRENT_DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
+      ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
+      ALTER TABLE groups ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS rank_points INTEGER DEFAULT 0;
     `);
 
@@ -986,6 +999,29 @@ async function startServer() {
     }
   });
 
+  app.get("/api/admin/schedule", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const user = (req as any).user;
+    try {
+      let query = `
+        SELECT s.*, c.name as coach_name, l.name as location_name 
+        FROM schedule s
+        LEFT JOIN coaches c ON s.coach_id = c.id
+        LEFT JOIN locations l ON s.location_id = l.id
+      `;
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        query += " WHERE s.coach_id = $1";
+        params.push(user.coach_id);
+      }
+      query += " ORDER BY s.location_id, s.order_index ASC";
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (e: any) {
+      res.status(500).json({ error: "Failed to fetch schedule" });
+    }
+  });
+
   app.post("/api/schedule", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index } = req.body;
@@ -1093,7 +1129,7 @@ async function startServer() {
   app.get("/api/admin/users", requireAuth, async (req, res) => {
     if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
     try {
-      const result = await pool.query("SELECT id, login, role, name FROM admin_users ORDER BY id ASC");
+      const result = await pool.query("SELECT id, login, role, name, coach_id FROM admin_users ORDER BY id ASC");
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch admin users" });
@@ -1102,11 +1138,11 @@ async function startServer() {
 
   app.post("/api/admin/users", requireAuth, async (req, res) => {
     if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
-    const { login, password, role, name } = req.body;
+    const { login, password, role, name, coach_id } = req.body;
     try {
       await pool.query(
-        "INSERT INTO admin_users (login, password, role, name) VALUES ($1, $2, $3, $4)",
-        [login, password, role || 'coach', name]
+        "INSERT INTO admin_users (login, password, role, name, coach_id) VALUES ($1, $2, $3, $4, $5)",
+        [login, password, role || 'coach', name, coach_id]
       );
       res.json({ success: true });
     } catch (e) {
@@ -1116,17 +1152,17 @@ async function startServer() {
 
   app.put("/api/admin/users/:id", requireAuth, async (req, res) => {
     if ((req as any).user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
-    const { login, password, role, name } = req.body;
+    const { login, password, role, name, coach_id } = req.body;
     try {
       if (password) {
         await pool.query(
-          "UPDATE admin_users SET login = $1, password = $2, role = $3, name = $4 WHERE id = $5",
-          [login, password, role, name, req.params.id]
+          "UPDATE admin_users SET login = $1, password = $2, role = $3, name = $4, coach_id = $5 WHERE id = $6",
+          [login, password, role, name, coach_id, req.params.id]
         );
       } else {
         await pool.query(
-          "UPDATE admin_users SET login = $1, role = $2, name = $3 WHERE id = $4",
-          [login, role, name, req.params.id]
+          "UPDATE admin_users SET login = $1, role = $2, name = $3, coach_id = $4 WHERE id = $5",
+          [login, role, name, coach_id, req.params.id]
         );
       }
       res.json({ success: true });
@@ -1234,13 +1270,20 @@ async function startServer() {
 
   app.get("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query(`
+      let query = `
         SELECT p.*, g.name as group_name 
         FROM participants p 
         LEFT JOIN groups g ON p.group_id = g.id 
-        ORDER BY p.name ASC
-      `);
+      `;
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        query += " WHERE g.coach_id = $1";
+        params.push(user.coach_id);
+      }
+      query += " ORDER BY p.name ASC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -1401,8 +1444,19 @@ async function startServer() {
         "INSERT INTO competitions (participant_id, name, result, date) VALUES ($1, $2, $3, $4)",
         [participant_id, name, result, date]
       );
-      // Increment rank points by 20 for a competition
-      await pool.query("UPDATE participants SET rank_points = rank_points + 20 WHERE id = $1", [participant_id]);
+      
+      // Points logic for competitions
+      let points = 5; // Participation
+      if (result === '1' || result?.toLowerCase()?.includes('1')) points = 15;
+      else if (result === '2' || result?.toLowerCase()?.includes('2')) points = 10;
+      else if (result === '3' || result?.toLowerCase()?.includes('3')) points = 7;
+
+      await pool.query(
+        "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+        [participant_id, points, `competition_${result}`, date]
+      );
+
+      await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
       res.json({ success: true });
     } catch (e) {
@@ -1431,10 +1485,18 @@ async function startServer() {
   });
 
   // Groups
-  app.get("/api/groups", async (req, res) => {
+  app.get("/api/groups", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query("SELECT * FROM groups ORDER BY order_index ASC");
+      let query = "SELECT * FROM groups";
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        query += " WHERE coach_id = $1";
+        params.push(user.coach_id);
+      }
+      query += " ORDER BY order_index ASC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -1444,10 +1506,80 @@ async function startServer() {
     }
   });
 
+  app.post("/api/groups", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { name, location_id, coach_id, order_index } = req.body;
+    const user = (req as any).user;
+    const finalCoachId = user.role === 'coach' ? user.coach_id : coach_id;
+    
+    try {
+      const result = await pool.query(
+        "INSERT INTO groups (name, location_id, coach_id, order_index) VALUES ($1, $2, $3, $4) RETURNING id",
+        [name, location_id || null, finalCoachId || null, order_index || 0]
+      );
+      res.json({ success: true, id: result.rows[0].id });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create group" });
+    }
+  });
+
+  app.put("/api/groups/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { name, location_id, coach_id, order_index } = req.body;
+    const user = (req as any).user;
+    
+    try {
+      if (user.role === 'coach') {
+        const check = await pool.query("SELECT coach_id FROM groups WHERE id = $1", [req.params.id]);
+        if (check.rows.length === 0 || check.rows[0].coach_id !== user.coach_id) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+
+      await pool.query(
+        "UPDATE groups SET name = $1, location_id = $2, coach_id = $3, order_index = $4 WHERE id = $5",
+        [name, location_id || null, coach_id || null, order_index || 0, req.params.id]
+      );
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to update group" });
+    }
+  });
+
+  app.delete("/api/groups/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    try {
+      if (user.role === 'coach') {
+        const check = await pool.query("SELECT coach_id FROM groups WHERE id = $1", [req.params.id]);
+        if (check.rows.length === 0 || check.rows[0].coach_id !== user.coach_id) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      }
+      await pool.query("DELETE FROM groups WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete group" });
+    }
+  });
+
   // Dashboard Stats
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
     try {
+      let groupDistQuery = `
+        SELECT g.name as group_name, COUNT(p.id) as count
+        FROM groups g
+        LEFT JOIN participants p ON g.id = p.group_id
+      `;
+      let groupDistParams: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        groupDistQuery += " WHERE g.coach_id = $1";
+        groupDistParams.push(user.coach_id);
+      }
+      groupDistQuery += " GROUP BY g.name";
+
       const [leadsByDay, groupDistribution, recentLeads, totals] = await Promise.all([
         pool.query(`
           SELECT DATE(created_at) as date, COUNT(*) as count 
@@ -1456,12 +1588,7 @@ async function startServer() {
           GROUP BY DATE(created_at)
           ORDER BY DATE(created_at) ASC
         `),
-        pool.query(`
-          SELECT g.name as group_name, COUNT(p.id) as count
-          FROM groups g
-          LEFT JOIN participants p ON g.id = p.group_id
-          GROUP BY g.name
-        `),
+        pool.query(groupDistQuery, groupDistParams),
         pool.query(`
           SELECT * FROM leads 
           ORDER BY created_at DESC 
@@ -1473,7 +1600,7 @@ async function startServer() {
             (SELECT COUNT(*) FROM leads WHERE status = 'new') as new_leads,
             (SELECT COUNT(*) FROM coaches) as total_coaches,
             (SELECT COUNT(*) FROM locations) as total_locations,
-            (SELECT COUNT(*) FROM participants) as total_participants
+            (SELECT COUNT(*) FROM participants p LEFT JOIN groups g ON p.group_id = g.id ${user.role === 'coach' ? 'WHERE g.coach_id = ' + user.coach_id : ''}) as total_participants
         `)
       ]);
 
@@ -1523,8 +1650,21 @@ async function startServer() {
   // Attendance
   app.get("/api/attendance/:date", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query("SELECT * FROM attendance WHERE date = $1", [req.params.date]);
+      let query = `
+        SELECT a.* 
+        FROM attendance a
+        JOIN participants p ON a.participant_id = p.id
+        JOIN groups g ON p.group_id = g.id
+        WHERE a.date = $1
+      `;
+      let params: any[] = [req.params.date];
+      if (user.role === 'coach' && user.coach_id) {
+        query += " AND g.coach_id = $2";
+        params.push(user.coach_id);
+      }
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -1538,13 +1678,106 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participant_id, date, status } = req.body;
     try {
+      await pool.query("BEGIN");
+      
+      // Check if attendance already exists to avoid double points
+      const existing = await pool.query(
+        "SELECT status FROM attendance WHERE participant_id = $1 AND date = $2",
+        [participant_id, date]
+      );
+
       await pool.query(
         "INSERT INTO attendance (participant_id, date, status) VALUES ($1, $2, $3) ON CONFLICT(participant_id, date) DO UPDATE SET status=EXCLUDED.status",
         [participant_id, date, status]
       );
+
+      // Points logic: +1 for present, -1 if changed from present to absent
+      if (status === 'present' && (!existing.rows[0] || existing.rows[0].status !== 'present')) {
+        await pool.query(
+          "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+          [participant_id, 1, 'attendance', date]
+        );
+        await pool.query("UPDATE participants SET rank_points = rank_points + 1 WHERE id = $1", [participant_id]);
+      } else if (status === 'absent' && existing.rows[0] && existing.rows[0].status === 'present') {
+        await pool.query(
+          "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+          [participant_id, -1, 'attendance_removal', date]
+        );
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1) WHERE id = $1", [participant_id]);
+      }
+
+      await pool.query("COMMIT");
       res.json({ success: true });
     } catch (e) {
+      await pool.query("ROLLBACK");
       res.status(500).json({ error: "Failed to update attendance" });
+    }
+  });
+
+  // Ratings and Birthdays
+  app.get("/api/ratings", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const { period, global } = req.query; // 'month', 'season', 'year', global: 'true'
+    const user = (req as any).user;
+    
+    try {
+      let dateFilter = "";
+      if (period === 'month') {
+        dateFilter = "AND pl.date >= date_trunc('month', CURRENT_DATE)";
+      } else if (period === 'year') {
+        dateFilter = "AND pl.date >= date_trunc('year', CURRENT_DATE)";
+      } else if (period === 'season') {
+        dateFilter = `AND pl.date >= CASE 
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (12, 1, 2) THEN date_trunc('year', CURRENT_DATE) - INTERVAL '1 month'
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (3, 4, 5) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '2 months'
+          WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (6, 7, 8) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '5 months'
+          ELSE date_trunc('year', CURRENT_DATE) + INTERVAL '8 months'
+        END`;
+      }
+
+      let query = `
+        SELECT p.id, p.name, SUM(pl.points) as total_points, g.name as group_name, l.name as location_name
+        FROM participants p
+        JOIN points_log pl ON p.id = pl.participant_id
+        LEFT JOIN groups g ON p.group_id = g.id
+        LEFT JOIN locations l ON g.location_id = l.id
+        WHERE 1=1 ${dateFilter}
+      `;
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id && global !== 'true') {
+        query += " AND g.coach_id = $1";
+        params.push(user.coach_id);
+      }
+      query += " GROUP BY p.id, p.name, g.name, l.name ORDER BY total_points DESC LIMIT 20";
+      
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  app.get("/api/birthdays", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const user = (req as any).user;
+    try {
+      let query = `
+        SELECT p.*, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE EXTRACT(MONTH FROM p.birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(DAY FROM p.birthday) = EXTRACT(DAY FROM CURRENT_DATE)
+      `;
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        query += " AND g.coach_id = $1";
+        params.push(user.coach_id);
+      }
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch birthdays" });
     }
   });
 

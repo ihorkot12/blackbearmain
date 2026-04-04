@@ -8,7 +8,7 @@ export const Button = ({ children, variant = 'primary', className = '', showIcon
     gold: 'bg-amber-500 hover:bg-amber-600 text-black',
   };
   
-  const baseStyles = "h-[58px] px-10 rounded-[18px] font-bold uppercase tracking-[0.05em] transition-all duration-300 flex items-center justify-center gap-3";
+  const baseStyles = "h-[58px] px-10 rounded-[18px] font-bold uppercase tracking-[0.05em] transition-all duration-300 inline-flex items-center justify-center gap-3";
   const hoverStyles = variant === 'primary' ? "hover:translate-y-[-2px]" : "hover:translate-y-[-1px]";
   const activeStyles = "active:translate-y-[1px]";
 

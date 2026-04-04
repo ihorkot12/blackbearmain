@@ -63,10 +63,13 @@ export const Navbar = () => {
 
   return (
     <>
+      <div className="bg-red-600 text-white py-1 px-4 text-center text-[10px] font-black uppercase tracking-[0.3em] z-[60] relative">
+        Шулявська — Сирець
+      </div>
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${
         isScrolled 
-          ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black' 
-          : 'bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10'
+          ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black mt-0' 
+          : 'bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10 mt-6'
       }`}>
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between">
           <Link 

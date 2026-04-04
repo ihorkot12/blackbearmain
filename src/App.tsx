@@ -510,7 +510,8 @@ function LandingPage() {
       </section>
 
       {/* Problem Section */}
-      <section className="py-24 bg-zinc-950 relative overflow-hidden">
+      {!content?.hide_section_problem && (
+        <section className="py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -567,9 +568,11 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Transformation Section (Dark Professional Style) */}
-      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+      {!content?.hide_section_transformation && (
+        <section className="py-8 md:py-10 bg-black relative overflow-hidden">
         {/* Subtle Background Accents */}
         {content?.transformation_bg ? (
           <div className="absolute inset-0 z-0">
@@ -679,23 +682,25 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Video Section */}
-      <section className="py-24 bg-black relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-16">
-            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Атмосфера додзьо</h2>
-            <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
-              {content?.video_title || "Відчуйте енергію тренувань"}
-            </h3>
-          </div>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="relative aspect-video rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl shadow-red-600/5"
-          >
+      {!content?.hide_section_video && (
+        <section className="py-12 bg-black relative overflow-hidden">
+          <div className="max-w-4xl mx-auto px-6 relative z-10">
+            <div className="text-center mb-10">
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Атмосфера додзьо</h2>
+              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
+                {content?.video_title || "Відчуйте енергію тренувань"}
+              </h3>
+            </div>
+            
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="relative aspect-video rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl shadow-red-600/5"
+            >
             {content?.video_url ? (
               <iframe 
                 src={content.video_url.includes('youtube.com/watch?v=') 
@@ -730,29 +735,20 @@ function LandingPage() {
           </motion.div>
         </div>
       </section>
+      )}
 
       {/* Coach Authority Section */}
-
-      {/* How it works Section */}
-      <section className="py-24 bg-black relative overflow-hidden">
-        {content?.how_bg && (
-          <div className="absolute inset-0 z-0">
-            <img 
-              src={content.how_bg} 
-              alt="Background" 
-              className="w-full h-full object-cover opacity-20 grayscale"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
-          </div>
-        )}
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-16">
+      {!content?.hide_section_coaches && (
+        <section id="coach" className="py-12 bg-black relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 relative z-10">
+            <div className="text-center mb-10">
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Експертність та досвід</h2>
+              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
+            </div>
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Процес навчання</h2>
             <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
               {content?.how_title || "Як почати тренування"}
             </h3>
-          </div>
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
@@ -778,6 +774,7 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* About Section */}
       <section id="about" className="py-8 md:py-10 bg-zinc-950 relative overflow-hidden">
@@ -830,7 +827,8 @@ function LandingPage() {
       </section>
 
       {/* Directions Section */}
-      <section id="directions" className="py-8 md:py-10 bg-black relative overflow-hidden">
+      {!content?.hide_section_directions && (
+        <section id="directions" className="py-8 md:py-10 bg-black relative overflow-hidden">
         {content?.directions_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -906,9 +904,11 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Results Section */}
-      <section id="results" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+      {!content?.hide_section_results && (
+        <section id="results" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
         {content?.results_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1019,18 +1019,20 @@ function LandingPage() {
 
         </div>
       </section>
+      )}
 
       {/* Coaches Section (Authority) */}
-      <section id="coach" className="py-24 bg-black relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-20">
-            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Експертність та досвід</h2>
-            <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
-          </div>
+      {!content?.hide_section_coaches && (
+        <section id="coach" className="py-12 bg-black relative overflow-hidden">
+          <div className="max-w-7xl mx-auto px-6 relative z-10">
+            <div className="text-center mb-10">
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Експертність та досвід</h2>
+              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
+            </div>
 
-          <div className="space-y-32">
+          <div className="space-y-16">
             {coaches.map((coach, index) => (
-              <div key={coach.id} className={`grid lg:grid-cols-2 gap-20 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
+              <div key={coach.id} className={`grid lg:grid-cols-2 gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
@@ -1082,9 +1084,11 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Schedule Section */}
-      <section id="schedule" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+      {!content?.hide_section_schedule && (
+        <section id="schedule" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
         {content?.schedule_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1208,22 +1212,6 @@ function LandingPage() {
                         </div>
                       ))}
                     </div>
-                    
-                    {loc.map_link && (
-                      <div className="mt-10 pt-8 border-t border-white/5">
-                        <a 
-                          href={loc.map_link} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-3 text-zinc-500 hover:text-white transition-all duration-300 text-[11px] font-black uppercase tracking-[0.2em] group/map"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover/map:bg-red-600 group-hover/map:text-white transition-all">
-                            <ExternalLink size={16} />
-                          </div>
-                          Відкрити маршрут у Google Maps
-                        </a>
-                      </div>
-                    )}
                   </div>
                 </motion.div>
               );
@@ -1246,9 +1234,11 @@ function LandingPage() {
 
         </div>
       </section>
+      )}
 
       {/* Reviews Section */}
-      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+      {!content?.hide_section_reviews && (
+        <section className="py-8 md:py-10 bg-black relative overflow-hidden">
         {content?.reviews_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1278,6 +1268,7 @@ function LandingPage() {
           </div>
         </div>
       </section>
+      )}
 
       {/* FAQ Section */}
       <section className="py-8 md:py-10 bg-black relative overflow-hidden">

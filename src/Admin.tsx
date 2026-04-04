@@ -122,27 +122,37 @@ export const LoginPage = () => {
   );
 };
 
-const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: string) => void }) => {
+const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: string, action?: string) => void, role: string, coachId: number | null }) => {
   const [stats, setStats] = useState<any>(null);
   const [chartData, setChartData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [birthdays, setBirthdays] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       const token = localStorage.getItem('admin_token');
       try {
-        const res = await fetch('/api/dashboard/stats', { 
-          headers: { 'Authorization': `Bearer ${token}` } 
-        }).then(r => r.json());
+        const [statsRes, birthdaysRes] = await Promise.all([
+          fetch('/api/dashboard/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+          fetch('/api/birthdays', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        ]);
         
-        if (res.error) throw new Error(res.error);
+        if (statsRes.error) throw new Error(statsRes.error);
         
-        setStats(res.totals || {});
+        setStats(statsRes.totals || {});
         setChartData({
-          leadsOverTime: res.leadsOverTime || [],
-          groupDistribution: res.groupDistribution || [],
-          recentLeads: res.recentLeads || []
+          leadsOverTime: statsRes.leadsOverTime || [],
+          groupDistribution: statsRes.groupDistribution || [],
+          recentLeads: statsRes.recentLeads || []
         });
+        setBirthdays(Array.isArray(birthdaysRes) ? birthdaysRes : []);
+        
+        if (Array.isArray(birthdaysRes) && birthdaysRes.length > 0) {
+          toast.info(`Сьогодні день народження у ${birthdaysRes.length} учнів!`, {
+            description: birthdaysRes.map(b => b.name).join(', '),
+            duration: 10000
+          });
+        }
       } catch (e) {
         console.error('Dashboard fetch failed', e);
         setStats({});
@@ -165,10 +175,10 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
 
   const statCards = [
     { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach' },
     { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-  ];
+    { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach' },
+  ].filter(card => !card.hidden);
 
   return (
     <div className="space-y-12 pb-20">
@@ -271,6 +281,31 @@ const Dashboard = ({ onQuickAction }: { onQuickAction: (tab: string, action?: st
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
+        {birthdays.length > 0 && (
+          <div className="lg:col-span-2 bg-red-600/10 backdrop-blur-md p-10 rounded-[3rem] border border-red-600/20 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-10 opacity-10">
+              <Smile size={120} />
+            </div>
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3 mb-8 text-red-500">
+              <Smile size={24} />
+              Сьогодні день народження!
+            </h3>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {birthdays.map((b, i) => (
+                <div key={i} className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/5">
+                  <div className="w-12 h-12 bg-red-600 text-white rounded-xl flex items-center justify-center font-black text-lg">
+                    {b.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">{b.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{b.group_name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
           <div className="flex items-center justify-between mb-10">
             <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
@@ -358,6 +393,7 @@ export const AdminPage = () => {
   const [initialAction, setInitialAction] = useState<string | null>(null);
   const [role, setRole] = useState<string>('admin');
   const [userName, setUserName] = useState<string>('Адміністратор');
+  const [coachId, setCoachId] = useState<number | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -379,6 +415,7 @@ export const AdminPage = () => {
         const data = await res.json();
         setRole(data.role || 'admin');
         setUserName(data.name || 'Адміністратор');
+        setCoachId(data.coach_id || null);
         
         // If coach and activeTab is restricted, switch to first allowed tab
         if (data.role === 'coach' && ['dashboard', 'leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
@@ -405,8 +442,10 @@ export const AdminPage = () => {
       items: [
         { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin'] },
         { id: 'attendance', label: 'Відвідуваність', icon: Calendar, roles: ['admin', 'coach'] },
-        { id: 'rating', label: 'Рейтинг', icon: Award, roles: ['admin'] },
+        { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
+        { id: 'rank_management', label: 'Пояси та Досягнення', icon: Award, roles: ['admin', 'coach'] },
         { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
+        { id: 'groups', label: 'Групи', icon: Users, roles: ['admin', 'coach'] },
         { id: 'schedule', label: 'Розклад', icon: Clock, roles: ['admin', 'coach'] },
       ]
     },
@@ -534,15 +573,17 @@ export const AdminPage = () => {
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
             >
-              {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} />}
+              {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'leads' && <LeadsViewer />}
               {activeTab === 'coaches' && <CoachesEditor />}
               {activeTab === 'locations' && <LocationsEditor />}
-              {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
-              {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
-              {activeTab === 'attendance' && <AttendanceEditor />}
+              {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
+              {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
+              {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
+              {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} />}
               {activeTab === 'rating' && <RatingEditor />}
+              {activeTab === 'rank_management' && <RankManagement />}
               {activeTab === 'settings' && <SettingsEditor />}
               {activeTab === 'admin_users' && <AdminUsersEditor />}
             </motion.div>
@@ -553,7 +594,7 @@ export const AdminPage = () => {
   );
 };
 
-const RatingEditor = () => {
+const RankManagement = () => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRank, setEditingRank] = useState<any>(null);
@@ -1023,6 +1064,206 @@ const RatingEditor = () => {
   );
 };
 
+const RatingEditor = () => {
+  const [period, setPeriod] = useState<'month' | 'season' | 'year'>('month');
+  const [isGlobal, setIsGlobal] = useState(false);
+  const [ratings, setRatings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchRatings = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/ratings?period=${period}${isGlobal ? '&global=true' : ''}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(r => r.json());
+      setRatings(Array.isArray(res) ? res : []);
+    } catch (e) {
+      console.error('Fetch ratings failed', e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchRatings();
+  }, [period, isGlobal]);
+
+  const getPeriodLabel = () => {
+    const base = isGlobal ? 'Клубний рейтинг' : 'Мій рейтинг';
+    if (period === 'month') return `${base}: Спортсмен місяця`;
+    if (period === 'season') return `${base}: Спортсмен сезону`;
+    return `${base}: Спортсмен року`;
+  };
+
+  return (
+    <div className="space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h2 className="text-5xl font-black uppercase tracking-tighter mb-3">Рейтинг</h2>
+          <p className="text-zinc-500 font-medium text-lg">Найкращі спортсмени за результатами відвідуваності та змагань</p>
+        </div>
+        
+        <div className="flex flex-col gap-4">
+          <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5 self-end">
+            <button
+              onClick={() => setIsGlobal(false)}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                !isGlobal ? 'bg-zinc-800 text-white' : 'text-zinc-500 hover:text-white'
+              }`}
+            >
+              Мої групи
+            </button>
+            <button
+              onClick={() => setIsGlobal(true)}
+              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                isGlobal ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'
+              }`}
+            >
+              Весь клуб
+            </button>
+          </div>
+
+          <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5">
+            {(['month', 'season', 'year'] as const).map((p) => (
+              <button
+                key={p}
+                onClick={() => setPeriod(p)}
+                className={`px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                  period === p ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-zinc-500 hover:text-white'
+                }`}
+              >
+                {p === 'month' ? 'Місяць' : p === 'season' ? 'Сезон' : 'Рік'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
+            <Trophy size={24} className="text-amber-500" />
+            {getPeriodLabel()}
+          </h3>
+
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <RefreshCw className="animate-spin text-red-600" size={32} />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {ratings.map((r, i) => (
+                <motion.div
+                  key={r.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group"
+                >
+                  <div className="flex items-center gap-6">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm ${
+                      i === 0 ? 'bg-amber-500 text-black' : 
+                      i === 1 ? 'bg-zinc-300 text-black' : 
+                      i === 2 ? 'bg-amber-700 text-white' : 
+                      'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {i + 1}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black uppercase tracking-tight">{r.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{r.group_name}</p>
+                        {isGlobal && r.location_name && (
+                          <>
+                            <span className="w-1 h-1 bg-zinc-700 rounded-full" />
+                            <p className="text-[10px] text-red-500/70 font-bold uppercase tracking-widest">{r.location_name}</p>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-xl font-black text-white leading-none">{r.total_points}</p>
+                      <p className="text-[8px] text-zinc-600 font-black uppercase tracking-widest mt-1">Балів</p>
+                    </div>
+                    {i < 3 && <Trophy size={20} className={i === 0 ? 'text-amber-500' : i === 1 ? 'text-zinc-300' : 'text-amber-700'} />}
+                  </div>
+                </motion.div>
+              ))}
+              {ratings.length === 0 && (
+                <div className="text-center py-20 text-zinc-500 font-bold italic">Даних за цей період поки немає</div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-8">
+          <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
+            <h3 className="text-xl font-black uppercase tracking-tight mb-6">Як нараховуються бали?</h3>
+            <div className="space-y-6">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-green-500/10 text-green-500 rounded-lg flex items-center justify-center shrink-0">
+                  <CheckCircle2 size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">Відвідування</p>
+                  <p className="text-xs text-zinc-500 font-medium">+1 бал за кожне тренування</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-amber-500/10 text-amber-500 rounded-lg flex items-center justify-center shrink-0">
+                  <Trophy size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">1 місце</p>
+                  <p className="text-xs text-zinc-500 font-medium">+15 балів за перемогу</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-zinc-300/10 text-zinc-300 rounded-lg flex items-center justify-center shrink-0">
+                  <Trophy size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">2 місце</p>
+                  <p className="text-xs text-zinc-500 font-medium">+10 балів</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-amber-700/10 text-amber-700 rounded-lg flex items-center justify-center shrink-0">
+                  <Trophy size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">3 місце</p>
+                  <p className="text-xs text-zinc-500 font-medium">+7 балів</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-zinc-500/10 text-zinc-500 rounded-lg flex items-center justify-center shrink-0">
+                  <Zap size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">Участь</p>
+                  <p className="text-xs text-zinc-500 font-medium">+5 балів за участь у змаганнях</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-red-600 p-10 rounded-[3rem] shadow-2xl shadow-red-600/20 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 p-10 opacity-20 group-hover:scale-110 transition-transform duration-700">
+              <Trophy size={120} />
+            </div>
+            <h3 className="text-2xl font-black uppercase tracking-tighter mb-4 text-white">Мотивація</h3>
+            <p className="text-white/80 text-sm font-medium leading-relaxed mb-8">Рейтинг допомагає учням бачити свій прогрес та змагатися за звання найкращого спортсмена клубу.</p>
+            <div className="w-12 h-1 bg-white/30 rounded-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SettingsEditor = () => {
   const [settings, setSettings] = useState<any>({});
   const [loading, setLoading] = useState(true);
@@ -1194,18 +1435,23 @@ const AdminUsersEditor = () => {
     login: '',
     password: '',
     role: 'coach',
-    name: ''
+    name: '',
+    coach_id: ''
   });
+  const [coaches, setCoaches] = useState<any[]>([]);
 
   const fetchUsers = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch('/api/admin/users', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      setUsers(data);
+      const [uRes, cRes] = await Promise.all([
+        fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const uData = await uRes.json();
+      const cData = await cRes.json();
+      setUsers(uData);
+      setCoaches(cData);
     } catch (e) {
       toast.error('Помилка завантаження акаунтів');
     }
@@ -1236,7 +1482,7 @@ const AdminUsersEditor = () => {
         toast.success(editingUser ? 'Акаунт оновлено' : 'Акаунт створено');
         setShowModal(false);
         setEditingUser(null);
-        setFormData({ login: '', password: '', role: 'coach', name: '' });
+        setFormData({ login: '', password: '', role: 'coach', name: '', coach_id: '' });
         fetchUsers();
       } else {
         toast.error('Помилка при збереженні');
@@ -1273,7 +1519,7 @@ const AdminUsersEditor = () => {
         <button 
           onClick={() => {
             setEditingUser(null);
-            setFormData({ login: '', password: '', role: 'coach', name: '' });
+            setFormData({ login: '', password: '', role: 'coach', name: '', coach_id: '' });
             setShowModal(true);
           }}
           className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 rounded-3xl font-black uppercase tracking-widest text-xs transition-all shadow-2xl shadow-red-600/20 flex items-center gap-4 group"
@@ -1373,6 +1619,21 @@ const AdminUsersEditor = () => {
                     <option value="admin">Адміністратор</option>
                   </select>
                 </div>
+                {formData.role === 'coach' && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Прив'язати до тренера</label>
+                    <select 
+                      value={formData.coach_id}
+                      onChange={(e) => setFormData({...formData, coach_id: e.target.value})}
+                      className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all appearance-none"
+                    >
+                      <option value="">Не вибрано</option>
+                      {coaches.map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-3">
@@ -1423,7 +1684,7 @@ const AdminUsersEditor = () => {
   );
 };
 
-const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
+const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: { initialAction?: string | null, onActionComplete?: () => void, role: string, coachId: number | null }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1442,7 +1703,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
     try {
       const [pRes, gRes] = await Promise.all([
         fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-        fetch('/api/groups').then(r => r.json())
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
       ]);
       setParticipants(Array.isArray(pRes) ? pRes : []);
       setGroups(Array.isArray(gRes) ? gRes : []);
@@ -1815,7 +2076,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete }: { initialAction
   );
 };
 
-const AttendanceEditor = () => {
+const AttendanceEditor = ({ role, coachId }: { role: string, coachId: number | null }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2054,6 +2315,7 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
     { id: 'teen_landing', title: 'Підлітки', icon: Zap },
     { id: 'personal_landing', title: 'Персональні', icon: Target },
     { id: 'women_landing', title: 'Жінки', icon: Heart },
+    { id: 'visibility', title: 'Видимість блоків', icon: Eye },
     { id: 'analytics', title: 'Аналітика', icon: Shield },
   ];
 
@@ -2187,6 +2449,16 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
     analytics: [
       { key: 'meta_pixel_code', label: 'Meta Pixel Code (Facebook)', type: 'textarea', placeholder: 'Вставте повний код пікселя <script>...</script>' },
       { key: 'google_pixel_code', label: 'Google Analytics / Tag Manager Code', type: 'textarea', placeholder: 'Вставте код відстеження Google' },
+    ],
+    visibility: [
+      { key: 'hide_section_problem', label: 'Приховати секцію "Виклики сучасності"', type: 'checkbox' },
+      { key: 'hide_section_transformation', label: 'Приховати секцію "Як дитяче карате змінює дитину"', type: 'checkbox' },
+      { key: 'hide_section_video', label: 'Приховати секцію "Атмосфера додзьо" (Відео)', type: 'checkbox' },
+      { key: 'hide_section_directions', label: 'Приховати секцію "Напрями"', type: 'checkbox' },
+      { key: 'hide_section_results', label: 'Приховати секцію "Результати"', type: 'checkbox' },
+      { key: 'hide_section_coaches', label: 'Приховати секцію "Наші майстри"', type: 'checkbox' },
+      { key: 'hide_section_schedule', label: 'Приховати секцію "Розклад"', type: 'checkbox' },
+      { key: 'hide_section_reviews', label: 'Приховати секцію "Відгуки"', type: 'checkbox' },
     ]
   };
 
@@ -2273,6 +2545,19 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
                   </div>
                 </div>
                 <p className="text-[10px] text-zinc-600 font-bold uppercase italic">Рекомендовано: 1920x1080px, до 5MB</p>
+              </div>
+            )}
+            {field.type === 'checkbox' && (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => handleChange(field.key, content[field.key] === 'true' ? 'false' : 'true')}
+                  className={`w-14 h-8 rounded-full transition-all relative ${content[field.key] === 'true' ? 'bg-red-600' : 'bg-zinc-800'}`}
+                >
+                  <div className={`absolute top-1 w-6 h-6 rounded-full bg-white transition-all ${content[field.key] === 'true' ? 'left-7' : 'left-1'}`} />
+                </button>
+                <span className="text-sm font-medium text-zinc-400">
+                  {content[field.key] === 'true' ? 'Приховано' : 'Відображається'}
+                </span>
               </div>
             )}
           </div>
@@ -2753,7 +3038,208 @@ const LocationsEditor = () => {
   );
 };
 
-const ScheduleEditor = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
+const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null }) => {
+  const [groups, setGroups] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<any[]>([]);
+  const [editingGroup, setEditingGroup] = useState<any | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const [gRes, lRes, cRes] = await Promise.all([
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/locations', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const gData = await gRes.json();
+      const lData = await lRes.json();
+      const cData = await cRes.json();
+      setGroups(Array.isArray(gData) ? gData : []);
+      setLocations(Array.isArray(lData) ? lData : []);
+      
+      let filteredCoaches = Array.isArray(cData) ? cData : [];
+      if (role === 'coach' && coachId) {
+        filteredCoaches = filteredCoaches.filter(c => c.id === coachId);
+      }
+      setCoaches(filteredCoaches);
+    } catch (e) {
+      setGroups([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleSaveGroup = async (group: any) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(group.id ? `/api/groups/${group.id}` : '/api/groups', {
+        method: group.id ? 'PUT' : 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(group)
+      });
+      
+      if (res.ok) {
+        setEditingGroup(null);
+        fetchData();
+        toast.success('Групу збережено');
+      } else {
+        toast.error('Помилка збереження');
+      }
+    } catch (e) {
+      toast.error('Помилка збереження');
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/groups/${confirmDelete.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Групу видалено');
+        fetchData();
+      } else {
+        toast.error('Помилка видалення');
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+    setIsDeleting(false);
+    setConfirmDelete(null);
+  };
+
+  return (
+    <div className="space-y-12">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Групи</h1>
+          <p className="text-zinc-500 font-medium max-w-2xl">Керування групами учнів та їх закріплення за тренерами.</p>
+        </div>
+        <button 
+          onClick={() => setEditingGroup({ name: '', location_id: locations[0]?.id, coach_id: coaches[0]?.id, order_index: 0 })}
+          className="bg-red-600 hover:bg-red-700 text-white px-10 py-5 rounded-3xl font-black uppercase tracking-widest text-xs transition-all shadow-2xl shadow-red-600/20 flex items-center gap-4 group"
+        >
+          <Plus size={20} className="group-hover:scale-110 transition-transform" />
+          Додати групу
+        </button>
+      </div>
+
+      {editingGroup && (
+        <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] p-12 backdrop-blur-xl space-y-8">
+          <h3 className="text-3xl font-black uppercase tracking-tight">{editingGroup.id ? 'Редагувати' : 'Нова'} група</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Назва групи</label>
+              <input 
+                type="text" 
+                value={editingGroup.name} 
+                onChange={e => setEditingGroup({...editingGroup, name: e.target.value})}
+                className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+                placeholder="Молодша група"
+              />
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Локація</label>
+              <select 
+                value={editingGroup.location_id} 
+                onChange={e => setEditingGroup({...editingGroup, location_id: e.target.value})}
+                className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all appearance-none"
+              >
+                {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 px-2">Тренер</label>
+              <select 
+                value={editingGroup.coach_id} 
+                onChange={e => setEditingGroup({...editingGroup, coach_id: e.target.value})}
+                className="w-full bg-white/5 border border-white/5 rounded-2xl py-4 px-6 text-sm font-medium outline-none focus:border-red-600/50 transition-all appearance-none"
+              >
+                <option value="">Не вибрано</option>
+                {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-4">
+            <button 
+              onClick={() => handleSaveGroup(editingGroup)}
+              className="bg-white text-black px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs hover:scale-105 transition-all"
+            >
+              Зберегти
+            </button>
+            <button 
+              onClick={() => setEditingGroup(null)}
+              className="bg-white/5 hover:bg-white/10 text-white px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
+            >
+              Скасувати
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-hidden backdrop-blur-xl">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-white/5">
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Назва</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Локація</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Тренер</th>
+              <th className="px-10 py-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {groups.map((group) => (
+              <tr key={group.id} className="group hover:bg-white/[0.02] transition-colors">
+                <td className="px-10 py-8 font-bold">{group.name}</td>
+                <td className="px-10 py-8 text-zinc-400">{locations.find(l => l.id === group.location_id)?.name || '—'}</td>
+                <td className="px-10 py-8 text-zinc-400">{coaches.find(c => c.id === group.coach_id)?.name || '—'}</td>
+                <td className="px-10 py-8 text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => setEditingGroup(group)}
+                      className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+                    >
+                      <Edit2 size={16} />
+                    </button>
+                    <button 
+                      onClick={() => setConfirmDelete({ id: group.id, name: group.name })}
+                      className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-red-600/10 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDeleteGroup}
+        title="Видалити групу?"
+        message={`Ви впевнені, що хочете видалити групу ${confirmDelete?.name}?`}
+        loading={isDeleting}
+      />
+    </div>
+  );
+};
+
+const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { initialAction?: string | null, onActionComplete?: () => void, role: string, coachId: number | null }) => {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [coaches, setCoaches] = useState<any[]>([]);
@@ -2763,10 +3249,11 @@ const ScheduleEditor = ({ initialAction, onActionComplete }: { initialAction?: s
 
   const fetchData = async () => {
     try {
+      const token = localStorage.getItem('admin_token');
       const [sRes, lRes, cRes] = await Promise.all([
-        fetch('/api/schedule'),
-        fetch('/api/locations'),
-        fetch('/api/coaches')
+        fetch('/api/admin/schedule', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/locations', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       const sData = await sRes.json();
       const lData = await lRes.json();
@@ -2774,7 +3261,12 @@ const ScheduleEditor = ({ initialAction, onActionComplete }: { initialAction?: s
       
       setSchedule(Array.isArray(sData) ? sData : []);
       setLocations(Array.isArray(lData) ? lData : []);
-      setCoaches(Array.isArray(cData) ? cData : []);
+      
+      let filteredCoaches = Array.isArray(cData) ? cData : [];
+      if (role === 'coach' && coachId) {
+        filteredCoaches = filteredCoaches.filter(c => c.id === coachId);
+      }
+      setCoaches(filteredCoaches);
     } catch (e) {
       setSchedule([]);
       setLocations([]);
