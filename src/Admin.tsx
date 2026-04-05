@@ -682,9 +682,9 @@ export const AdminPage = () => {
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
               {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
-              {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} />}
+              {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'rating' && <RatingEditor />}
-              {activeTab === 'rank_management' && <RankManagement />}
+              {activeTab === 'rank_management' && <RankManagement initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'settings' && <SettingsEditor />}
               {activeTab === 'admin_users' && <AdminUsersEditor />}
             </motion.div>
