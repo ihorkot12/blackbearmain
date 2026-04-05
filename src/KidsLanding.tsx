@@ -201,7 +201,7 @@ export const KidsLanding = () => {
               Набір у групу 4–7 років: Залишилось 3 вільних місця
             </div>
             <h1 
-              className="text-6xl md:text-[120px] font-black uppercase leading-[0.85] tracking-tighter mb-10"
+              className="text-5xl sm:text-6xl md:text-[120px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
               dangerouslySetInnerHTML={{ __html: content?.kids_hero_title || 'Фундамент <br /> <span className="text-red-600">майбутнього</span> <br /> лідера' }}
             />
             <p 
@@ -232,11 +232,11 @@ export const KidsLanding = () => {
       </section>
 
       {/* Pain Points Section */}
-      <section id="pain-points" className="py-32 bg-zinc-950 border-y border-white/5">
+      <section id="pain-points" className="py-16 md:py-32 bg-zinc-950 border-y border-white/5">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl mb-20">
+          <div className="max-w-3xl mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Проблеми, які ми вирішуємо</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
               Допоможемо <br /> <span className="text-zinc-700">вашій дитині</span>
             </h3>
           </div>
@@ -249,7 +249,7 @@ export const KidsLanding = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="p-10 bg-zinc-900/30 rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
+                className="p-6 sm:p-10 bg-zinc-900/30 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
               >
                 <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center mb-8 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                   {point.icon}
@@ -277,11 +277,11 @@ export const KidsLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-32 bg-zinc-950">
+      <section className="py-16 md:py-32 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
+          <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Привілеї клубу</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">Більше ніж <span className="text-zinc-700">тренування</span></h3>
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Більше ніж <span className="text-zinc-700">тренування</span></h3>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
@@ -301,11 +301,11 @@ export const KidsLanding = () => {
       </section>
 
       {/* How it works / Steps */}
-      <section className="py-32 bg-black">
+      <section className="py-16 md:py-32 bg-black">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
+          <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Твій шлях до успіху</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">Як ми <span className="text-zinc-700">працюємо</span></h3>
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Як ми <span className="text-zinc-700">працюємо</span></h3>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
@@ -325,9 +325,9 @@ export const KidsLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-24 bg-zinc-950">
+      <section className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-16">Що отримає ваша дитина?</h2>
+          <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-12 md:mb-16">Що отримає ваша дитина?</h2>
           
           <div className="grid md:grid-cols-3 gap-12">
             {[
@@ -346,9 +346,9 @@ export const KidsLanding = () => {
       </section>
 
       {/* Testimonial Section */}
-      <section className="py-24 bg-black">
+      <section className="py-16 md:py-24 bg-black">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="bg-zinc-900 p-12 rounded-[3rem] border border-white/5 relative">
+          <div className="bg-zinc-900 p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/5 relative">
             <Quote className="absolute top-8 right-8 text-red-600/20 w-24 h-24" />
             <div className="relative z-10">
               <div className="flex gap-1 mb-6">

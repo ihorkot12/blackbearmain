@@ -169,7 +169,7 @@ export const TeenLanding = () => {
               Група 12+: Залишилось 4 вільних місця
             </div>
             <h1 
-              className="text-6xl md:text-[130px] font-black uppercase leading-[0.8] tracking-tighter mb-10"
+              className="text-5xl sm:text-6xl md:text-[130px] font-black uppercase leading-[0.9] md:leading-[0.8] tracking-tighter mb-10"
               dangerouslySetInnerHTML={{ __html: content?.teen_hero_title || 'Стань <br /> <span className="text-red-600 text-glow">найкращою</span> <br /> версією себе' }}
             />
             <p 
@@ -193,11 +193,11 @@ export const TeenLanding = () => {
       </section>
 
       {/* Pain Points Section */}
-      <section id="pain-points" className="py-32 bg-zinc-950 border-y border-white/5">
+      <section id="pain-points" className="py-16 md:py-32 bg-zinc-950 border-y border-white/5">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl mb-20">
+          <div className="max-w-3xl mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Твої виклики</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
               Час стати <br /> <span className="text-zinc-700">сильнішим</span>
             </h3>
           </div>
@@ -210,7 +210,7 @@ export const TeenLanding = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="p-10 bg-zinc-900/30 rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
+                className="p-6 sm:p-10 bg-zinc-900/30 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
               >
                 <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center mb-8 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                   {point.icon}
@@ -238,16 +238,16 @@ export const TeenLanding = () => {
       </section>
 
       {/* Unique Advantages Section */}
-      <section className="py-32 bg-black relative overflow-hidden">
+      <section className="py-16 md:py-32 bg-black relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-24 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
             <div className="relative order-2 lg:order-1">
-              <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
-              <div className="absolute -inset-6 border border-zinc-800 rounded-[4rem] rotate-1" />
+              <div className="absolute -inset-6 border border-red-600/20 rounded-3xl lg:rounded-[4rem] -rotate-2" />
+              <div className="absolute -inset-6 border border-zinc-800 rounded-3xl lg:rounded-[4rem] rotate-1" />
               <img 
                 src={content?.teen_advantages_image || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1000&auto=format&fit=crop"} 
                 alt="Teen Training" 
-                className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
+                className="relative rounded-3xl lg:rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute bottom-12 -right-12 bg-red-600 p-8 rounded-[2rem] shadow-2xl hidden md:block">
@@ -288,11 +288,11 @@ export const TeenLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-32 bg-zinc-900/50 relative overflow-hidden">
+      <section className="py-16 md:py-32 bg-zinc-900/50 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
+          <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Привілеї клубу</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">Більше ніж <span className="text-zinc-700">тренування</span></h3>
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Більше ніж <span className="text-zinc-700">тренування</span></h3>
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -317,11 +317,11 @@ export const TeenLanding = () => {
       </section>
 
       {/* How it works / Steps */}
-      <section className="py-32 bg-zinc-950">
+      <section className="py-16 md:py-32 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
+          <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Твій шлях</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">Як стати <span className="text-zinc-700">майстром</span></h3>
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Як стати <span className="text-zinc-700">майстром</span></h3>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
@@ -341,9 +341,9 @@ export const TeenLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-24 bg-black">
+      <section className="py-16 md:py-24 bg-black">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-16">Що ти отримаєш?</h2>
+          <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-12 md:mb-16">Що ти отримаєш?</h2>
           
           <div className="grid md:grid-cols-3 gap-12">
             {[
@@ -362,9 +362,9 @@ export const TeenLanding = () => {
       </section>
 
       {/* Testimonial Section */}
-      <section className="py-24 bg-zinc-950">
+      <section className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="bg-zinc-900 p-12 rounded-[3rem] border border-white/5 relative">
+          <div className="bg-zinc-900 p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/5 relative">
             <Quote className="absolute top-8 right-8 text-red-600/20 w-24 h-24" />
             <div className="relative z-10">
               <div className="flex gap-1 mb-6">

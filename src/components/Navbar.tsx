@@ -35,6 +35,7 @@ export const Navbar = () => {
     { name: 'Тренери', href: '#coach' },
     { name: 'Розклад', href: '#schedule' },
     { name: 'Контакти', href: '#contact' },
+    { name: 'Батькам', href: '/login' },
   ];
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
@@ -174,54 +175,105 @@ export const Navbar = () => {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed inset-0 z-40 bg-black pt-24 px-6 md:hidden overflow-y-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl md:hidden flex flex-col"
           >
-            <div className="flex flex-col gap-6 text-center pb-12">
-              {navLinks.map((link) => {
-                if (link.subItems) {
-                  return (
-                    <div key={link.name} className="space-y-4">
-                      <div className="text-sm font-black text-red-600 uppercase tracking-widest">{link.name}</div>
-                      <div className="flex flex-col gap-4">
-                        {link.subItems.map(sub => (
-                          <Link 
-                            key={sub.name}
-                            to={sub.href}
-                            onClick={() => setIsMenuOpen(false)}
-                            className="text-2xl font-bold text-white"
-                          >
-                            {sub.name}
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <Link 
-                    key={link.name} 
-                    to={getHref(link.href)}
-                    onClick={(e) => {
-                      handleAnchorClick(e, link.href);
-                      setIsMenuOpen(false);
-                    }}
-                    className="text-2xl font-bold text-white uppercase tracking-tighter"
-                  >
-                    {link.name}
-                  </Link>
-                );
-              })}
-              <Link 
-                to="/login" 
+            <div className="flex items-center justify-between px-6 h-[72px] border-b border-white/5">
+              <BrandLogo size="sm" align="start" />
+              <button 
+                className="text-white p-2 bg-white/5 rounded-full" 
                 onClick={() => setIsMenuOpen(false)}
-                className="text-2xl font-bold text-white uppercase tracking-tighter flex items-center justify-center gap-2"
               >
-                <User size={20} />
-                Вхід
-              </Link>
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-12 px-8">
+              <div className="flex flex-col gap-10">
+                {navLinks.map((link, idx) => {
+                  if (link.subItems) {
+                    return (
+                      <motion.div 
+                        key={link.name} 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="space-y-6"
+                      >
+                        <div className="text-[10px] font-black text-red-600 uppercase tracking-[0.3em]">{link.name}</div>
+                        <div className="flex flex-col gap-6 pl-4 border-l border-red-600/20">
+                          {link.subItems.map(sub => (
+                            <Link 
+                              key={sub.name}
+                              to={sub.href}
+                              onClick={() => setIsMenuOpen(false)}
+                              className="text-2xl font-bold text-white hover:text-red-500 transition-colors"
+                            >
+                              {sub.name}
+                            </Link>
+                          ))}
+                        </div>
+                      </motion.div>
+                    );
+                  }
+                  return (
+                    <motion.div
+                      key={link.name}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                    >
+                      <Link 
+                        to={getHref(link.href)}
+                        onClick={(e) => {
+                          handleAnchorClick(e, link.href);
+                          setIsMenuOpen(false);
+                        }}
+                        className="text-4xl font-black text-white uppercase tracking-tighter hover:text-red-500 transition-colors"
+                      >
+                        {link.name}
+                      </Link>
+                    </motion.div>
+                  );
+                })}
+                
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: navLinks.length * 0.1 }}
+                >
+                  <Link 
+                    to="/login" 
+                    onClick={() => setIsMenuOpen(false)}
+                    className="text-2xl font-bold text-white uppercase tracking-tighter flex items-center gap-3 hover:text-red-500 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
+                      <User size={20} />
+                    </div>
+                    Вхід в кабінет
+                  </Link>
+                </motion.div>
+              </div>
+            </div>
+
+            <div className="p-8 border-t border-white/5">
+              <Button 
+                variant="primary" 
+                className="w-full h-[64px] text-sm"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  const contactSection = document.getElementById('contact');
+                  if (contactSection) {
+                    contactSection.scrollIntoView({ behavior: 'smooth' });
+                  } else if (!isMainPage) {
+                    window.location.href = '/#contact';
+                  }
+                }}
+              >
+                Записатися на тренування
+              </Button>
             </div>
           </motion.div>
         )}

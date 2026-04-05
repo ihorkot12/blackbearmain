@@ -11,9 +11,18 @@ export const ParentProfile = () => {
 
   useEffect(() => {
     fetch('/api/profile')
-      .then(res => res.ok ? res.json() : navigate('/login'))
-      .then(setData);
-  }, []);
+      .then(res => {
+        if (!res.ok) {
+          navigate('/login');
+          return null;
+        }
+        return res.json();
+      })
+      .then(data => {
+        if (data) setData(data);
+      })
+      .catch(() => navigate('/login'));
+  }, [navigate]);
 
   if (!data) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Завантаження...</div>;
 
@@ -31,6 +40,13 @@ export const ParentProfile = () => {
               <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none">{participant.name}</h1>
               <div className="flex items-center gap-3 mt-2">
                 <span className="px-2 py-0.5 bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase rounded border border-white/5">{participant.group_name}</span>
+                <span className={`px-2 py-0.5 text-[10px] font-black uppercase rounded border ${
+                  participant.payment_status === 'paid' 
+                    ? 'bg-green-500/10 text-green-500 border-green-500/20' 
+                    : 'bg-red-600/10 text-red-600 border-red-600/20'
+                }`}>
+                  {participant.payment_status === 'paid' ? 'Оплачено' : 'Очікує оплати'}
+                </span>
                 <span className="text-zinc-500 text-xs font-bold">Учень Black Bear Dojo</span>
               </div>
             </div>

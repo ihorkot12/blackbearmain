@@ -82,13 +82,13 @@ export const ContactForm = ({
   }
 
   return (
-    <section id="contact" className="py-24 bg-zinc-950 relative overflow-hidden">
+    <section id="contact" className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-1/2 h-full bg-red-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
       
       <div className="max-w-7xl mx-auto px-6 relative z-10 w-full">
-        <div className="grid md:grid-cols-2 gap-16 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-8 leading-[0.9]">
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-8 leading-[1.1] md:leading-[0.9]">
               {title}
             </h2>
             <p className="text-zinc-400 text-lg mb-12 leading-relaxed max-w-md">
@@ -127,7 +127,7 @@ export const ContactForm = ({
             </div>
           </div>
 
-          <div className="bg-zinc-900 p-8 md:p-12 rounded-[3rem] border border-white/10 shadow-2xl relative">
+          <div className="bg-zinc-900 p-6 sm:p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/10 shadow-2xl relative">
             <div className="absolute -top-6 -right-6 w-24 h-24 bg-red-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase tracking-tighter rotate-12 shadow-2xl z-20">
               Безкоштовно
             </div>

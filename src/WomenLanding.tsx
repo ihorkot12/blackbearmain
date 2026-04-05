@@ -162,7 +162,7 @@ export const WomenLanding = () => {
               Естетика • Сила • Впевненість
             </div>
             <h1 
-              className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[0.9] mb-8"
+              className="text-4xl sm:text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[1] md:leading-[0.9] mb-8"
               dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Дівчат</span>' }}
             />
             <p 
@@ -191,10 +191,10 @@ export const WomenLanding = () => {
       </section>
 
       {/* Comparison Section */}
-      <section className="py-24 bg-zinc-950 relative overflow-hidden">
+      <section className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-20">
-            <h2 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6">
+          <div className="text-center mb-12 md:mb-20">
+            <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6 leading-none">
               Чому Карате <span className="text-red-600">краще за Бокс?</span>
             </h2>
             <p className="text-zinc-500 max-w-2xl mx-auto">
@@ -202,8 +202,8 @@ export const WomenLanding = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div className="space-y-4">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="space-y-4 order-2 lg:order-1">
               {comparison.map((item, idx) => (
                 <motion.div 
                   key={idx}
@@ -221,7 +221,7 @@ export const WomenLanding = () => {
                 </motion.div>
               ))}
             </div>
-            <div className="relative">
+            <div className="relative order-1 lg:order-2">
               <div className="aspect-square rounded-3xl overflow-hidden border border-white/10">
                 <img 
                   src={content?.women_advantages_image || "https://images.unsplash.com/photo-1599058917233-3583503c5e8e?q=80&w=1000&auto=format&fit=crop"} 
@@ -243,16 +243,16 @@ export const WomenLanding = () => {
       </section>
 
       {/* Benefits Grid */}
-      <section className="py-24 relative">
+      <section className="py-16 md:py-24 relative">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-4 gap-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {benefits.map((benefit, idx) => (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
-                className="p-8 rounded-3xl bg-zinc-900 border border-white/5 hover:border-red-600/30 transition-all group"
+                className="p-6 sm:p-8 rounded-3xl bg-zinc-900 border border-white/5 hover:border-red-600/30 transition-all group"
               >
                 <div className="mb-6 p-4 rounded-2xl bg-black inline-block group-hover:scale-110 transition-transform">
                   {benefit.icon}
@@ -268,18 +268,18 @@ export const WomenLanding = () => {
       </section>
 
       {/* Closing Objections (FAQ Style) */}
-      <section className="py-24 bg-zinc-950">
+      <section className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4">
               Ваші <span className="text-red-600">Страхи</span> — Наші Відповіді
             </h2>
             <p className="text-zinc-500">Ми розуміємо ваші сумніви. Ось як ми робимо тренування комфортними.</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {fears.map((fear, idx) => (
-              <div key={idx} className="p-8 rounded-3xl bg-white/5 border border-white/10">
+              <div key={idx} className="p-6 sm:p-8 rounded-3xl bg-white/5 border border-white/10">
                 <div className="flex items-start gap-4">
                   <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center shrink-0 font-black text-xs">?</div>
                   <div>

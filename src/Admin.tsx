@@ -6,8 +6,8 @@ import {
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
-  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, FileUp, Link
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
+  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -79,13 +79,14 @@ export const LoginPage = () => {
     });
     if (res.ok) {
       const data = await res.json();
-      if (data.role === 'coach' || data.role === 'admin') {
-        localStorage.setItem('admin_token', data.token);
-        navigate('/admin');
-      } else {
-        localStorage.setItem('parent_token', data.token);
-        navigate('/profile');
+      if (data.role === 'parent') {
+        navigate('/parent');
+        return;
       }
+      localStorage.setItem('admin_token', data.token);
+      localStorage.setItem('admin_role', data.role);
+      localStorage.setItem('admin_name', data.name);
+      navigate('/admin');
     } else {
       setError('Неправильний логін або пароль');
     }
@@ -175,6 +176,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
 
   const statCards = [
     { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { title: 'Боржники', value: stats?.unpaid_participants || 0, icon: CreditCard, color: 'text-orange-500', bg: 'bg-orange-500/10' },
     { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach' },
     { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
     { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach' },
@@ -223,7 +225,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             Динаміка заявок
           </h3>
           <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={chartData?.leadsOverTime || []}>
                 <defs>
                   <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
@@ -255,7 +257,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             Розподіл по групах
           </h3>
           <div className="h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={chartData?.groupDistribution || []}
@@ -357,30 +359,61 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
           <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
           <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
-            <button 
-              onClick={() => onQuickAction('participants', 'add')}
-              className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
-            >
-              Додати учня
-            </button>
-            <button 
-              onClick={() => onQuickAction('schedule', 'add')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Редагувати розклад
-            </button>
-            <button 
-              onClick={() => onQuickAction('content', 'video')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Контент сайту
-            </button>
-            <button 
-              onClick={() => onQuickAction('leads')}
-              className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
-            >
-              Звіти
-            </button>
+            {role === 'admin' ? (
+              <>
+                <button 
+                  onClick={() => onQuickAction('participants', 'add')}
+                  className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+                >
+                  Додати учня
+                </button>
+                <button 
+                  onClick={() => onQuickAction('schedule', 'add')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Редагувати розклад
+                </button>
+                <button 
+                  onClick={() => onQuickAction('content', 'video')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Контент сайту
+                </button>
+                <button 
+                  onClick={() => onQuickAction('leads')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Звіти
+                </button>
+              </>
+            ) : (
+              <>
+                <button 
+                  onClick={() => onQuickAction('attendance', 'mark')}
+                  className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+                >
+                  Відмітити відвідуваність
+                </button>
+                <button 
+                  onClick={() => onQuickAction('rank_management', 'add_points')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Додати бали
+                </button>
+                <button 
+                  onClick={() => onQuickAction('participants', 'add')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Додати учня
+                </button>
+                <button 
+                  onClick={() => onQuickAction('schedule')}
+                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                >
+                  Розклад
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -394,7 +427,32 @@ export const AdminPage = () => {
   const [role, setRole] = useState<string>('admin');
   const [userName, setUserName] = useState<string>('Адміністратор');
   const [coachId, setCoachId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const search = async () => {
+      if (searchQuery.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      const token = localStorage.getItem('admin_token');
+      try {
+        const res = await fetch(`/api/participants?search=${searchQuery}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }).then(r => r.json());
+        setSearchResults(Array.isArray(res) ? res.slice(0, 5) : []);
+      } catch (e) {
+        setSearchResults([]);
+      }
+      setIsSearching(false);
+    };
+    const timer = setTimeout(search, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -418,7 +476,7 @@ export const AdminPage = () => {
         setCoachId(data.coach_id || null);
         
         // If coach and activeTab is restricted, switch to first allowed tab
-        if (data.role === 'coach' && ['dashboard', 'leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
+        if (data.role === 'coach' && ['leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
           setActiveTab('attendance');
         }
       } catch (e) {
@@ -431,16 +489,14 @@ export const AdminPage = () => {
 
   const handleQuickAction = (tab: string, action?: string) => {
     setActiveTab(tab);
-    if (action) {
-      setInitialAction(action);
-    }
+    setInitialAction(action || null);
   };
 
   const menuGroups = [
     {
       title: 'Операційка',
       items: [
-        { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin'] },
+        { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin', 'coach'] },
         { id: 'attendance', label: 'Відвідуваність', icon: Calendar, roles: ['admin', 'coach'] },
         { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
         { id: 'rank_management', label: 'Пояси та Досягнення', icon: Award, roles: ['admin', 'coach'] },
@@ -541,9 +597,54 @@ export const AdminPage = () => {
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-red-600 transition-colors" size={18} />
               <input 
                 type="text" 
-                placeholder="Швидкий пошук..." 
+                placeholder="Швидкий пошук учнів..." 
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="w-full bg-white/5 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
               />
+              
+              <AnimatePresence>
+                {searchQuery.length >= 2 && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50"
+                  >
+                    {isSearching ? (
+                      <div className="p-8 text-center">
+                        <RefreshCw className="animate-spin text-red-600 mx-auto mb-2" size={20} />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Пошук...</p>
+                      </div>
+                    ) : searchResults.length > 0 ? (
+                      <div className="p-2">
+                        {searchResults.map(p => (
+                          <button
+                            key={p.id}
+                            onClick={() => {
+                              setActiveTab('participants');
+                              setInitialAction(`edit:${p.id}`);
+                              setSearchQuery('');
+                            }}
+                            className="w-full flex items-center gap-4 p-4 hover:bg-white/5 rounded-xl transition-all text-left group"
+                          >
+                            <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-lg flex items-center justify-center font-black">
+                              {p.name[0]}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black uppercase tracking-tight group-hover:text-red-500 transition-colors">{p.name}</p>
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{p.group_name || 'Без групи'}</p>
+                            </div>
+                            <ChevronRight size={14} className="ml-auto text-zinc-700 group-hover:text-red-600 transition-colors" />
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-8 text-center text-zinc-500 font-bold italic">Нічого не знайдено</div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
           <div className="flex items-center gap-6">
@@ -594,7 +695,7 @@ export const AdminPage = () => {
   );
 };
 
-const RankManagement = () => {
+const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: string | null, onActionComplete?: () => void }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRank, setEditingRank] = useState<any>(null);
@@ -605,6 +706,7 @@ const RankManagement = () => {
   const [compName, setCompName] = useState('');
   const [compResult, setCompResult] = useState('');
   const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
+  const [search, setSearch] = useState('');
 
   const fetchParticipants = async () => {
     setLoading(true);
@@ -641,10 +743,22 @@ const RankManagement = () => {
   }, []);
 
   useEffect(() => {
+    if (initialAction === 'add_points') {
+      toast.info('Оберіть учня для нарахування балів або додавання досягнень');
+      onActionComplete?.();
+    }
+  }, [initialAction]);
+
+  useEffect(() => {
     if (showDetails) {
       fetchDetails(showDetails.id);
     }
   }, [showDetails]);
+
+  const filteredParticipants = participants.filter(p => 
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.group_name?.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleUpdateRank = async (id: number, belt: string, points: number) => {
     try {
@@ -766,14 +880,26 @@ const RankManagement = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center gap-4">
         <h2 className="text-4xl font-black uppercase tracking-tight">Рейтинг та досягнення</h2>
-        <button 
-          onClick={fetchParticipants}
-          className="bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl transition-all border border-white/5"
-        >
-          <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div className="flex items-center gap-4 flex-1 max-w-md">
+          <div className="relative w-full">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input 
+              type="text" 
+              placeholder="Пошук учня..." 
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+            />
+          </div>
+          <button 
+            onClick={fetchParticipants}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white p-4 rounded-2xl transition-all border border-white/5"
+          >
+            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
       </div>
 
       <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-hidden">
@@ -788,7 +914,7 @@ const RankManagement = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {participants.map(p => (
+            {filteredParticipants.map(p => (
               <tr key={p.id} className="hover:bg-white/5 transition-colors">
                 <td className="p-6 font-bold">{p.name}</td>
                 <td className="p-6 text-sm text-zinc-500">{p.group_name}</td>
@@ -1431,6 +1557,8 @@ const AdminUsersEditor = () => {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [formData, setFormData] = useState({
     login: '',
     password: '',
@@ -1492,11 +1620,12 @@ const AdminUsersEditor = () => {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Ви впевнені, що хочете видалити цей акаунт?')) return;
+  const handleDelete = async () => {
+    if (!confirmDelete) return;
+    setIsDeleting(true);
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch(`/api/admin/users/${id}`, {
+      const res = await fetch(`/api/admin/users/${confirmDelete.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -1507,6 +1636,8 @@ const AdminUsersEditor = () => {
     } catch (e) {
       toast.error('Помилка при видаленні');
     }
+    setIsDeleting(false);
+    setConfirmDelete(null);
   };
 
   return (
@@ -1553,9 +1684,13 @@ const AdminUsersEditor = () => {
                 <td className="px-10 py-8 font-mono text-sm text-zinc-400">{user.login}</td>
                 <td className="px-10 py-8">
                   <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                    user.role === 'admin' ? 'bg-red-600/10 text-red-500' : 'bg-blue-600/10 text-blue-500'
+                    user.role === 'admin' ? 'bg-red-600/10 text-red-500' : 
+                    user.role === 'parent' ? 'bg-green-600/10 text-green-500' :
+                    'bg-blue-600/10 text-blue-500'
                   }`}>
-                    {user.role === 'admin' ? 'Адмін' : 'Тренер'}
+                    {user.role === 'admin' ? 'Адмін' : 
+                     user.role === 'parent' ? 'Батьки' : 
+                     'Тренер'}
                   </span>
                 </td>
                 <td className="px-10 py-8 text-right">
@@ -1571,7 +1706,7 @@ const AdminUsersEditor = () => {
                       <Edit2 size={16} />
                     </button>
                     <button 
-                      onClick={() => handleDelete(user.id)}
+                      onClick={() => setConfirmDelete({ id: user.id, name: user.name })}
                       className="p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-red-500 hover:bg-red-600/10 transition-all"
                     >
                       <Trash2 size={16} />
@@ -1583,6 +1718,15 @@ const AdminUsersEditor = () => {
           </tbody>
         </table>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        onConfirm={handleDelete}
+        loading={isDeleting}
+        title="Видалити акаунт?"
+        message={`Ви впевнені, що хочете видалити акаунт користувача ${confirmDelete?.name}?`}
+      />
 
       {showModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
@@ -1617,6 +1761,7 @@ const AdminUsersEditor = () => {
                   >
                     <option value="coach">Тренер</option>
                     <option value="admin">Адміністратор</option>
+                    <option value="parent">Батьки</option>
                   </select>
                 </div>
                 {formData.role === 'coach' && (
@@ -1692,6 +1837,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   const [search, setSearch] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [showImportModal, setShowImportModal] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -1719,10 +1865,25 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
 
   useEffect(() => {
     if (initialAction === 'add' && groups.length > 0) {
-      setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' });
+      setEditingParticipant({ 
+        name: '', 
+        age: '', 
+        group_id: groups[0]?.id || '', 
+        parent_login: '', 
+        parent_password: '',
+        payment_status: 'unpaid',
+        status: 'active'
+      });
       onActionComplete?.();
+    } else if (initialAction?.startsWith('edit:') && participants.length > 0) {
+      const id = parseInt(initialAction.split(':')[1]);
+      const p = participants.find(x => x.id === id);
+      if (p) {
+        setEditingParticipant(p);
+        onActionComplete?.();
+      }
     }
-  }, [initialAction, groups]);
+  }, [initialAction, groups, participants]);
 
   const handleSave = async (data: any) => {
     const token = localStorage.getItem('admin_token');
@@ -1817,8 +1978,16 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
             <FileUp size={18} />
             Імпорт
           </button>
-          <button 
-            onClick={() => setEditingParticipant({ name: '', age: '', group_id: groups[0]?.id || '', parent_login: '', parent_password: '' })}
+        <button 
+            onClick={() => setEditingParticipant({ 
+              name: '', 
+              age: '', 
+              group_id: groups[0]?.id || '', 
+              parent_login: '', 
+              parent_password: '',
+              payment_status: 'unpaid',
+              status: 'active'
+            })}
             className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center gap-3"
           >
             <Plus size={18} />
@@ -1850,7 +2019,8 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень</th>
               <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Вік</th>
               <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Група</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Батьківський вхід</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Оплата</th>
+              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Статус</th>
               <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
             </tr>
           </thead>
@@ -1860,9 +2030,25 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                 <td className="p-8">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black">
-                      {p.name[0]}
+                      {p.name?.[0] || '?'}
                     </div>
-                    <span className="font-bold text-lg">{p.name}</span>
+                    <div>
+                      <div className="font-bold text-lg">{p.name}</div>
+                      <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-2">
+                        <span className="opacity-50">L:</span> {p.parent_login || '—'}
+                        <span className="ml-2 opacity-50">P:</span> 
+                        <span className="font-mono">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowPasswords(prev => ({...prev, [p.id]: !prev[p.id]}));
+                          }}
+                          className="ml-1 text-zinc-600 hover:text-white transition-colors"
+                        >
+                          {showPasswords[p.id] ? <EyeOff size={10} /> : <Eye size={10} />}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </td>
                 <td className="p-8 text-zinc-400 font-medium">{p.age} років</td>
@@ -1872,10 +2058,18 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </span>
                 </td>
                 <td className="p-8">
-                  <div className="text-xs font-mono text-zinc-500">
-                    <p>L: {p.parent_login}</p>
-                    <p>P: {p.parent_password}</p>
-                  </div>
+                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                    p.payment_status === 'paid' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
+                  }`}>
+                    {p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                  </span>
+                </td>
+                <td className="p-8">
+                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                    p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 'bg-zinc-800 text-zinc-500'
+                  }`}>
+                    {p.status === 'active' ? 'Активний' : 'Архів'}
+                  </span>
                 </td>
                 <td className="p-8 text-right">
                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -2036,6 +2230,30 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус оплати</label>
+                  <select 
+                    value={editingParticipant.payment_status}
+                    onChange={e => setEditingParticipant({...editingParticipant, payment_status: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  >
+                    <option value="unpaid">Не оплачено</option>
+                    <option value="paid">Оплачено</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус учня</label>
+                  <select 
+                    value={editingParticipant.status}
+                    onChange={e => setEditingParticipant({...editingParticipant, status: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  >
+                    <option value="active">Активний</option>
+                    <option value="inactive">Архів</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін батьків</label>
                   <input 
                     type="text" 
@@ -2046,12 +2264,21 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                 </div>
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
-                  <input 
-                    type="text" 
-                    value={editingParticipant.parent_password}
-                    onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
-                  />
+                  <div className="relative">
+                    <input 
+                      type={showPasswords['editing'] ? 'text' : 'password'} 
+                      value={editingParticipant.parent_password}
+                      onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
+                      className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors pr-12"
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShowPasswords(prev => ({...prev, editing: !prev.editing}))}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
+                    >
+                      {showPasswords['editing'] ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex gap-4 pt-6">
@@ -2076,7 +2303,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   );
 };
 
-const AttendanceEditor = ({ role, coachId }: { role: string, coachId: number | null }) => {
+const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { role: string, coachId: number | null, initialAction?: string | null, onActionComplete?: () => void }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -2104,6 +2331,13 @@ const AttendanceEditor = ({ role, coachId }: { role: string, coachId: number | n
   useEffect(() => {
     fetchData();
   }, [date]);
+
+  useEffect(() => {
+    if (initialAction === 'mark') {
+      toast.info('Відмітьте присутніх учнів на сьогодні');
+      onActionComplete?.();
+    }
+  }, [initialAction]);
 
   const toggleAttendance = async (participantId: number, currentStatus: string) => {
     const newStatus = currentStatus === 'present' ? 'absent' : 'present';

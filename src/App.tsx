@@ -11,6 +11,7 @@ import { ContactForm } from './components/ContactForm';
 
 const AdminPage = lazy(() => import('./Admin').then(m => ({ default: m.AdminPage })));
 const LoginPage = lazy(() => import('./Admin').then(m => ({ default: m.LoginPage })));
+const ParentPanel = lazy(() => import('./ParentPanel'));
 const ParentProfile = lazy(() => import('./CRM').then(m => ({ default: m.ParentProfile })));
 const KidsLanding = lazy(() => import('./KidsLanding').then(m => ({ default: m.KidsLanding })));
 const JuniorLanding = lazy(() => import('./JuniorLanding').then(m => ({ default: m.JuniorLanding })));
@@ -62,7 +63,7 @@ const ScrollToTop = () => {
     }
     
     if (!hash) {
-      window.scrollTo(0, 0);
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [pathname, hash]);
 
@@ -171,7 +172,7 @@ const ThankYouPage = ({ onBack }: { onBack: () => void }) => (
 );
 
 const SectionTitle = ({ title, subtitle, light = false }: { title: string, subtitle?: string, light?: boolean }) => (
-  <div className="mb-16 text-center">
+  <div className="mb-12 md:mb-16 text-center px-4">
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       whileInView={{ opacity: 1, scale: 1 }}
@@ -185,17 +186,16 @@ const SectionTitle = ({ title, subtitle, light = false }: { title: string, subti
       initial={{ opacity: 0, y: 20 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
-      className={`text-4xl md:text-6xl font-black mb-6 uppercase tracking-tighter leading-none ${light ? 'text-white' : 'text-zinc-900'}`}
-    >
-      {title}
-    </motion.h2>
+      className={`text-3xl sm:text-4xl md:text-6xl font-black mb-4 md:mb-6 uppercase tracking-tighter leading-none ${light ? 'text-white' : 'text-zinc-900'}`}
+      dangerouslySetInnerHTML={{ __html: title }}
+    />
     {subtitle && (
       <motion.p 
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ delay: 0.1 }}
-        className={`text-lg md:text-xl max-w-3xl mx-auto font-medium ${light ? 'text-zinc-400' : 'text-zinc-600'}`}
+        className={`text-base md:text-xl max-w-3xl mx-auto font-medium ${light ? 'text-zinc-400' : 'text-zinc-600'}`}
       >
         {subtitle}
       </motion.p>
@@ -245,6 +245,7 @@ export default function App() {
           <Route path="/" element={<LandingPage initialContent={content} />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/parent" element={<ParentPanel />} />
           <Route path="/dashboard" element={<AdminPage />} />
           <Route path="/profile" element={<ParentProfile />} />
           <Route path="/kids-4-7" element={<KidsLanding />} />
@@ -276,7 +277,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       name: "Олег Крамаренко",
       role: "Провідний тренер",
       bio: "Кожне тренування — це перемога над собою. Ми вчимо дітей не здаватися перед труднощами.",
-      photo: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=800&auto=format&fit=crop",
+      photo: "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=800&auto=format&fit=crop",
       achievements: ["10 років тренерської практики", "Підготовка до змагань", "Всеукраїнський та міжнародний рівень"]
     }
   ];
@@ -334,11 +335,9 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
   const location = useLocation();
 
+  // Scroll to section if hash is present
   React.useEffect(() => {
-    const navigation = window.performance?.getEntriesByType('navigation')[0] as any;
-    const isReload = navigation?.type === 'reload';
-
-    if (location.hash && !isReload) {
+    if (location.hash) {
       const id = location.hash.substring(1);
       const element = document.getElementById(id);
       if (element) {
@@ -353,8 +352,6 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           });
         }, 600);
       }
-    } else if (isReload || !location.hash) {
-      window.scrollTo(0, 0);
     }
   }, [location.hash]);
 
@@ -456,7 +453,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden pt-24">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24">
         {/* Background Image with Deep Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
@@ -493,11 +490,11 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Дитяче карате Київ • Секція карате Київ</span>
             </h1>
 
-            <div className="text-4xl md:text-7xl font-black mb-6 tracking-tighter leading-none uppercase">
-              <div dangerouslySetInnerHTML={{ __html: content?.hero_title || "<span class='bg-gradient-to-r from-white via-white to-zinc-500 bg-clip-text text-transparent'>Формуємо дисципліну,</span><br /><span class='text-red-600 tracking-tight'>силу та впевненість.</span>" }} />
-            </div>
+    <div className="text-3xl sm:text-5xl md:text-7xl font-black mb-6 tracking-tighter leading-[1.1] md:leading-none uppercase">
+      <div dangerouslySetInnerHTML={{ __html: content?.hero_title || "<span class='bg-gradient-to-r from-white via-white to-zinc-500 bg-clip-text text-transparent'>Формуємо дисципліну,</span><br /><span class='text-red-600 tracking-tight'>силу та впевненість.</span>" }} />
+    </div>
             
-            <p className="text-lg md:text-xl text-zinc-200 max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
+            <p className="text-zinc-300 text-lg md:text-xl max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
               {content?.hero_subtitle || "Професійна секція карате Київ під керівництвом 3 дану. 5+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи."}
             </p>
 
@@ -552,9 +549,9 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Problem Section */}
       {content?.hide_section_problem !== 'true' && (
-        <section className="py-24 bg-zinc-950 relative overflow-hidden">
+        <section className="py-12 md:py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               whileInView={{ opacity: 1, x: 0 }}
@@ -564,7 +561,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                 {content?.modern_label || "Виклики сучасності"}
               </h2>
               <h3 
-                className="text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
+                className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
                 dangerouslySetInnerHTML={{ __html: content?.modern_title || 'Ваша дитина проводить занадто багато часу в <span class="text-zinc-600">гаджетах?</span>' }}
               />
               <p className="text-zinc-400 text-lg mb-8 leading-relaxed">
@@ -589,7 +586,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/5"
+              className="relative aspect-square rounded-3xl lg:rounded-[3rem] overflow-hidden border border-white/5"
             >
               <img 
                 src={content?.modern_image || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop"} 
@@ -613,261 +610,161 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Transformation Section (Dark Professional Style) */}
       {content?.hide_section_transformation !== 'true' && (
-        <section className="py-8 md:py-10 bg-black relative overflow-hidden">
-        {/* Subtle Background Accents */}
-        {content?.transformation_bg ? (
-          <div className="absolute inset-0 z-0">
-            <img 
-              src={content.transformation_bg} 
-              alt="Background" 
-              className="w-full h-full object-cover opacity-20 grayscale"
-              referrerPolicy="no-referrer"
-              loading="lazy"
-              decoding="async"
-            />
-            <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
-          </div>
-        ) : (
+        <section className="py-16 md:py-24 bg-black relative overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none" />
-        )}
-        
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="text-center mb-10">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-            >
-              <h2 className="text-3xl md:text-5xl font-black uppercase mb-4 tracking-tight">
-                {content?.transformation_title || "Як дитяче карате змінює дитину"}
-              </h2>
-              <div 
-                className="text-zinc-400 text-base md:text-lg max-w-2xl mx-auto font-medium"
-                dangerouslySetInnerHTML={{ __html: content?.transformation_subtitle || `Наша секція карате Київ допомагає батькам виховувати сильних особистостей. <br />
-                <span class="text-red-500">Ми перетворюємо слабкість на силу.</span>` }}
-              />
-            </motion.div>
-          </div>
-
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Left Side - Problems */}
-            <motion.div 
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-zinc-900/40 backdrop-blur-sm p-8 md:p-12 rounded-[2.5rem] border border-white/5 relative group hover:border-red-600/20 transition-all duration-500"
-            >
-              <div className="absolute top-0 left-10 w-20 h-[2px] bg-zinc-700 group-hover:bg-red-600 transition-colors duration-500" />
-              <h3 className="text-xl md:text-2xl font-black uppercase mb-8 text-zinc-300 flex items-center gap-4">
-                {content?.problems_title || "Ваша дитина:"}
-              </h3>
-              <ul className="space-y-6">
-                {[
-                  content?.problem1 || 'Невпевнена у власних силах?',
-                  content?.problem2 || 'Багато часу проводить у телефоні?',
-                  content?.problem3 || 'Потребує дисципліни та фізичного розвитку?',
-                  content?.problem4 || 'Має труднощі у спілкуванні з однолітками?',
-                  content?.problem5,
-                  content?.problem6
-                ].filter(Boolean).map((item, i) => (
-                  <li key={i} className="flex items-start gap-4 text-base text-zinc-400 group-hover:text-zinc-300 transition-colors">
-                    <div className="w-5 h-5 rounded-full border border-red-600/30 flex items-center justify-center shrink-0 mt-1">
-                      <X size={12} className="text-red-600/50" />
+          
+          <div className="max-w-7xl mx-auto px-6 relative z-10">
+            <div className="grid lg:grid-cols-2 gap-12 items-center">
+              <motion.div
+                initial={{ opacity: 0, x: -30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
+                  {content?.transformation_label || "Результати навчання"}
+                </h2>
+                <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight">
+                  {content?.transformation_title || "Як карате змінює вашу дитину"}
+                </h3>
+                <p className="text-zinc-400 text-lg mb-8 leading-relaxed">
+                  {content?.transformation_subtitle || "Ми не просто вчимо техніці — ми формуємо особистість. Через 3 місяці регулярних занять батьки помічають суттєві зміни:"}
+                </p>
+                
+                <div className="space-y-6">
+                  {[
+                    { title: content?.result1_title || 'Дисципліна', text: content?.result1_text || 'Дитина стає більш організованою та відповідальною.' },
+                    { title: content?.result2_title || 'Впевненість', text: content?.result2_text || 'Зникає страх перед труднощами та новими викликами.' },
+                    { title: content?.result3_title || 'Фізична сила', text: content?.result3_text || 'Покращується постава, витривалість та імунітет.' }
+                  ].map((item, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-600/20 flex items-center justify-center shrink-0">
+                        <CheckCircle2 size={18} className="text-red-600" />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-bold uppercase tracking-tight mb-1">{item.title}</h4>
+                        <p className="text-zinc-500 text-sm leading-relaxed">{item.text}</p>
+                      </div>
                     </div>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
+                  ))}
+                </div>
+              </motion.div>
 
-            {/* Right Side - Results */}
-            <motion.div 
-              initial={{ opacity: 0, x: 30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-zinc-900/80 backdrop-blur-sm p-8 md:p-12 rounded-[2.5rem] border border-red-600/10 relative group hover:border-red-600/30 transition-all duration-500 shadow-2xl shadow-red-600/5"
-            >
-              <div className="absolute top-0 left-10 w-20 h-[2px] bg-red-600" />
-              <h3 className="text-xl md:text-2xl font-black uppercase mb-8 text-white flex items-center gap-4">
-                Через 3 місяці тренувань:
-              </h3>
-              <ul className="space-y-6">
-                {[
-                  'Покращується самодисципліна та фокус',
-                  'Зростає впевненість у собі та своїх діях',
-                  'Підвищується фізична витривалість та імунітет',
-                  'З’являється повага до старших та однолітків'
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-4 text-base md:text-lg font-bold text-white">
-                    <div className="w-5 h-5 rounded-full bg-red-600 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-red-600/40">
-                      <CheckCircle2 size={12} className="text-white" />
-                    </div>
-                    <span>{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          </div>
-
-          <div className="mt-12 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2 }}
-            >
-              <Button variant="primary" className="mx-auto mb-6 h-[52px]" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-                Записати дитину на пробне
-              </Button>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-      )}
-
-      {/* Video Section */}
-      {content?.hide_section_video !== 'true' && (
-        <section className="py-8 bg-black relative overflow-hidden">
-          <div className="max-w-3xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-6">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Атмосфера додзьо</h2>
-              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
-                {content?.video_title || "Відчуйте енергію тренувань"}
-              </h3>
-            </div>
-            
-            <motion.div 
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="relative aspect-video rounded-[3rem] overflow-hidden border border-white/10 group shadow-2xl shadow-red-600/5"
-            >
-            {content?.video_url ? (
-              <iframe 
-                src={content.video_url.includes('youtube.com/watch?v=') 
-                  ? content.video_url.replace('watch?v=', 'embed/') 
-                  : content.video_url.includes('youtu.be/')
-                  ? content.video_url.replace('youtu.be/', 'youtube.com/embed/')
-                  : content.video_url
-                }
-                title="Training Video"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <div className="relative w-full h-full cursor-pointer">
-                <img 
-                  src="https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1200&auto=format&fit=crop" 
-                  alt="Training Video Placeholder" 
-                  className="w-full h-full object-cover brightness-50 group-hover:scale-105 transition-transform duration-700"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center shadow-[0_0_50px_rgba(220,38,38,0.5)] group-hover:scale-110 transition-transform">
-                    <div className="w-0 h-0 border-t-[12px] border-t-transparent border-l-[20px] border-l-white border-b-[12px] border-b-transparent ml-2" />
+              <motion.div
+                initial={{ opacity: 0, x: 30 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="bg-zinc-900/50 backdrop-blur-sm p-8 md:p-12 rounded-[2.5rem] border border-white/5 relative"
+              >
+                <div className="absolute top-0 left-12 w-16 h-1 bg-red-600" />
+                <h4 className="text-2xl font-black uppercase mb-8 tracking-tight">Чому обирають нас?</h4>
+                <div className="space-y-8">
+                  <div className="flex items-center gap-6">
+                    <div className="text-4xl font-black text-red-600/20">01</div>
+                    <p className="text-zinc-300 font-medium">Професійні тренери з міжнародним досвідом</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-4xl font-black text-red-600/20">02</div>
+                    <p className="text-zinc-300 font-medium">Безпечне середовище та дружня атмосфера</p>
+                  </div>
+                  <div className="flex items-center gap-6">
+                    <div className="text-4xl font-black text-red-600/20">03</div>
+                    <p className="text-zinc-300 font-medium">Зручне розташування та гнучкий графік</p>
                   </div>
                 </div>
-                <div className="absolute bottom-10 left-10">
-                  <p className="text-white font-bold uppercase tracking-widest text-sm">Дивитись відео тренування</p>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      </section>
+                
+                <Button 
+                  variant="primary" 
+                  className="w-full mt-10"
+                  onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                >
+                  Записатись на пробне
+                </Button>
+              </motion.div>
+            </div>
+          </div>
+        </section>
       )}
 
       {/* How to start Section */}
       {content?.hide_section_how !== 'true' && (
-        <section id="how" className="py-12 bg-black relative overflow-hidden">
+        <section id="how" className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-10">
+            <div className="text-center mb-16">
               <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Процес навчання</h2>
-              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">
+              <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight">
                 {content?.how_title || "Як почати тренування"}
               </h3>
             </div>
           
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { title: content?.how_step1_title || 'Запис', text: content?.how_step1_text || 'Залиште заявку на сайті або зателефонуйте нам.' },
-              { title: content?.how_step2_title || 'Пробне', text: content?.how_step2_text || 'Приходьте на перше безкоштовне заняття.' },
-              { title: content?.how_step3_title || 'Результат', text: content?.how_step3_text || 'Починайте регулярні тренування та прогресуйте.' }
-            ].map((step, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.2 }}
-                className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-3xl border border-white/5 text-center"
-              >
-                <div className="w-12 h-12 bg-red-600 rounded-full flex items-center justify-center text-xl font-black mx-auto mb-6">
-                  {i + 1}
-                </div>
-                <h4 className="text-xl font-bold mb-4 uppercase tracking-tight">{step.title}</h4>
-                <p className="text-zinc-400 leading-relaxed">{step.text}</p>
-              </motion.div>
-            ))}
+            <div className="grid md:grid-cols-3 gap-8">
+              {[
+                { title: content?.how_step1_title || 'Запис', text: content?.how_step1_text || 'Залиште заявку на сайті або зателефонуйте нам.' },
+                { title: content?.how_step2_title || 'Пробне', text: content?.how_step2_text || 'Приходьте на перше безкоштовне заняття.' },
+                { title: content?.how_step3_title || 'Результат', text: content?.how_step3_text || 'Починайте регулярні тренування та прогресуйте.' }
+              ].map((step, i) => (
+                <motion.div 
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.2 }}
+                  className="bg-zinc-900/50 backdrop-blur-sm p-8 rounded-3xl border border-white/5 text-center group hover:border-red-600/30 transition-all"
+                >
+                  <div className="w-14 h-14 bg-red-600 rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-8 rotate-3 group-hover:rotate-0 transition-transform">
+                    {i + 1}
+                  </div>
+                  <h4 className="text-xl font-bold mb-4 uppercase tracking-tight">{step.title}</h4>
+                  <p className="text-zinc-400 leading-relaxed">{step.text}</p>
+                </motion.div>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       )}
 
       {/* About Section */}
-      <section id="about" className="py-8 md:py-10 bg-zinc-950 relative overflow-hidden">
-        {/* Background Image with Overlay */}
+      <section id="about" className="py-16 md:py-32 bg-black relative overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
             src={content?.about_image || "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1200&auto=format&fit=crop"} 
             alt="Karate Emotion" 
-            className="w-full h-full object-cover grayscale opacity-30"
+            className="w-full h-full object-cover grayscale opacity-20"
             referrerPolicy="no-referrer"
             loading="lazy"
-            decoding="async"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-black/40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/90 to-transparent" />
         </div>
 
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="max-w-3xl">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.2em] mb-4">Клуб кіокушинкай карате в Києві</h2>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-black mb-8 uppercase tracking-tight text-white leading-tight">
+            <h2 className="text-4xl md:text-5xl lg:text-7xl font-black mb-8 uppercase tracking-tight text-white leading-tight">
               {content?.about_title || "Дисципліна. Сила. Характер."}
             </h2>
             
             <div 
-              className="text-zinc-300 text-lg md:text-xl mb-8 leading-relaxed font-medium"
+              className="text-zinc-300 text-lg md:text-xl mb-10 leading-relaxed font-medium"
               dangerouslySetInnerHTML={{ __html: content?.about_text || `Black Bear Dojo — це середовище, де ваша дитина здобуває <span class="text-red-500 font-bold">дисципліну</span> та впевненість.<br class="hidden md:block" />
               Системні тренування формують міцний характер, повагу до оточуючих та вміння досягати цілей.<br class="hidden md:block" />
               Розвиток відбувається поступово: від базових навичок до участі у <span class="text-red-500 font-bold">змаганнях</span>.<br class="hidden md:block" />
               Наш багаторічний <span class="text-red-500 font-bold">досвід</span> допомагає виховувати не лише сильних спортсменів, а й цілеспрямованих особистостей.` }}
             />
 
-            {content?.about_quote && (
-              <div className="bg-white/5 border-l-4 border-red-600 p-6 rounded-r-2xl mb-10 italic text-zinc-300">
-                "{content.about_quote}"
-              </div>
-            )}
-
-            <div className="flex flex-wrap gap-3 mb-10">
-              <Link to="/kids-4-7" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 4–7 років</Link>
-              <Link to="/juniors-7-12" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 7–12 років</Link>
-              <Link to="/teens-12-plus" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для підлітків 12+</Link>
-              <Link to="/women-karate" className="px-5 py-2.5 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-xs font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Карате для дівчат</Link>
+            <div className="flex flex-wrap gap-3 mb-12">
+              <Link to="/kids-4-7" className="px-6 py-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 4–7 років</Link>
+              <Link to="/juniors-7-12" className="px-6 py-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для дітей 7–12 років</Link>
+              <Link to="/teens-12-plus" className="px-6 py-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для підлітків 12+</Link>
             </div>
 
-            <Button variant="primary" className="px-10 py-5 text-sm" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+            <Button variant="primary" className="px-12 py-6 text-base" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
               Записатися на пробне тренування
             </Button>
           </div>
         </div>
       </section>
-
       {/* Directions Section */}
       {content?.hide_section_directions !== 'true' && (
-        <section id="directions" className="py-8 md:py-10 bg-black relative overflow-hidden">
+        <section id="directions" className="py-16 md:py-24 bg-black relative overflow-hidden">
         {content?.directions_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -903,7 +800,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="group p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 hover:border-red-600/50 transition-all duration-500 flex flex-col h-full cursor-pointer relative overflow-hidden"
+                  className="group p-6 sm:p-8 bg-zinc-900 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/50 transition-all duration-500 flex flex-col h-full cursor-pointer relative overflow-hidden"
                 >
                   {item.badge && (
                     <div className="absolute top-6 right-6 px-3 py-1 rounded-full bg-red-600 text-white text-[8px] font-black uppercase tracking-widest shadow-lg">
@@ -947,7 +844,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Results Section */}
       {content?.hide_section_results !== 'true' && (
-        <section id="results" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+        <section id="results" className="py-12 md:py-24 bg-[#0B0B0B] relative overflow-hidden">
         {content?.results_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -963,33 +860,11 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         )}
         <div className="max-w-[1200px] mx-auto px-6 relative z-10">
           
-          {/* Header */}
-          <div className="text-center mb-12">
-            <motion.h2 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight mb-4"
-            >
-              {content?.results_title || "Результати, що підтверджують рівень підготовки"}
-            </motion.h2>
-            <motion.div 
-              initial={{ opacity: 0, scaleX: 0 }}
-              whileInView={{ opacity: 1, scaleX: 1 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.2, duration: 0.5 }}
-              className="w-24 h-0.5 bg-[#D40000] mx-auto mb-6"
-            />
-            <motion.p 
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="text-zinc-400 text-lg md:text-xl"
-            >
-              {content?.results_subtitle || "Фактичні досягнення клубу та його вихованців"}
-            </motion.p>
-          </div>
+          <SectionTitle 
+            title={content?.results_title || "Результати, що підтверджують рівень підготовки"} 
+            subtitle={content?.results_subtitle || "Фактичні досягнення клубу та його вихованців"}
+            light
+          />
 
           {/* Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-16">
@@ -1020,7 +895,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.4, duration: 0.7 }}
-            className="relative w-full aspect-[21/9] md:aspect-[21/7] rounded-3xl overflow-hidden mb-16 group"
+            className="relative w-full aspect-[4/3] sm:aspect-[21/9] md:aspect-[21/7] rounded-3xl overflow-hidden mb-16 group"
           >
             <img 
               src={content?.results_image || "https://images.unsplash.com/photo-1564415315949-7a0c4c73aab4?q=80&w=1200&auto=format&fit=crop"} 
@@ -1062,34 +937,39 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Coaches Section (Authority) */}
       {content?.hide_section_coaches !== 'true' && (
-        <section id="coach" className="py-8 bg-black relative overflow-hidden">
+        <section id="coach" className="py-12 md:py-24 bg-black relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
-            <div className="text-center mb-6">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-2">Експертність та досвід</h2>
-              <h3 className="text-4xl md:text-5xl font-black uppercase tracking-tight">Наші <span className="text-zinc-600">майстри</span></h3>
-            </div>
+            <SectionTitle 
+              title={content?.coach_title || "Наші <span class='text-zinc-600'>майстри</span>"} 
+              subtitle={content?.coach_subtitle || "Експертність та досвід, що формують майбутніх чемпіонів"}
+              light
+            />
 
-          <div className="space-y-16">
+            <div className="space-y-20 md:space-y-32">
             {coaches.map((coach, index) => (
               <div key={coach.id} className={`grid lg:grid-cols-2 gap-12 items-center ${index % 2 !== 0 ? 'lg:flex-row-reverse' : ''}`}>
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
-                  className="relative"
+                  className="relative max-w-md mx-auto lg:max-w-none"
                 >
-                  <div className={`absolute -inset-4 border border-red-600/20 rounded-[4rem] ${index % 2 !== 0 ? 'rotate-3' : '-rotate-3'}`} />
-                  <div className="relative aspect-[4/5] rounded-[3rem] overflow-hidden border border-white/10">
+                  <div className={`absolute -inset-4 border border-red-600/20 rounded-3xl lg:rounded-[4rem] ${index % 2 !== 0 ? 'rotate-3' : '-rotate-3'} hidden sm:block`} />
+                  <div className="relative aspect-[4/5] rounded-3xl lg:rounded-[3rem] overflow-hidden border border-white/10 bg-zinc-900">
                     <img 
                       src={coach.photo || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop"} 
                       alt={coach.name} 
-                      className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
+                      className="w-full h-full object-cover object-center grayscale hover:grayscale-0 transition-all duration-700"
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop";
+                      }}
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-                    <div className="absolute bottom-10 left-10">
-                      <h4 className="text-3xl font-black uppercase tracking-tighter">{coach.name}</h4>
-                      <p className="text-red-600 font-bold uppercase tracking-widest text-sm">{coach.role}</p>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                    <div className="absolute bottom-6 left-6 md:bottom-10 md:left-10">
+                      <h4 className="text-2xl md:text-3xl font-black uppercase tracking-tighter text-white">{coach.name}</h4>
+                      <p className="text-red-600 font-bold uppercase tracking-widest text-[10px] md:text-sm">{coach.role}</p>
                     </div>
                   </div>
                 </motion.div>
@@ -1127,7 +1007,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Schedule Section */}
       {content?.hide_section_schedule !== 'true' && (
-        <section id="schedule" className="py-8 md:py-10 bg-[#0B0B0B] relative overflow-hidden">
+        <section id="schedule" className="py-16 md:py-24 bg-[#0B0B0B] relative overflow-hidden">
         {content?.schedule_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1184,7 +1064,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="bg-[#111111] rounded-[2.5rem] border border-white/5 relative overflow-hidden group hover:border-red-600/20 transition-all duration-500 shadow-2xl"
+                  className="bg-[#111111] rounded-3xl lg:rounded-[2.5rem] border border-white/5 relative overflow-hidden group hover:border-red-600/20 transition-all duration-500 shadow-2xl"
                 >
                   {/* Decorative element */}
                   <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 rounded-full blur-[100px] -mr-20 -mt-20 group-hover:bg-red-600/10 transition-colors duration-700" />
@@ -1277,7 +1157,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Reviews Section */}
       {content?.hide_section_reviews !== 'true' && (
-        <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+        <section className="py-16 md:py-24 bg-black relative overflow-hidden">
         {content?.reviews_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1310,7 +1190,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       )}
 
       {/* FAQ Section */}
-      <section className="py-8 md:py-10 bg-black relative overflow-hidden">
+      <section className="py-16 md:py-24 bg-black relative overflow-hidden">
         {content?.faq_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1389,7 +1269,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               Обмежений набір
             </div>
             
-            <h2 className="text-4xl md:text-7xl font-black uppercase text-white mb-8 tracking-tighter leading-none">
+            <h2 className="text-4xl sm:text-5xl md:text-7xl font-black uppercase text-white mb-8 tracking-tighter leading-[1.1] md:leading-none">
               Готові виховати <br /> <span className="text-red-600">чемпіона?</span>
             </h2>
             

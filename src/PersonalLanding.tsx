@@ -142,7 +142,7 @@ export const PersonalLanding = () => {
               Персональний наставник: Залишилось 1 вільне місце на вечір
             </div>
             <h1 
-              className="text-6xl md:text-[110px] font-black uppercase leading-[0.85] tracking-tighter mb-10"
+              className="text-5xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
               dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Максимальний <br /> <span className="text-red-600 text-glow">результат</span> <br /> тет-а-тет' }}
             />
             <p 
@@ -166,11 +166,11 @@ export const PersonalLanding = () => {
       </section>
 
       {/* Advantages Section */}
-      <section id="advantages" className="py-32 bg-zinc-950 border-y border-white/5">
+      <section id="advantages" className="py-16 md:py-32 bg-zinc-950 border-y border-white/5">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl mb-20">
+          <div className="max-w-3xl mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Чому персонально?</h2>
-            <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
+            <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
               Твій прогрес — <br /> <span className="text-zinc-700">наш пріоритет</span>
             </h3>
           </div>
@@ -183,7 +183,7 @@ export const PersonalLanding = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="p-10 bg-zinc-900/30 rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
+                className="p-6 sm:p-10 bg-zinc-900/30 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500 group"
               >
                 <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center mb-8 transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-500">
                   <div className="text-red-600">{adv.icon}</div>
@@ -197,15 +197,15 @@ export const PersonalLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-32 bg-black relative overflow-hidden">
+      <section className="py-16 md:py-32 bg-black relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid lg:grid-cols-2 gap-24 items-center">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
             <div className="relative">
-              <div className="absolute -inset-6 border border-red-600/20 rounded-[4rem] -rotate-2" />
+              <div className="absolute -inset-6 border border-red-600/20 rounded-3xl lg:rounded-[4rem] -rotate-2" />
               <img 
                 src={content?.personal_advantages_image || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=1000&auto=format&fit=crop"} 
                 alt="Personal Training Session" 
-                className="relative rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
+                className="relative rounded-3xl lg:rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"
               />
             </div>
