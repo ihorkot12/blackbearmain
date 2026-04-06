@@ -175,11 +175,11 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
   );
 
   const statCards = [
-    { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Боржники', value: stats?.unpaid_participants || 0, icon: CreditCard, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach' },
-    { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach' },
+    { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10', tab: 'participants' },
+    { title: 'Боржники', value: stats?.unpaid_participants || 0, icon: CreditCard, color: 'text-orange-500', bg: 'bg-orange-500/10', tab: 'participants' },
+    { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach', tab: 'leads' },
+    { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10', tab: 'groups' },
+    { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach', tab: 'coaches' },
   ].filter(card => !card.hidden);
 
   return (
@@ -204,13 +204,21 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-zinc-900/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 relative group hover:border-white/10 transition-all"
+            onClick={() => card.tab && onQuickAction(card.tab)}
+            className={`bg-zinc-900/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 relative group hover:border-white/10 transition-all ${card.tab ? 'cursor-pointer hover:bg-zinc-900/50' : ''}`}
           >
             <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
               <card.icon size={28} />
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{card.title}</p>
-            <p className="text-4xl font-black uppercase tracking-tighter">{card.value}</p>
+            <div className="flex items-center justify-between">
+              <p className="text-4xl font-black uppercase tracking-tighter">{card.value}</p>
+              {card.tab && (
+                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <ArrowUpRight size={16} className="text-zinc-500" />
+                </div>
+              )}
+            </div>
             <div className="absolute top-8 right-8 opacity-5 group-hover:opacity-10 transition-opacity">
               <card.icon size={64} />
             </div>
@@ -219,10 +227,16 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
-          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
-            <Activity size={24} className="text-red-600" />
-            Динаміка заявок
+        <div 
+          onClick={() => onQuickAction('leads')}
+          className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
+        >
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Activity size={24} className="text-red-600" />
+              Динаміка заявок
+            </div>
+            <ArrowUpRight size={20} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -251,10 +265,16 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </div>
         </div>
 
-        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
-          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
-            <MapPin size={24} className="text-red-600" />
-            Розподіл по групах
+        <div 
+          onClick={() => onQuickAction('groups')}
+          className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
+        >
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <MapPin size={24} className="text-red-600" />
+              Розподіл по групах
+            </div>
+            <ArrowUpRight size={20} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
           <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -284,13 +304,19 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
 
       <div className="grid lg:grid-cols-2 gap-8">
         {birthdays.length > 0 && (
-          <div className="lg:col-span-2 bg-red-600/10 backdrop-blur-md p-10 rounded-[3rem] border border-red-600/20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-10 opacity-10">
+          <div 
+            onClick={() => onQuickAction('participants')}
+            className="lg:col-span-2 bg-red-600/10 backdrop-blur-md p-10 rounded-[3rem] border border-red-600/20 relative overflow-hidden cursor-pointer hover:bg-red-600/20 transition-all group"
+          >
+            <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform">
               <Smile size={120} />
             </div>
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3 mb-8 text-red-500">
-              <Smile size={24} />
-              Сьогодні день народження!
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center justify-between mb-8 text-red-500">
+              <div className="flex items-center gap-3">
+                <Smile size={24} />
+                Сьогодні день народження!
+              </div>
+              <ArrowUpRight size={20} className="text-red-600/50 group-hover:text-red-500 transition-colors" />
             </h3>
             <div className="grid sm:grid-cols-2 gap-4">
               {birthdays.map((b, i) => (
@@ -323,7 +349,11 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </div>
           <div className="space-y-4">
             {(chartData?.recentLeads || []).map((lead: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group">
+              <div 
+                key={i} 
+                onClick={() => onQuickAction('leads')}
+                className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group cursor-pointer"
+              >
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
                     {lead.name ? lead.name[0] : '?'}
