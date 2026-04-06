@@ -548,7 +548,8 @@ export const AdminPage = () => {
     {
       title: 'Управління',
       items: [
-        { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin'] },
+        { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin', 'coach'] },
+        { id: 'crm', label: 'CRM & Фінанси', icon: BarChart3, roles: ['admin', 'coach'] },
         { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },
         { id: 'coaches', label: 'Тренери', icon: Users, roles: ['admin'] },
         { id: 'locations', label: 'Локації', icon: MapPin, roles: ['admin', 'coach'] },
@@ -752,6 +753,7 @@ export const AdminPage = () => {
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'leads' && <LeadsViewer />}
+              {activeTab === 'crm' && <CRMFinance role={role} coachId={coachId} />}
               {activeTab === 'coaches' && <CoachesEditor />}
               {activeTab === 'locations' && <LocationsEditor />}
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
@@ -3955,31 +3957,427 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   );
 };
 
+const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null }) => {
+  const [payments, setPayments] = useState<any[]>([]);
+  const [report, setReport] = useState<any>(null);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [month, setMonth] = useState(new Date().getMonth() + 1);
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    participant_id: '',
+    amount: '',
+    type: 'subscription',
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    notes: ''
+  });
+
+  const fetchData = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const [payRes, repRes, leadsRes, partRes] = await Promise.all([
+        fetch(`/api/payments?month=${month}&year=${year}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch(`/api/reports/finance?year=${year}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/leads', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+      ]);
+      setPayments(Array.isArray(payRes) ? payRes : []);
+      setReport(repRes);
+      setLeads(Array.isArray(leadsRes) ? leadsRes : []);
+      setParticipants(Array.isArray(partRes) ? partRes : []);
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [month, year]);
+
+  const handleAddPayment = async () => {
+    if (!newPayment.participant_id || !newPayment.amount) {
+      toast.error('Заповніть обов\'язкові поля');
+      return;
+    }
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newPayment)
+      });
+      if (res.ok) {
+        toast.success('Оплату додано');
+        setIsAddingPayment(false);
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка додавання оплати');
+    }
+  };
+
+  const monthlyData = useMemo(() => {
+    if (!report?.monthly) return [];
+    const months = ['Січ', 'Лют', 'Бер', 'Квіт', 'Трав', 'Черв', 'Лип', 'Серп', 'Вер', 'Жовт', 'Лист', 'Груд'];
+    return months.map((m, i) => {
+      const found = report.monthly.find((r: any) => r.month === i + 1);
+      return { name: m, total: found ? parseFloat(found.total) : 0 };
+    });
+  }, [report]);
+
+  const typeData = useMemo(() => {
+    if (!report?.byType) return [];
+    const colors: any = {
+      subscription: '#ef4444',
+      exam: '#3b82f6',
+      equipment: '#10b981',
+      other: '#f59e0b'
+    };
+    const labels: any = {
+      subscription: 'Абонемент',
+      exam: 'Атестація',
+      equipment: 'Екіпірування',
+      other: 'Інше'
+    };
+    return report.byType.map((t: any) => ({
+      name: labels[t.type] || t.type,
+      value: parseFloat(t.total),
+      color: colors[t.type] || '#888888'
+    }));
+  }, [report]);
+
+  return (
+    <div className="space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div>
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">CRM & Фінанси</h1>
+          <p className="text-zinc-500 font-medium max-w-2xl">Керування лідами, оплатами та фінансова звітність.</p>
+        </div>
+        <div className="flex gap-4">
+          <button 
+            onClick={() => setIsAddingPayment(true)}
+            className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-red-600/20 flex items-center gap-3"
+          >
+            <Plus size={18} />
+            Додати оплату
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+          <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px] mb-2">Дохід за місяць</p>
+          <h3 className="text-4xl font-black">{monthlyData[month-1]?.total.toLocaleString()} ₴</h3>
+          <div className="mt-4 flex items-center gap-2 text-green-500 text-xs font-bold">
+            <ArrowUpRight size={14} />
+            <span>+12% від минулого місяця</span>
+          </div>
+        </div>
+        <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+          <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px] mb-2">Конверсія лідів</p>
+          <h3 className="text-4xl font-black">
+            {leads.length > 0 ? Math.round((leads.filter(l => l.status === 'converted').length / leads.length) * 100) : 0}%
+          </h3>
+          <p className="mt-4 text-zinc-500 text-xs font-medium">{leads.filter(l => l.status === 'converted').length} з {leads.length} лідів стали учнями</p>
+        </div>
+        <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+          <p className="text-zinc-500 font-black uppercase tracking-widest text-[10px] mb-2">Очікуваний дохід</p>
+          <h3 className="text-4xl font-black">
+            {leads.reduce((acc, l) => acc + (l.status === 'new' ? parseFloat(l.value || 0) : 0), 0).toLocaleString()} ₴
+          </h3>
+          <p className="mt-4 text-zinc-500 text-xs font-medium">Потенціал нових заявок</p>
+        </div>
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8">Динаміка доходів ({year})</h3>
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+                <XAxis dataKey="name" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v/1000}k`} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
+                  itemStyle={{ color: '#fff' }}
+                />
+                <Area type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+          <h3 className="text-xl font-black uppercase tracking-tight mb-8">Розподіл за типом</h3>
+          <div className="h-80 flex items-center">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={typeData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {typeData.map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="w-48 space-y-4">
+              {typeData.map((t: any) => (
+                <div key={t.name} className="flex items-center gap-3">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: t.color }} />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-white">{t.name}</p>
+                    <p className="text-[10px] text-zinc-500">{t.value.toLocaleString()} ₴</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Payments List */}
+      <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">
+        <div className="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-6">
+          <h3 className="text-xl font-black uppercase tracking-tight">Історія оплат</h3>
+          <div className="flex gap-4">
+            <select 
+              value={month} 
+              onChange={e => setMonth(parseInt(e.target.value))}
+              className="bg-black border border-white/10 rounded-xl px-4 py-2 text-white text-sm"
+            >
+              {['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'].map((m, i) => (
+                <option key={m} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <select 
+              value={year} 
+              onChange={e => setYear(parseInt(e.target.value))}
+              className="bg-black border border-white/10 rounded-xl px-4 py-2 text-white text-sm"
+            >
+              {[2024, 2025, 2026].map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Учень</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Група</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Тип</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Сума</th>
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map(pay => (
+                <tr key={pay.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                  <td className="px-8 py-6">
+                    <p className="font-bold text-white">{pay.participant_name}</p>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="px-3 py-1 bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase rounded-full">
+                      {pay.group_name}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      pay.type === 'subscription' ? 'bg-blue-500/10 text-blue-500' :
+                      pay.type === 'exam' ? 'bg-purple-500/10 text-purple-500' :
+                      'bg-zinc-500/10 text-zinc-500'
+                    }`}>
+                      {pay.type === 'subscription' ? 'Абонемент' : pay.type === 'exam' ? 'Атестація' : pay.type}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6 text-zinc-400 text-sm">
+                    {new Date(pay.date).toLocaleDateString('uk-UA')}
+                  </td>
+                  <td className="px-8 py-6 text-right font-black text-white">
+                    {parseFloat(pay.amount).toLocaleString()} ₴
+                  </td>
+                </tr>
+              ))}
+              {payments.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center text-zinc-500 font-medium italic">
+                    Оплат за цей період не знайдено
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Add Payment Modal */}
+      {isAddingPayment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingPayment(false)} />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 shadow-2xl"
+          >
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Нова оплата</h3>
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <div className="col-span-2">
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Учень</label>
+                <select 
+                  value={newPayment.participant_id}
+                  onChange={e => setNewPayment({...newPayment, participant_id: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="">Оберіть учня</option>
+                  {participants.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Сума (₴)</label>
+                <input 
+                  type="number"
+                  value={newPayment.amount}
+                  onChange={e => setNewPayment({...newPayment, amount: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                  placeholder="1500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Тип</label>
+                <select 
+                  value={newPayment.type}
+                  onChange={e => setNewPayment({...newPayment, type: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="subscription">Абонемент</option>
+                  <option value="exam">Атестація</option>
+                  <option value="equipment">Екіпірування</option>
+                  <option value="other">Інше</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Місяць</label>
+                <select 
+                  value={newPayment.month}
+                  onChange={e => setNewPayment({...newPayment, month: parseInt(e.target.value)})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  {['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'].map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Рік</label>
+                <select 
+                  value={newPayment.year}
+                  onChange={e => setNewPayment({...newPayment, year: parseInt(e.target.value)})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  {[2024, 2025, 2026].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={handleAddPayment}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all"
+              >
+                Зберегти оплату
+              </button>
+              <button 
+                onClick={() => setIsAddingPayment(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all"
+              >
+                Скасувати
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const LeadsViewer = () => {
   const [leads, setLeads] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<any[]>([]);
   const [editingLead, setEditingLead] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const fetchLeads = () => {
+  const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
-    fetch('/api/leads', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Unauthorized');
-      return res.json();
-    })
-    .then(data => setLeads(Array.isArray(data) ? data : []))
-    .catch(err => {
+    try {
+      const [lRes, cRes] = await Promise.all([
+        fetch('/api/leads', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+      const lData = await lRes.json();
+      const cData = await cRes.json();
+      setLeads(Array.isArray(lData) ? lData : []);
+      setCoaches(Array.isArray(cData) ? cData : []);
+    } catch (err) {
       console.error('Fetch leads failed:', err);
-      setLeads([]);
-    });
+    }
   };
 
   useEffect(() => {
-    fetchLeads();
+    fetchData();
   }, []);
+
+  const handleSaveLead = async (lead: any) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(lead)
+      });
+      if (res.ok) {
+        toast.success('Заявку оновлено');
+        setEditingLead(null);
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка оновлення');
+    }
+  };
 
   const [isDeletingAll, setIsDeletingAll] = useState(false);
   const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
@@ -3995,7 +4393,7 @@ const LeadsViewer = () => {
       
       if (res.ok) {
         toast.success('Всі заявки видалено');
-        fetchLeads();
+        fetchData();
       } else {
         toast.error('Помилка видалення заявок');
       }
@@ -4004,30 +4402,6 @@ const LeadsViewer = () => {
     }
     setIsDeletingAll(false);
     setShowDeleteAllConfirm(false);
-  };
-
-  const handleSaveLead = async (lead: any) => {
-    try {
-      const token = localStorage.getItem('admin_token');
-      const res = await fetch(`/api/leads/${lead.id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(lead)
-      });
-      
-      if (res.ok) {
-        setEditingLead(null);
-        fetchLeads();
-        toast.success('Заявку оновлено');
-      } else {
-        toast.error('Помилка оновлення заявки');
-      }
-    } catch (e) {
-      toast.error('Помилка оновлення заявки');
-    }
   };
 
   const handleDelete = async () => {
@@ -4043,7 +4417,7 @@ const LeadsViewer = () => {
       
       if (res.ok) {
         toast.success('Заявку видалено');
-        fetchLeads();
+        fetchData();
       } else {
         toast.error('Помилка видалення заявки');
       }
@@ -4088,143 +4462,158 @@ const LeadsViewer = () => {
       />
       
       {editingLead && (
-        <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-          <div className="bg-zinc-900 w-full max-w-lg rounded-3xl border border-white/10 p-8 space-y-6">
-            <h3 className="text-2xl font-bold">Редагувати заявку</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Ім'я</label>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setEditingLead(null)} />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 shadow-2xl"
+          >
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Редагувати лід</h3>
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Ім'я</label>
                 <input 
                   type="text" 
                   value={editingLead.name} 
                   onChange={e => setEditingLead({...editingLead, name: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Телефон</label>
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Телефон</label>
                 <input 
                   type="text" 
                   value={editingLead.phone} 
                   onChange={e => setEditingLead({...editingLead, phone: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Локація</label>
-                <input 
-                  type="text" 
-                  value={editingLead.location} 
-                  onChange={e => setEditingLead({...editingLead, location: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Група</label>
-                <input 
-                  type="text" 
-                  value={editingLead.age_group} 
-                  onChange={e => setEditingLead({...editingLead, age_group: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-300 mb-2">Статус</label>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Статус</label>
                 <select 
                   value={editingLead.status} 
                   onChange={e => setEditingLead({...editingLead, status: e.target.value})}
-                  className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
                 >
                   <option value="new">Нова</option>
-                  <option value="contacted">Зв'язалися</option>
-                  <option value="trial">Призначено пробне</option>
-                  <option value="client">Клієнт</option>
-                  <option value="closed">Закрито</option>
+                  <option value="contacted">В роботі</option>
+                  <option value="trial">Пробне тренування</option>
+                  <option value="converted">Учень</option>
+                  <option value="rejected">Відмова</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Цінність (₴)</label>
+                <input 
+                  type="number" 
+                  value={editingLead.value || ''} 
+                  onChange={e => setEditingLead({...editingLead, value: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                  placeholder="2500"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Призначений тренер</label>
+                <select 
+                  value={editingLead.assigned_coach_id || ''} 
+                  onChange={e => setEditingLead({...editingLead, assigned_coach_id: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="">Не призначено</option>
+                  {coaches.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
                 </select>
               </div>
             </div>
-            <div className="flex gap-4 pt-4">
+            <div className="flex gap-4">
               <button 
                 onClick={() => handleSaveLead(editingLead)}
-                className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all"
               >
-                Зберегти
+                Зберегти зміни
               </button>
               <button 
                 onClick={() => setEditingLead(null)}
-                className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-3 rounded-xl font-bold transition-colors"
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all"
               >
                 Скасувати
               </button>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
 
-      <div className="bg-zinc-900 rounded-[2rem] border border-white/5 overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-black/50 border-b border-white/5">
-            <tr>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дата</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Ім'я</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Телефон</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Локація</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Група</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Статус</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дії</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {leads.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="p-8 text-center text-zinc-500">Заявок поки немає</td>
+      <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата / Лід</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Локація / Група</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Цінність</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Дії</th>
               </tr>
-            ) : (
-              leads.map(lead => (
-                <tr key={lead.id} className="hover:bg-white/5 transition-colors">
-                  <td className="p-6 text-sm text-zinc-400">{new Date(lead.created_at).toLocaleString('uk-UA')}</td>
-                  <td className="p-6 font-bold">{lead.name}</td>
-                  <td className="p-6 font-mono text-red-400">{lead.phone}</td>
-                  <td className="p-6 text-sm">{lead.location || 'Не вказано'}</td>
-                  <td className="p-6 text-sm">{lead.age_group}</td>
-                  <td className="p-6">
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase tracking-widest ${
-                      lead.status === 'new' ? 'bg-red-600/20 text-red-500' :
-                      lead.status === 'contacted' ? 'bg-blue-600/20 text-blue-500' :
-                      lead.status === 'trial' ? 'bg-amber-600/20 text-amber-500' :
-                      lead.status === 'client' ? 'bg-green-600/20 text-green-500' :
-                      'bg-zinc-800 text-zinc-500'
-                    }`}>
-                      {lead.status === 'new' ? 'Нова' : 
-                       lead.status === 'contacted' ? 'Зв\'язалися' :
-                       lead.status === 'trial' ? 'Пробне' :
-                       lead.status === 'client' ? 'Клієнт' :
-                       lead.status === 'closed' ? 'Закрито' : lead.status}
-                    </span>
-                  </td>
-                  <td className="p-6">
-                    <div className="flex gap-2">
-                      <button 
-                        onClick={() => setEditingLead(lead)}
-                        className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                        title="Редагувати"
-                      >
-                        <Settings size={18} />
-                      </button>
-                      <button 
-                        onClick={() => setConfirmDelete({ id: lead.id, name: lead.name })}
-                        className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="Видалити"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </td>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {leads.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center text-zinc-500 font-medium italic">Заявок поки немає</td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                leads.map(lead => (
+                  <tr key={lead.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="px-8 py-6">
+                      <p className="text-[10px] text-zinc-500 font-bold mb-1">{new Date(lead.created_at).toLocaleDateString('uk-UA')}</p>
+                      <p className="font-bold text-white">{lead.name}</p>
+                      <p className="text-xs text-red-500 font-mono">{lead.phone}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="text-sm text-white">{lead.location || '—'}</p>
+                      <p className="text-xs text-zinc-500">{lead.age_group}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <p className="font-black text-white">{parseFloat(lead.value || 0).toLocaleString()} ₴</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                        lead.status === 'new' ? 'bg-red-500/10 text-red-500' :
+                        lead.status === 'contacted' ? 'bg-blue-500/10 text-blue-500' :
+                        lead.status === 'trial' ? 'bg-amber-500/10 text-amber-500' :
+                        lead.status === 'converted' ? 'bg-green-500/10 text-green-500' :
+                        'bg-zinc-500/10 text-zinc-500'
+                      }`}>
+                        {lead.status === 'new' ? 'Нова' : 
+                         lead.status === 'contacted' ? 'В роботі' :
+                         lead.status === 'trial' ? 'Пробне' :
+                         lead.status === 'converted' ? 'Учень' :
+                         lead.status === 'rejected' ? 'Відмова' : lead.status}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => setEditingLead(lead)}
+                          className="p-3 bg-white/5 hover:bg-white/10 rounded-xl transition-all text-zinc-400 hover:text-white"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setConfirmDelete({ id: lead.id, name: lead.name })}
+                          className="p-3 bg-red-600/5 hover:bg-red-600/20 rounded-xl transition-all text-red-500/50 hover:text-red-500"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <ConfirmModal 

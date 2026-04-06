@@ -163,6 +163,18 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+        amount DECIMAL(10, 2) NOT NULL,
+        date DATE DEFAULT CURRENT_DATE,
+        month INTEGER,
+        year INTEGER,
+        type TEXT DEFAULT 'subscription', -- 'subscription', 'exam', 'equipment', 'other'
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
@@ -172,6 +184,10 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS rank_points INTEGER DEFAULT 0;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS value DECIMAL(10, 2) DEFAULT 0;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
+      ALTER TABLE leads ADD COLUMN IF NOT EXISTS converted_participant_id INTEGER REFERENCES participants(id) ON DELETE SET NULL;
     `);
 
     // Seed initial admin if empty
@@ -704,9 +720,12 @@ async function startServer() {
   });
 
   // Startup Notification
+  // Removed as per user request to avoid unnecessary notifications on login/startup
+  /*
   setTimeout(() => {
     sendTelegramMessage(`<b>🚀 Системне оновлення</b>\n\nСистема Black Bear успішно запущена та готова до роботи.\nВсі модулі сповіщень активовані.`);
   }, 5000);
+  */
 
   // --- End Scheduled Tasks ---
 
@@ -1844,12 +1863,13 @@ async function startServer() {
       if (user.role === 'coach' && user.coach_id) {
         totalsQuery = `
           SELECT 
-            0 as total_leads,
-            0 as new_leads,
+            (SELECT COUNT(*) FROM leads WHERE assigned_coach_id = $1) as total_leads,
+            (SELECT COUNT(*) FROM leads WHERE assigned_coach_id = $1 AND status = 'new') as new_leads,
             1 as total_coaches,
             (SELECT COUNT(*) FROM groups WHERE coach_id = $1) as total_locations,
             (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE g.coach_id = $1) as total_participants,
-            (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE p.payment_status = 'unpaid' AND g.coach_id = $1) as unpaid_participants
+            (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE p.payment_status = 'unpaid' AND g.coach_id = $1) as unpaid_participants,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments pay JOIN participants p ON pay.participant_id = p.id JOIN groups g ON p.group_id = g.id WHERE g.coach_id = $1 AND pay.month = EXTRACT(MONTH FROM CURRENT_DATE) AND pay.year = EXTRACT(YEAR FROM CURRENT_DATE)) as monthly_revenue
         `;
         totalsParams.push(user.coach_id);
       } else {
@@ -1860,7 +1880,8 @@ async function startServer() {
             (SELECT COUNT(*) FROM coaches) as total_coaches,
             (SELECT COUNT(*) FROM locations) as total_locations,
             (SELECT COUNT(*) FROM participants) as total_participants,
-            (SELECT COUNT(*) FROM participants WHERE payment_status = 'unpaid') as unpaid_participants
+            (SELECT COUNT(*) FROM participants WHERE payment_status = 'unpaid') as unpaid_participants,
+            (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE month = EXTRACT(MONTH FROM CURRENT_DATE) AND year = EXTRACT(YEAR FROM CURRENT_DATE)) as monthly_revenue
         `;
       }
 
@@ -1869,27 +1890,167 @@ async function startServer() {
           SELECT DATE(created_at) as date, COUNT(*) as count 
           FROM leads 
           WHERE created_at > CURRENT_DATE - INTERVAL '14 days'
+          ${user.role === 'coach' ? 'AND assigned_coach_id = $1' : ''}
           GROUP BY DATE(created_at)
           ORDER BY DATE(created_at) ASC
-        `),
+        `, user.role === 'coach' ? [user.coach_id] : []),
         pool.query(groupDistQuery, groupDistParams),
         pool.query(`
           SELECT * FROM leads 
+          ${user.role === 'coach' ? 'WHERE assigned_coach_id = $1' : ''}
           ORDER BY created_at DESC 
           LIMIT 5
-        `),
+        `, user.role === 'coach' ? [user.coach_id] : []),
         pool.query(totalsQuery, totalsParams)
       ]);
 
       res.json({
-        leadsOverTime: user.role === 'admin' ? leadsByDay.rows : [],
+        leadsOverTime: leadsByDay.rows,
         groupDistribution: groupDistribution.rows,
-        recentLeads: user.role === 'admin' ? recentLeads.rows : [],
+        recentLeads: recentLeads.rows,
         totals: totals.rows[0]
       });
     } catch (e) {
       console.error('Dashboard stats error:', e);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // Payments API
+  app.get("/api/payments", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const user = (req as any).user;
+    const { month, year, participant_id } = req.query;
+    try {
+      let query = `
+        SELECT pay.*, p.name as participant_name, g.name as group_name
+        FROM payments pay
+        JOIN participants p ON pay.participant_id = p.id
+        JOIN groups g ON p.group_id = g.id
+      `;
+      let params: any[] = [];
+      let conditions: string[] = [];
+
+      if (user.role === 'coach' && user.coach_id) {
+        conditions.push("g.coach_id = $" + (params.length + 1));
+        params.push(user.coach_id);
+      }
+
+      if (month) {
+        conditions.push("pay.month = $" + (params.length + 1));
+        params.push(month);
+      }
+      if (year) {
+        conditions.push("pay.year = $" + (params.length + 1));
+        params.push(year);
+      }
+      if (participant_id) {
+        conditions.push("pay.participant_id = $" + (params.length + 1));
+        params.push(participant_id);
+      }
+
+      if (conditions.length > 0) {
+        query += " WHERE " + conditions.join(" AND ");
+      }
+      query += " ORDER BY pay.date DESC";
+
+      const result = await pool.query(query, params);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch payments" });
+    }
+  });
+
+  app.post("/api/payments", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { participant_id, amount, date, month, year, type, notes } = req.body;
+    try {
+      const result = await pool.query(
+        "INSERT INTO payments (participant_id, amount, date, month, year, type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        [participant_id, amount, date || new Date(), month, year, type || 'subscription', notes]
+      );
+      
+      // Update participant payment status if it's a subscription for current month
+      const now = new Date();
+      if (type === 'subscription' && parseInt(month) === (now.getMonth() + 1) && parseInt(year) === now.getFullYear()) {
+        await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participant_id]);
+      }
+
+      res.json({ success: true, id: result.rows[0].id });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create payment" });
+    }
+  });
+
+  app.delete("/api/payments/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      await pool.query("DELETE FROM payments WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete payment" });
+    }
+  });
+
+  // Financial Reports
+  app.get("/api/reports/finance", requireAuth, async (req, res) => {
+    if (!pool) return res.json({});
+    const user = (req as any).user;
+    const { year } = req.query;
+    const targetYear = year || new Date().getFullYear();
+    
+    try {
+      let query = `
+        SELECT month, SUM(amount) as total
+        FROM payments
+        WHERE year = $1
+      `;
+      let params: any[] = [targetYear];
+
+      if (user.role === 'coach' && user.coach_id) {
+        query = `
+          SELECT pay.month, SUM(pay.amount) as total
+          FROM payments pay
+          JOIN participants p ON pay.participant_id = p.id
+          JOIN groups g ON p.group_id = g.id
+          WHERE pay.year = $1 AND g.coach_id = $2
+          GROUP BY pay.month
+        `;
+        params.push(user.coach_id);
+      } else {
+        query += " GROUP BY month";
+      }
+
+      const result = await pool.query(query, params);
+      
+      // Group by type
+      let typeQuery = `
+        SELECT type, SUM(amount) as total
+        FROM payments
+        WHERE year = $1
+      `;
+      let typeParams: any[] = [targetYear];
+      if (user.role === 'coach' && user.coach_id) {
+        typeQuery = `
+          SELECT pay.type, SUM(pay.amount) as total
+          FROM payments pay
+          JOIN participants p ON pay.participant_id = p.id
+          JOIN groups g ON p.group_id = g.id
+          WHERE pay.year = $1 AND g.coach_id = $2
+          GROUP BY pay.type
+        `;
+        typeParams.push(user.coach_id);
+      } else {
+        typeQuery += " GROUP BY type";
+      }
+      const typeResult = await pool.query(typeQuery, typeParams);
+
+      res.json({
+        monthly: result.rows,
+        byType: typeResult.rows
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch financial report" });
     }
   });
 
