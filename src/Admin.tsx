@@ -178,26 +178,27 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
     { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10', tab: 'participants' },
     { title: 'Боржники', value: stats?.unpaid_participants || 0, icon: CreditCard, color: 'text-orange-500', bg: 'bg-orange-500/10', tab: 'participants' },
     { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach', tab: 'leads' },
+    { title: 'Рейтинг', value: 'Топ 20', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-500/10', tab: 'rating' },
     { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10', tab: 'groups' },
     { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach', tab: 'coaches' },
   ].filter(card => !card.hidden);
 
   return (
     <div className="space-y-12 pb-20">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
-          <h2 className="text-5xl font-black uppercase tracking-tighter mb-3">Головна</h2>
-          <p className="text-zinc-500 font-medium text-lg">Огляд активності та ключові показники клубу</p>
+          <h2 className="text-3xl lg:text-5xl font-black uppercase tracking-tighter mb-3">Головна</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-lg">Огляд активності та ключові показники клубу</p>
         </div>
-        <div className="flex gap-4">
-          <div className="bg-zinc-900/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/5 text-right">
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="bg-zinc-900/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/5 text-right flex-1 md:flex-none">
             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Сьогодні</p>
-            <p className="text-white font-black uppercase tracking-tight">{new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <p className="text-white font-black uppercase tracking-tight text-xs lg:text-base">{new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
         {statCards.map((card, i) => (
           <motion.div 
             key={i}
@@ -205,21 +206,21 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
             onClick={() => card.tab && onQuickAction(card.tab)}
-            className={`bg-zinc-900/30 backdrop-blur-md p-8 rounded-[2.5rem] border border-white/5 relative group hover:border-white/10 transition-all ${card.tab ? 'cursor-pointer hover:bg-zinc-900/50' : ''}`}
+            className={`bg-zinc-900/30 backdrop-blur-md p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border border-white/5 relative group hover:border-white/10 transition-all ${card.tab ? 'cursor-pointer hover:bg-zinc-900/50' : ''}`}
           >
-            <div className={`w-14 h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500`}>
-              <card.icon size={28} />
+            <div className={`w-10 h-10 lg:w-14 lg:h-14 ${card.bg} ${card.color} rounded-2xl flex items-center justify-center mb-4 lg:mb-6 group-hover:scale-110 transition-transform duration-500`}>
+              <card.icon size={20} className="lg:size-6" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{card.title}</p>
+            <p className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">{card.title}</p>
             <div className="flex items-center justify-between">
-              <p className="text-4xl font-black uppercase tracking-tighter">{card.value}</p>
+              <p className="text-2xl lg:text-4xl font-black uppercase tracking-tighter">{card.value}</p>
               {card.tab && (
                 <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <ArrowUpRight size={16} className="text-zinc-500" />
                 </div>
               )}
             </div>
-            <div className="absolute top-8 right-8 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div className="absolute top-8 right-8 opacity-5 group-hover:opacity-10 transition-opacity hidden lg:block">
               <card.icon size={64} />
             </div>
           </motion.div>
@@ -229,16 +230,16 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       <div className="grid lg:grid-cols-3 gap-8">
         <div 
           onClick={() => onQuickAction('leads')}
-          className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
+          className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
         >
-          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center justify-between">
+          <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-6 lg:mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Activity size={24} className="text-red-600" />
+              <Activity size={20} className="text-red-600" />
               Динаміка заявок
             </div>
-            <ArrowUpRight size={20} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
+            <ArrowUpRight size={18} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
-          <div className="h-80 w-full">
+          <div className="h-60 lg:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={chartData?.leadsOverTime || []}>
                 <defs>
@@ -267,16 +268,16 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
 
         <div 
           onClick={() => onQuickAction('groups')}
-          className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
+          className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
         >
-          <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center justify-between">
+          <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-6 lg:mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <MapPin size={24} className="text-red-600" />
+              <MapPin size={20} className="text-red-600" />
               Розподіл по групах
             </div>
-            <ArrowUpRight size={20} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
+            <ArrowUpRight size={18} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
-          <div className="h-80 w-full">
+          <div className="h-60 lg:h-80 w-full">
             <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
@@ -306,19 +307,19 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
         {birthdays.length > 0 && (
           <div 
             onClick={() => onQuickAction('participants')}
-            className="lg:col-span-2 bg-red-600/10 backdrop-blur-md p-10 rounded-[3rem] border border-red-600/20 relative overflow-hidden cursor-pointer hover:bg-red-600/20 transition-all group"
+            className="lg:col-span-2 bg-red-600/10 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-red-600/20 relative overflow-hidden cursor-pointer hover:bg-red-600/20 transition-all group"
           >
-            <div className="absolute top-0 right-0 p-10 opacity-10 group-hover:scale-110 transition-transform">
-              <Smile size={120} />
+            <div className="absolute top-0 right-0 p-6 lg:p-10 opacity-10 group-hover:scale-110 transition-transform">
+              <Smile size={80} className="lg:size-[120px]" />
             </div>
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center justify-between mb-8 text-red-500">
+            <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center justify-between mb-6 lg:mb-8 text-red-500">
               <div className="flex items-center gap-3">
-                <Smile size={24} />
+                <Smile size={20} />
                 Сьогодні день народження!
               </div>
-              <ArrowUpRight size={20} className="text-red-600/50 group-hover:text-red-500 transition-colors" />
+              <ArrowUpRight size={18} className="text-red-600/50 group-hover:text-red-500 transition-colors" />
             </h3>
-            <div className="grid sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {birthdays.map((b, i) => (
                 <div key={i} className="flex items-center gap-4 p-5 bg-white/5 rounded-2xl border border-white/5">
                   <div className="w-12 h-12 bg-red-600 text-white rounded-xl flex items-center justify-center font-black text-lg">
@@ -334,10 +335,10 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </div>
         )}
 
-        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5">
-          <div className="flex items-center justify-between mb-10">
-            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-              <Activity size={24} className="text-red-600" />
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-6 lg:mb-10">
+            <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <Activity size={20} className="text-red-600" />
               Останні заявки
             </h3>
             <button 
@@ -381,37 +382,37 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </div>
         </div>
 
-        <div className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-          <div className="w-24 h-24 bg-red-600/10 text-red-600 rounded-3xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
-            <LayoutDashboard size={48} />
+          <div className="w-16 h-16 lg:w-24 lg:h-24 bg-red-600/10 text-red-600 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-6 lg:mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
+            <LayoutDashboard size={32} className="lg:size-[48px]" />
           </div>
-          <h3 className="text-2xl font-black uppercase tracking-tighter mb-4">Швидкі дії</h3>
-          <p className="text-zinc-500 text-sm font-medium mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
-          <div className="grid grid-cols-2 gap-4 w-full max-w-sm">
+          <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter mb-3 lg:mb-4">Швидкі дії</h3>
+          <p className="text-zinc-500 text-[10px] lg:text-sm font-medium mb-6 lg:mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
+          <div className="grid grid-cols-2 gap-2 lg:gap-4 w-full">
             {role === 'admin' ? (
               <>
                 <button 
                   onClick={() => onQuickAction('participants', 'add')}
-                  className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
                 >
                   Додати учня
                 </button>
                 <button 
                   onClick={() => onQuickAction('schedule', 'add')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
-                  Редагувати розклад
+                  Розклад
                 </button>
                 <button 
                   onClick={() => onQuickAction('content', 'video')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
-                  Контент сайту
+                  Контент
                 </button>
                 <button 
                   onClick={() => onQuickAction('leads')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
                   Звіти
                 </button>
@@ -420,25 +421,25 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
               <>
                 <button 
                   onClick={() => onQuickAction('attendance', 'mark')}
-                  className="px-6 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
                 >
-                  Відмітити відвідуваність
+                  Відвідуваність
                 </button>
                 <button 
                   onClick={() => onQuickAction('rank_management', 'add_points')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
-                  Додати бали
+                  Бали
                 </button>
                 <button 
                   onClick={() => onQuickAction('participants', 'add')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
-                  Додати учня
+                  Учень
                 </button>
                 <button 
                   onClick={() => onQuickAction('schedule')}
-                  className="px-6 py-4 bg-white/5 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 hover:-translate-y-1"
+                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
                   Розклад
                 </button>
@@ -519,8 +520,17 @@ export const AdminPage = () => {
 
   const handleQuickAction = (tab: string, action?: string) => {
     setActiveTab(tab);
-    setInitialAction(action || null);
+    // Use a small timeout to ensure the component has mounted before setting initialAction
+    if (action) {
+      setTimeout(() => {
+        setInitialAction(action);
+      }, 50);
+    } else {
+      setInitialAction(null);
+    }
   };
+
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuGroups = [
     {
@@ -554,83 +564,118 @@ export const AdminPage = () => {
   })).filter(group => group.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 flex font-sans selection:bg-red-600/30">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30 overflow-x-hidden">
       <Toaster position="top-right" theme="dark" richColors />
-      {/* Sidebar */}
-      <div className="w-72 bg-zinc-950 border-r border-white/5 flex flex-col sticky top-0 h-screen z-40">
-        <div className="p-8 flex-1 overflow-y-auto custom-scrollbar">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 bg-red-600 flex items-center justify-center rotate-3 shadow-[0_0_30px_rgba(220,38,38,0.4)] rounded-xl">
-              <span className="text-white font-black italic text-xl">B</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-black tracking-tighter text-xl uppercase leading-none">Black Bear</span>
-              <span className="text-red-600 font-bold text-[10px] uppercase tracking-[0.4em] mt-1">
-                Панель управління
-              </span>
-            </div>
+      
+      {/* Mobile Header */}
+      <div className="lg:hidden h-20 bg-zinc-950 border-b border-white/5 flex items-center justify-between px-6 sticky top-0 z-50 backdrop-blur-xl bg-black/80">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-red-600 flex items-center justify-center rotate-3 shadow-[0_0_20px_rgba(220,38,38,0.3)] rounded-lg">
+            <Shield size={20} className="text-white" />
           </div>
-          
-          <nav className="space-y-8">
+          <span className="font-black tracking-tighter text-lg uppercase leading-none">Admin</span>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-zinc-400 border border-white/5"
+        >
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </div>
+
+      {/* Sidebar */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      <div className={`
+        fixed inset-y-0 left-0 z-[70] w-72 lg:w-80 bg-zinc-950 border-r border-white/5 
+        transform transition-transform duration-500 ease-out lg:translate-x-0 lg:static
+        ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="h-full flex flex-col p-6 lg:p-8">
+          <div className="flex items-center justify-between mb-10 lg:mb-12">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_10px_30px_rgba(220,38,38,0.3)]">
+                <Shield size={24} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl lg:text-2xl font-black uppercase tracking-tighter leading-none">Admin</h1>
+                <p className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest text-zinc-500">Control Panel</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="lg:hidden p-2 hover:bg-white/5 rounded-xl transition-colors text-zinc-500"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <nav className="flex-1 space-y-8 overflow-y-auto custom-scrollbar pr-2">
             {visibleGroups.map((group, gIdx) => (
               <div key={gIdx} className="space-y-3">
-                <h3 className="px-5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">{group.title}</h3>
+                <h3 className="px-5 text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">{group.title}</h3>
                 <div className="space-y-1">
                   {group.items.map((item) => (
                     <button 
                       key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-500 group relative ${
+                      onClick={() => {
+                        setActiveTab(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all duration-300 group relative ${
                         activeTab === item.id 
-                          ? 'text-white' 
+                          ? 'bg-red-600 text-white shadow-[0_10px_30px_rgba(220,38,38,0.2)]' 
                           : 'text-zinc-500 hover:bg-white/5 hover:text-white'
                       }`}
                     >
-                      {activeTab === item.id && (
-                        <motion.div 
-                          layoutId="active-tab"
-                          className="absolute inset-0 bg-red-600 rounded-2xl shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
-                          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                        />
-                      )}
-                      <item.icon size={20} className={`relative z-10 ${activeTab === item.id ? 'scale-110' : 'group-hover:scale-110 transition-transform'}`} />
-                      <span className="relative z-10 font-black uppercase tracking-widest text-[10px]">{item.label}</span>
-                      {activeTab === item.id && <ChevronRight size={14} className="relative z-10 ml-auto opacity-50" />}
+                      <item.icon size={18} className={activeTab === item.id ? 'text-white' : 'group-hover:text-red-600 transition-colors'} />
+                      <span className="font-black uppercase tracking-widest text-[9px] lg:text-[10px]">{item.label}</span>
+                      {activeTab === item.id && <ChevronRight size={14} className="ml-auto opacity-50" />}
                     </button>
                   ))}
                 </div>
               </div>
             ))}
           </nav>
-        </div>
 
-        <div className="p-8 space-y-2 border-t border-white/5 bg-zinc-950/50">
-          <button 
-            onClick={() => {
-              localStorage.removeItem('admin_token');
-              navigate('/');
-            }}
-            className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-red-600/10 hover:text-red-500 transition-all duration-300 group border border-transparent hover:border-red-600/20"
-          >
-            <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="font-black uppercase tracking-widest text-[10px]">Вийти на сайт</span>
-          </button>
+          <div className="pt-8 border-t border-white/5 mt-auto">
+            <button 
+              onClick={() => {
+                localStorage.removeItem('admin_token');
+                navigate('/');
+              }}
+              className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-red-600/10 hover:text-red-600 transition-all duration-300 group"
+            >
+              <LogOut size={18} />
+              <span className="font-black uppercase tracking-widest text-[9px] lg:text-[10px]">Вийти</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-screen flex flex-col bg-[radial-gradient(circle_at_50%_0%,_rgba(220,38,38,0.03)_0%,_transparent_50%)]">
+      <div className="flex-1 min-h-screen flex flex-col bg-[radial-gradient(circle_at_50%_0%,_rgba(220,38,38,0.03)_0%,_transparent_50%)] overflow-x-hidden">
         {/* Top Bar */}
-        <header className="h-24 border-b border-white/5 flex items-center justify-between px-12 sticky top-0 bg-black/50 backdrop-blur-xl z-30">
+        <header className="h-20 lg:h-24 border-b border-white/5 flex items-center justify-between px-6 lg:px-12 sticky top-20 lg:top-0 bg-black/50 backdrop-blur-xl z-30">
           <div className="flex items-center gap-6 flex-1 max-w-xl">
             <div className="relative w-full group">
               <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-red-600 transition-colors" size={18} />
               <input 
                 type="text" 
-                placeholder="Швидкий пошук учнів..." 
+                placeholder="Швидкий пошук..." 
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full bg-white/5 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-sm font-medium outline-none focus:border-red-600/50 transition-all"
+                className="w-full bg-white/5 border border-white/5 rounded-2xl py-3 pl-12 pr-4 text-xs lg:text-sm font-medium outline-none focus:border-red-600/50 transition-all"
               />
               
               <AnimatePresence>
@@ -695,7 +740,7 @@ export const AdminPage = () => {
           </div>
         </header>
 
-        <main className="p-12 max-w-7xl mx-auto w-full">
+        <main className="p-6 lg:p-12 max-w-7xl mx-auto w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -735,6 +780,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   const [badgeType, setBadgeType] = useState('');
   const [compName, setCompName] = useState('');
   const [compResult, setCompResult] = useState('');
+  const [compType, setCompType] = useState('competition');
   const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
   const [search, setSearch] = useState('');
 
@@ -836,7 +882,10 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   };
 
   const handleAddComp = async (participantId: number) => {
-    if (!compName) return;
+    if (!compName) {
+      toast.error('Введіть назву');
+      return;
+    }
     try {
       const token = localStorage.getItem('admin_token');
       const res = await fetch('/api/competitions', {
@@ -848,15 +897,17 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         body: JSON.stringify({ 
           participant_id: participantId, 
           name: compName, 
+          type: compType,
           result: compResult,
           date: new Date().toISOString().split('T')[0]
         })
       });
       if (res.ok) {
-        toast.success('Результат змагань додано');
+        toast.success('Активність додано');
         setShowCompModal(null);
         setCompName('');
         setCompResult('');
+        setCompType('competition');
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
       }
@@ -932,21 +983,30 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         </div>
       </div>
 
-      <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-black/50 border-b border-white/5">
-            <tr>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Учень</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Група</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Пояс</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Бали</th>
-              <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дії</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-white/5">
-            {filteredParticipants.map(p => (
-              <tr key={p.id} className="hover:bg-white/5 transition-colors">
-                <td className="p-6 font-bold">{p.name}</td>
+      {loading ? (
+        <div className="flex justify-center p-20">
+          <RefreshCw size={48} className="animate-spin text-red-600" />
+        </div>
+      ) : participants.length === 0 ? (
+        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] p-20 text-center">
+          <p className="text-zinc-500 font-bold uppercase tracking-widest">Список учасників порожній</p>
+        </div>
+      ) : (
+        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-hidden">
+          <table className="w-full text-left">
+            <thead className="bg-black/50 border-b border-white/5">
+              <tr>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Учень</th>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Група</th>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Пояс</th>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Бали</th>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дії</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {filteredParticipants.map(p => (
+                <tr key={p.id} className="hover:bg-white/5 transition-colors">
+                  <td className="p-6 font-bold">{p.name}</td>
                 <td className="p-6 text-sm text-zinc-500">{p.group_name}</td>
                 <td className="p-6">
                   <div className="flex items-center gap-3">
@@ -1000,6 +1060,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           </tbody>
         </table>
       </div>
+      )}
 
       {/* Details Modal */}
       <AnimatePresence>
@@ -1176,27 +1237,43 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
               animate={{ opacity: 1, scale: 1 }}
               className="bg-zinc-900 w-full max-w-md rounded-[2.5rem] border border-white/10 p-8 space-y-6"
             >
-              <h3 className="text-2xl font-black uppercase tracking-tight">Результат змагань</h3>
+              <h3 className="text-2xl font-black uppercase tracking-tight">Додати активність</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Назва турніру</label>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Тип заходу</label>
+                  <select 
+                    value={compType}
+                    onChange={e => setCompType(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all appearance-none"
+                  >
+                    <option value="competition">Змагання</option>
+                    <option value="club_event">Захід клубу</option>
+                    <option value="certification">Атестація</option>
+                    <option value="seminar">Семінар</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Назва заходу</label>
                   <input 
                     type="text"
                     value={compName}
                     onChange={e => setCompName(e.target.value)}
                     className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                    placeholder="Введіть назву..."
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Результат (місце)</label>
-                  <input 
-                    type="text"
-                    placeholder="Наприклад: 1 місце"
-                    value={compResult}
-                    onChange={e => setCompResult(e.target.value)}
-                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
-                  />
-                </div>
+                {compType === 'competition' && (
+                  <div>
+                    <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Результат (місце)</label>
+                    <input 
+                      type="text"
+                      placeholder="Наприклад: 1 місце"
+                      value={compResult}
+                      onChange={e => setCompResult(e.target.value)}
+                      className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                    />
+                  </div>
+                )}
               </div>
               <div className="flex gap-4 pt-4">
                 <button 
@@ -1256,7 +1333,7 @@ const RatingEditor = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-5xl font-black uppercase tracking-tighter mb-3">Рейтинг</h2>
-          <p className="text-zinc-500 font-medium text-lg">Найкращі спортсмени за результатами відвідуваності та змагань</p>
+          <p className="text-zinc-500 font-medium text-lg">Найкращі спортсмени за результатами відвідуваності, змагань, атестацій та семінарів</p>
         </div>
         
         <div className="flex flex-col gap-4">
@@ -1994,130 +2071,138 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   const filtered = participants.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
-          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Учасники</h2>
-          <p className="text-zinc-500 font-medium">Керування базою учнів клубу</p>
+          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Учасники</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-base">Керування базою учнів клубу</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 w-full lg:w-auto">
           <button 
             onClick={() => setShowImportModal(true)}
-            className="bg-zinc-900 hover:bg-zinc-800 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all border border-white/5 flex items-center gap-3"
+            className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-white/5 flex items-center justify-center gap-3"
           >
-            <FileUp size={18} />
+            <FileUp size={16} />
             Імпорт
           </button>
         <button 
             onClick={() => setEditingParticipant({ 
               name: '', 
               age: '', 
+              birthday: '',
               group_id: groups[0]?.id || '', 
               parent_login: '', 
               parent_password: '',
               payment_status: 'unpaid',
               status: 'active'
             })}
-            className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center gap-3"
+            className="bg-red-600 hover:bg-red-700 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center justify-center gap-3"
           >
-            <Plus size={18} />
+            <Plus size={16} />
             Додати учня
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500" size={16} />
           <input 
             type="text" 
             placeholder="Пошук за ім'ям..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-colors"
+            className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-3 lg:py-4 pl-12 pr-4 text-white text-sm outline-none focus:border-red-600 transition-colors"
           />
         </div>
-        <button className="bg-zinc-900 border border-white/5 p-4 rounded-2xl text-zinc-500 hover:text-white transition-colors">
-          <Filter size={18} />
+        <button className="bg-zinc-900 border border-white/5 p-3 lg:p-4 rounded-2xl text-zinc-500 hover:text-white transition-colors flex items-center justify-center">
+          <Filter size={16} />
         </button>
       </div>
 
-      <div className="bg-zinc-900/30 rounded-[3rem] border border-white/5 overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-white/5">
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Вік</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Група</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Оплата</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Статус</th>
-              <th className="p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
-                <td className="p-8">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black">
-                      {p.name?.[0] || '?'}
-                    </div>
-                    <div>
-                      <div className="font-bold text-lg">{p.name}</div>
-                      <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-2">
-                        <span className="opacity-50">L:</span> {p.parent_login || '—'}
-                        <span className="ml-2 opacity-50">P:</span> 
-                        <span className="font-mono">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowPasswords(prev => ({...prev, [p.id]: !prev[p.id]}));
-                          }}
-                          className="ml-1 text-zinc-600 hover:text-white transition-colors"
-                        >
-                          {showPasswords[p.id] ? <EyeOff size={10} /> : <Eye size={10} />}
-                        </button>
+      <div className="bg-zinc-900/30 rounded-[2rem] lg:rounded-[3rem] border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto scrollbar-hide">
+          <table className="w-full text-left border-collapse min-w-[800px]">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Вік / ДН</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Група</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Оплата</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Статус</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(p => (
+                <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
+                  <td className="p-6 lg:p-8">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black text-sm">
+                        {p.name?.[0] || '?'}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm lg:text-lg">{p.name}</div>
+                        <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-2">
+                          <span className="opacity-50">L:</span> {p.parent_login || '—'}
+                          <span className="ml-2 opacity-50">P:</span> 
+                          <span className="font-mono">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowPasswords(prev => ({...prev, [p.id]: !prev[p.id]}));
+                            }}
+                            className="ml-1 text-zinc-600 hover:text-white transition-colors"
+                          >
+                            {showPasswords[p.id] ? <EyeOff size={10} /> : <Eye size={10} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </td>
-                <td className="p-8 text-zinc-400 font-medium">{p.age} років</td>
-                <td className="p-8">
-                  <span className="px-4 py-2 bg-white/5 rounded-full text-xs font-bold text-zinc-300 border border-white/5">
-                    {p.group_name || 'Без групи'}
-                  </span>
-                </td>
-                <td className="p-8">
-                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                    p.payment_status === 'paid' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
-                  }`}>
-                    {p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
-                  </span>
-                </td>
-                <td className="p-8">
-                  <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
-                    p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 'bg-zinc-800 text-zinc-500'
-                  }`}>
-                    {p.status === 'active' ? 'Активний' : 'Архів'}
-                  </span>
-                </td>
-                <td className="p-8 text-right">
-                  <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-3 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
-                      <Trash2 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => setEditingParticipant(p)}
-                      className="p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <div className="text-zinc-400 font-medium text-xs lg:text-sm">{p.age} років</div>
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
+                      {p.birthday ? new Date(p.birthday).toLocaleDateString('uk-UA') : '—'}
+                    </div>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <span className="px-3 lg:px-4 py-1 lg:py-2 bg-white/5 rounded-full text-[10px] lg:text-xs font-bold text-zinc-300 border border-white/5">
+                      {p.group_name || 'Без групи'}
+                    </span>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[9px] font-black uppercase tracking-widest ${
+                      p.payment_status === 'paid' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
+                    }`}>
+                      {p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                    </span>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[9px] font-black uppercase tracking-widest ${
+                      p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {p.status === 'active' ? 'Активний' : 'Архів'}
+                    </span>
+                  </td>
+                  <td className="p-6 lg:p-8 text-right">
+                    <div className="flex items-center justify-end gap-1 lg:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-2 lg:p-3 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setEditingParticipant(p)}
+                        className="p-2 lg:p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <ConfirmModal 
@@ -2130,15 +2215,15 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       />
 
       {showImportModal && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 overflow-y-auto">
-          <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
-            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8 flex items-center gap-4">
-              <FileUp className="text-red-600" size={32} />
-              Імпорт учасників
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 lg:p-6 overflow-y-auto">
+          <div className="max-w-xl w-full bg-zinc-950 p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/10 shadow-2xl my-auto">
+            <h3 className="text-2xl lg:text-3xl font-black uppercase tracking-tighter mb-6 lg:mb-8 flex items-center gap-4">
+              <FileUp className="text-red-600" size={28} />
+              Імпорт
             </h3>
             
-            <div className="space-y-6">
-              <div className="p-6 bg-white/[0.03] rounded-3xl border border-dashed border-white/10 text-center group hover:border-red-600/50 transition-colors">
+            <div className="space-y-4 lg:space-y-6">
+              <div className="p-4 lg:p-6 bg-white/[0.03] rounded-2xl lg:rounded-3xl border border-dashed border-white/10 text-center group hover:border-red-600/50 transition-colors">
                 <input 
                   type="file" 
                   id="excel-upload" 
@@ -2147,73 +2232,73 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   onChange={e => setImportFile(e.target.files?.[0] || null)}
                 />
                 <label htmlFor="excel-upload" className="cursor-pointer block">
-                  <div className="w-16 h-16 bg-red-600/10 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                    <FileUp size={32} />
+                  <div className="w-12 h-12 lg:w-16 lg:h-16 bg-red-600/10 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-3 lg:mb-4 group-hover:scale-110 transition-transform">
+                    <FileUp size={24} />
                   </div>
-                  <p className="text-sm font-black uppercase tracking-tight mb-1">
-                    {importFile ? importFile.name : 'Оберіть Excel або CSV файл'}
+                  <p className="text-xs lg:text-sm font-black uppercase tracking-tight mb-1">
+                    {importFile ? importFile.name : 'Оберіть файл'}
                   </p>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
-                    Натисніть або перетягніть файл сюди
+                  <p className="text-[8px] lg:text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                    Excel або CSV
                   </p>
                 </label>
               </div>
 
               <div className="relative">
                 <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-zinc-500">
-                  <Link size={18} />
+                  <Link size={16} />
                 </div>
                 <input 
                   type="text" 
-                  placeholder="Або вставте посилання на Google Таблицю..." 
+                  placeholder="Або посилання на Google Таблицю..." 
                   value={importUrl}
                   onChange={e => setImportUrl(e.target.value)}
-                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-colors"
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl py-3 lg:py-4 pl-12 pr-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Цільова група (необов'язково)</label>
+                <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Цільова група</label>
                 <select 
                   value={importGroupId}
                   onChange={e => setImportGroupId(e.target.value)}
-                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                 >
                   <option value="">Без групи (автоматично)</option>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
 
-              <div className="bg-red-600/5 p-6 rounded-2xl border border-red-600/10">
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2 flex items-center gap-2">
-                  <AlertCircle size={14} />
-                  Вимоги до формату
+              <div className="bg-red-600/5 p-4 lg:p-6 rounded-2xl border border-red-600/10">
+                <p className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-red-500 mb-2 flex items-center gap-2">
+                  <AlertCircle size={12} />
+                  Вимоги
                 </p>
-                <p className="text-[11px] text-zinc-400 leading-relaxed font-medium">
-                  Файл має містити колонки: <span className="text-white font-bold">Ім'я</span> (обов'язково), 
+                <p className="text-[10px] lg:text-[11px] text-zinc-400 leading-relaxed font-medium">
+                  Колонки: <span className="text-white font-bold">Ім'я</span>, 
                   <span className="text-white font-bold"> Вік</span>, 
                   <span className="text-white font-bold"> Логін</span>, 
                   <span className="text-white font-bold"> Пароль</span>.
                 </p>
               </div>
 
-              <div className="flex gap-4 pt-6">
+              <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-6">
                 <button 
                   onClick={() => {
                     setShowImportModal(false);
                     setImportFile(null);
                     setImportUrl('');
                   }}
-                  className="flex-1 py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors uppercase tracking-widest text-[10px]"
+                  className="flex-1 py-3 lg:py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors uppercase tracking-widest text-[9px] lg:text-[10px]"
                 >
                   Скасувати
                 </button>
                 <button 
                   onClick={handleImport}
                   disabled={importLoading || (!importFile && !importUrl)}
-                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center justify-center gap-2"
+                  className="flex-1 py-3 lg:py-4 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:hover:bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-[9px] lg:text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center justify-center gap-2"
                 >
-                  {importLoading ? <RefreshCw className="animate-spin" size={16} /> : 'Імпортувати'}
+                  {importLoading ? <RefreshCw className="animate-spin" size={14} /> : 'Імпортувати'}
                 </button>
               </div>
             </div>
@@ -2222,84 +2307,95 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       )}
 
       {editingParticipant && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-6 overflow-y-auto">
-          <div className="max-w-xl w-full bg-zinc-950 p-10 rounded-[3rem] border border-white/10 shadow-2xl">
-            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 lg:p-6 overflow-y-auto">
+          <div className="max-w-xl w-full bg-zinc-950 p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/10 shadow-2xl my-auto">
+            <h3 className="text-2xl lg:text-3xl font-black uppercase tracking-tighter mb-6 lg:mb-8">
               {editingParticipant.id ? 'Редагувати учня' : 'Новий учень'}
             </h3>
-            <div className="space-y-6">
+            <div className="space-y-4 lg:space-y-6">
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">ПІБ учня</label>
+                <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">ПІБ учня</label>
                 <input 
                   type="text" 
                   value={editingParticipant.name}
                   onChange={e => setEditingParticipant({...editingParticipant, name: e.target.value})}
-                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Вік</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Вік</label>
                   <input 
                     type="number" 
                     value={editingParticipant.age}
                     onChange={e => setEditingParticipant({...editingParticipant, age: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Група</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">День народження</label>
+                  <input 
+                    type="date" 
+                    value={editingParticipant.birthday ? editingParticipant.birthday.split('T')[0] : ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, birthday: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Група</label>
                   <select 
                     value={editingParticipant.group_id}
                     onChange={e => setEditingParticipant({...editingParticipant, group_id: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
                     {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус оплати</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус оплати</label>
                   <select 
                     value={editingParticipant.payment_status}
                     onChange={e => setEditingParticipant({...editingParticipant, payment_status: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
                     <option value="unpaid">Не оплачено</option>
                     <option value="paid">Оплачено</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус учня</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Статус учня</label>
                   <select 
                     value={editingParticipant.status}
                     onChange={e => setEditingParticipant({...editingParticipant, status: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
                     <option value="active">Активний</option>
                     <option value="inactive">Архів</option>
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін батьків</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін батьків</label>
                   <input 
                     type="text" 
                     value={editingParticipant.parent_login}
                     onChange={e => setEditingParticipant({...editingParticipant, parent_login: e.target.value})}
-                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors"
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
                   <div className="relative">
                     <input 
                       type={showPasswords['editing'] ? 'text' : 'password'} 
                       value={editingParticipant.parent_password}
                       onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                      className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-4 text-white outline-none focus:border-red-600 transition-colors pr-12"
+                      className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-12 text-sm"
                     />
                     <button 
                       type="button"
@@ -2311,16 +2407,16 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </div>
                 </div>
               </div>
-              <div className="flex gap-4 pt-6">
+              <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-6">
                 <button 
                   onClick={() => setEditingParticipant(null)}
-                  className="flex-1 py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors"
+                  className="flex-1 py-3 lg:py-4 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors uppercase tracking-widest text-[9px] lg:text-[10px]"
                 >
                   Скасувати
                 </button>
                 <button 
                   onClick={() => handleSave(editingParticipant)}
-                  className="flex-1 py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all"
+                  className="flex-1 py-3 lg:py-4 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-[9px] lg:text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
                 >
                   Зберегти
                 </button>
@@ -2390,28 +2486,28 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
-          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Відвідуваність</h2>
-          <p className="text-zinc-500 font-medium">Відмічайте присутність учнів на заняттях</p>
+          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Відвідуваність</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-base">Відмічайте присутність учнів на заняттях</p>
         </div>
-        <div className="flex items-center gap-4 bg-zinc-900 p-2 rounded-2xl border border-white/5">
+        <div className="flex items-center gap-2 lg:gap-4 bg-zinc-900 p-2 rounded-2xl border border-white/5 w-full lg:w-auto justify-between">
           <button 
             onClick={() => {
               const d = new Date(date);
               d.setDate(d.getDate() - 1);
               setDate(d.toISOString().split('T')[0]);
             }}
-            className="p-3 hover:bg-white/5 rounded-xl transition-colors"
+            className="p-2 lg:p-3 hover:bg-white/5 rounded-xl transition-colors"
           >
-            <ChevronLeft size={20} />
+            <ChevronLeft size={18} />
           </button>
           <input 
             type="date" 
             value={date}
             onChange={e => setDate(e.target.value)}
-            className="bg-transparent text-white font-bold outline-none px-4"
+            className="bg-transparent text-white font-bold outline-none px-2 lg:px-4 text-sm"
           />
           <button 
             onClick={() => {
@@ -2419,32 +2515,32 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
               d.setDate(d.getDate() + 1);
               setDate(d.toISOString().split('T')[0]);
             }}
-            className="p-3 hover:bg-white/5 rounded-xl transition-colors"
+            className="p-2 lg:p-3 hover:bg-white/5 rounded-xl transition-colors"
           >
-            <ChevronRight size={20} />
+            <ChevronRight size={18} />
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         {participants.map(p => (
           <button
             key={p.id}
             onClick={() => toggleAttendance(p.id, attendance[p.id] || 'absent')}
-            className={`p-8 rounded-[2.5rem] border transition-all duration-500 flex items-center justify-between group ${
+            className={`p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border transition-all duration-500 flex items-center justify-between group ${
               attendance[p.id] === 'present' 
                 ? 'bg-green-500/10 border-green-500/30 text-green-500' 
                 : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-white/10'
             }`}
           >
             <div className="text-left">
-              <p className="font-black uppercase tracking-tight text-lg group-hover:translate-x-1 transition-transform">{p.name}</p>
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">{p.group_name || 'Без групи'}</p>
+              <p className="font-black uppercase tracking-tight text-base lg:text-lg group-hover:translate-x-1 transition-transform">{p.name}</p>
+              <p className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest opacity-60">{p.group_name || 'Без групи'}</p>
             </div>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
               attendance[p.id] === 'present' ? 'bg-green-500 text-white rotate-12' : 'bg-white/5 text-zinc-700'
             }`}>
-              {attendance[p.id] === 'present' ? <CheckCircle2 size={24} /> : <XCircle size={24} />}
+              {attendance[p.id] === 'present' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
             </div>
           </button>
         ))}
@@ -2731,38 +2827,38 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
   };
 
   return (
-    <div className="space-y-10">
-      <div className="flex justify-between items-end">
+    <div className="space-y-6 lg:space-y-10">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
-          <h2 className="text-4xl font-black uppercase tracking-tighter mb-2">Контент сайту</h2>
-          <p className="text-zinc-500 font-medium text-lg">Керуйте текстами та зображеннями на головній сторінці</p>
+          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Контент сайту</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-lg">Керуйте текстами та зображеннями на головній сторінці</p>
         </div>
         <button 
           onClick={() => handleSave()}
           disabled={saving || dirtyFields.size === 0}
-          className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3 ${
+          className={`w-full lg:w-auto px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all flex items-center justify-center gap-3 ${
             dirtyFields.size > 0 
               ? 'bg-red-600 text-white shadow-[0_10px_30px_rgba(220,38,38,0.3)] hover:bg-red-700' 
               : 'bg-zinc-900 text-zinc-500 cursor-not-allowed'
           }`}
         >
-          {saving ? <RefreshCw className="animate-spin" size={18} /> : <Save size={18} />}
-          {saving ? 'Збереження...' : `Зберегти зміни (${dirtyFields.size})`}
+          {saving ? <RefreshCw className="animate-spin" size={16} /> : <Save size={16} />}
+          {saving ? 'Збереження...' : `Зберегти (${dirtyFields.size})`}
         </button>
       </div>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      <div className="flex gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-6 px-6 lg:mx-0 lg:px-0">
         {sections.map(s => (
           <button
             key={s.id}
             onClick={() => setActiveSection(s.id)}
-            className={`flex items-center gap-3 px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] whitespace-nowrap transition-all border ${
+            className={`flex items-center gap-3 px-5 lg:px-6 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[9px] lg:text-[10px] whitespace-nowrap transition-all border ${
               activeSection === s.id 
                 ? 'bg-red-600 border-red-600 text-white shadow-lg' 
                 : 'bg-zinc-900/50 border-white/5 text-zinc-500 hover:border-white/10'
             }`}
           >
-            <s.icon size={16} />
+            <s.icon size={14} />
             {s.title}
           </button>
         ))}
@@ -2772,7 +2868,7 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
         key={activeSection}
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="bg-zinc-900/30 backdrop-blur-md p-10 rounded-[3rem] border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-10"
+        className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-10"
       >
         {sectionFields[activeSection].map(field => (
           <div key={field.key} className={field.type === 'textarea' || field.type === 'image' ? 'md:col-span-2' : ''}>

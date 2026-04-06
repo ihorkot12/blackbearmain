@@ -11,6 +11,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
+import cron from 'node-cron';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -135,6 +136,7 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
+        type TEXT DEFAULT 'competition', -- 'competition', 'club_event', 'certification', 'seminar'
         result TEXT,
         date DATE
       );
@@ -585,6 +587,128 @@ async function startServer() {
       res.status(500).json({ error: "Failed to save lead" });
     }
   });
+
+  // --- Scheduled Tasks (Telegram Notifications) ---
+
+  // Weekly Attendance Report - Every Sunday at 20:00
+  cron.schedule('0 20 * * 0', async () => {
+    console.log('Running weekly attendance report...');
+    try {
+      if (!pool) return;
+      
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const dateStr = oneWeekAgo.toISOString().split('T')[0];
+
+      const result = await pool.query(`
+        SELECT 
+          p.name,
+          COUNT(CASE WHEN a.status = 'present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN a.status = 'absent' THEN 1 END) as absent_count
+        FROM participants p
+        LEFT JOIN attendance a ON p.id = a.participant_id AND a.date >= $1
+        WHERE p.status = 'active'
+        GROUP BY p.id, p.name
+        ORDER BY present_count DESC
+      `, [dateStr]);
+
+      const participants = result.rows;
+      const regular = participants.filter(p => parseInt(p.present_count) >= 2);
+      const missing = participants.filter(p => parseInt(p.present_count) === 0);
+
+      let report = `<b>📊 Звіт про відвідуваність за тиждень</b>\n\n`;
+      
+      report += `<b>✅ Регулярно ходять:</b>\n`;
+      if (regular.length > 0) {
+        regular.slice(0, 10).forEach(p => {
+          report += `• ${p.name} (${p.present_count} зан.)\n`;
+        });
+      } else {
+        report += `<i>Дані відсутні</i>\n`;
+      }
+
+      report += `\n<b>⚠️ Пропускають (0 занять):</b>\n`;
+      if (missing.length > 0) {
+        missing.slice(0, 15).forEach(p => {
+          report += `• ${p.name}\n`;
+        });
+      } else {
+        report += `<i>Всі відвідували заняття!</i>\n`;
+      }
+
+      await sendTelegramMessage(report);
+      console.log('Weekly attendance report sent.');
+    } catch (err) {
+      console.error('Failed to send weekly report:', err);
+    }
+  });
+
+  // Monthly Payment Reminder - Every 1st of the month at 09:00
+  cron.schedule('0 9 1 * *', async () => {
+    console.log('Running monthly payment reminder...');
+    try {
+      if (!pool) return;
+
+      const result = await pool.query(`
+        SELECT name, belt FROM participants 
+        WHERE payment_status != 'paid' AND status = 'active'
+      `);
+
+      const debtors = result.rows;
+      if (debtors.length === 0) return;
+
+      let message = `<b>💳 Нагадування про оплату (до 5 числа)</b>\n\n`;
+      message += `Нагадуємо про необхідність оплати за поточний місяць для наступних учнів:\n\n`;
+      
+      debtors.forEach(p => {
+        message += `• ${p.name} (${p.belt || 'Білий'})\n`;
+      });
+
+      message += `\nБудь ласка, здійсніть оплату вчасно. Дякуємо!`;
+
+      await sendTelegramMessage(message);
+      console.log('Monthly payment reminder sent.');
+    } catch (err) {
+      console.error('Failed to send payment reminder:', err);
+    }
+  });
+
+  // Daily Birthday Notification - Every day at 09:00
+  cron.schedule('0 9 * * *', async () => {
+    console.log('Checking for birthdays today...');
+    try {
+      if (!pool) return;
+
+      const result = await pool.query(`
+        SELECT p.name, g.name as group_name, p.age
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE EXTRACT(MONTH FROM p.birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
+        AND EXTRACT(DAY FROM p.birthday) = EXTRACT(DAY FROM CURRENT_DATE)
+        AND p.status = 'active'
+      `);
+
+      const birthdays = result.rows;
+      if (birthdays.length === 0) return;
+
+      let message = `<b>🎂 Сьогодні День Народження!</b>\n\n`;
+      birthdays.forEach(p => {
+        message += `🎉 Вітаємо <b>${p.name}</b> з групи "${p.group_name || 'Без групи'}"! 🥳\n`;
+      });
+
+      await sendTelegramMessage(message);
+      console.log('Birthday notifications sent.');
+    } catch (err) {
+      console.error('Failed to send birthday notifications:', err);
+    }
+  });
+
+  // Startup Notification
+  setTimeout(() => {
+    sendTelegramMessage(`<b>🚀 Системне оновлення</b>\n\nСистема Black Bear успішно запущена та готова до роботи.\nВсі модулі сповіщень активовані.`);
+  }, 5000);
+
+  // --- End Scheduled Tasks ---
 
   app.delete("/api/leads/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
@@ -1297,12 +1421,13 @@ async function startServer() {
       }
 
       // Map data to database fields
-      // Expected columns: "Name" or "Ім'я", "Age" or "Вік", "Login" or "Логін", "Password" or "Пароль"
+      // Expected columns: "Name" or "Ім'я", "Age" or "Вік", "Login" or "Логін", "Password" or "Пароль", "Birthday" or "Дата народження"
       const participantsToInsert = data.map(row => ({
-        name: row["Name"] || row["Ім'я"] || row["name"] || row["ім'я"] || "",
+        name: row["Name"] || row["Ім'я"] || row["ПІБ"] || row["ПІБ дитини"] || row["name"] || row["ім'я"] || "",
         age: parseInt(row["Age"] || row["Вік"] || row["age"] || row["вік"] || "0"),
-        parent_login: row["Login"] || row["Логін"] || row["login"] || row["логін"] || `user_${Math.random().toString(36).substring(2, 7)}`,
-        parent_password: row["Password"] || row["Пароль"] || row["password"] || row["пароль"] || Math.random().toString(36).substring(2, 10),
+        birthday: row["Birthday"] || row["Дата народження"] || row["birthday"] || row["дата народження"] || null,
+        parent_login: row["Login"] || row["Логін"] || row["Логін (англійською)"] || row["login"] || row["логін"] || `user_${Math.random().toString(36).substring(2, 7)}`,
+        parent_password: row["Password"] || row["Пароль"] || row["Пароль (англійською)"] || row["password"] || row["пароль"] || Math.random().toString(36).substring(2, 10),
         group_id: group_id || null,
         payment_status: row["Payment"] || row["Оплата"] || 'unpaid',
         status: row["Status"] || row["Статус"] || 'active'
@@ -1312,9 +1437,22 @@ async function startServer() {
       try {
         await client.query('BEGIN');
         for (const p of participantsToInsert) {
+          // Handle birthday format if it's a string from Excel/CSV
+          let formattedBirthday = null;
+          if (p.birthday) {
+            try {
+              const d = new Date(p.birthday);
+              if (!isNaN(d.getTime())) {
+                formattedBirthday = d.toISOString().split('T')[0];
+              }
+            } catch (e) {
+              console.warn(`Invalid birthday format for ${p.name}: ${p.birthday}`);
+            }
+          }
+
           await client.query(
-            "INSERT INTO participants (name, age, parent_login, parent_password, group_id, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (parent_login) DO NOTHING",
-            [p.name, p.age, p.parent_login, p.parent_password, p.group_id, p.payment_status, p.status]
+            "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (parent_login) DO NOTHING",
+            [p.name, p.age, formattedBirthday, p.group_id, p.parent_login, p.parent_password, p.payment_status, p.status]
           );
         }
         await client.query('COMMIT');
@@ -1541,27 +1679,34 @@ async function startServer() {
 
   app.post("/api/competitions", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { participant_id, name, result, date } = req.body;
+    const { participant_id, name, result, date, type = 'competition' } = req.body;
     try {
       await pool.query("BEGIN");
       const insertRes = await pool.query(
-        "INSERT INTO competitions (participant_id, name, result, date) VALUES ($1, $2, $3, $4) RETURNING id",
-        [participant_id, name, result, date]
+        "INSERT INTO competitions (participant_id, name, type, result, date) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+        [participant_id, name, type, result, date]
       );
       const compId = insertRes.rows[0].id;
       
-      // Points logic for competitions
-      let points = 5; // Participation
-      const normalizedResult = result?.toLowerCase()?.trim() || "";
+      // Points logic
+      let points = 5; // Default participation
       
-      // Better parsing: check if it starts with 1, 2, or 3 or contains "1 місце" etc.
-      if (normalizedResult.startsWith('1') || normalizedResult.includes('1 місце') || normalizedResult.includes('1 місце')) points = 15;
-      else if (normalizedResult.startsWith('2') || normalizedResult.includes('2 місце') || normalizedResult.includes('2 місце')) points = 10;
-      else if (normalizedResult.startsWith('3') || normalizedResult.includes('3 місце') || normalizedResult.includes('3 місце')) points = 7;
+      if (type === 'competition') {
+        const normalizedResult = result?.toLowerCase()?.trim() || "";
+        if (normalizedResult.startsWith('1') || normalizedResult.includes('1 місце')) points = 15;
+        else if (normalizedResult.startsWith('2') || normalizedResult.includes('2 місце')) points = 10;
+        else if (normalizedResult.startsWith('3') || normalizedResult.includes('3 місце')) points = 7;
+      } else if (type === 'certification') {
+        points = 20; // Certification is high value
+      } else if (type === 'seminar') {
+        points = 10;
+      } else if (type === 'club_event') {
+        points = 5;
+      }
 
       await pool.query(
         "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, $3, $4, $5)",
-        [participant_id, points, `competition_${result}`, date, `comp_${compId}`]
+        [participant_id, points, `${type}_${result || name}`, date, `comp_${compId}`]
       );
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
@@ -1569,7 +1714,7 @@ async function startServer() {
       res.json({ success: true });
     } catch (e) {
       await pool.query("ROLLBACK");
-      res.status(500).json({ error: "Failed to create competition entry" });
+      res.status(500).json({ error: "Failed to create entry" });
     }
   });
 
