@@ -361,7 +361,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
                   </div>
                   <div>
                     <p className="text-sm font-black uppercase tracking-tight">{lead.name}</p>
-                    <p className="text-[10px] text-zinc-500 font-bold">{lead.phone}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold">{lead.phone} • <span className="text-red-500/80">{lead.source || 'main'}</span></p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -4434,7 +4434,7 @@ const LeadsViewer = () => {
         <div className="flex items-center gap-4">
           <h2 className="text-3xl font-bold">Заявки з сайту</h2>
           <button 
-            onClick={fetchLeads}
+            onClick={fetchData}
             className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
             title="Оновити"
           >
@@ -4552,6 +4552,7 @@ const LeadsViewer = () => {
               <tr className="border-b border-white/5">
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата / Лід</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Локація / Група</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Джерело</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Цінність</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Дії</th>
@@ -4573,6 +4574,11 @@ const LeadsViewer = () => {
                     <td className="px-8 py-6">
                       <p className="text-sm text-white">{lead.location || '—'}</p>
                       <p className="text-xs text-zinc-500">{lead.age_group}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className="px-2 py-1 bg-white/5 rounded text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
+                        {lead.source || 'main'}
+                      </span>
                     </td>
                     <td className="px-8 py-6">
                       <p className="font-black text-white">{parseFloat(lead.value || 0).toLocaleString()} ₴</p>

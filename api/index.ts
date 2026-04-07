@@ -4,10 +4,37 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import bcrypt from 'bcryptjs';
 import session from 'express-session';
+import fetch from 'node-fetch';
 
 const app = express();
 const PORT = 3000;
 const db = new Database('dojo.db');
+
+// Telegram Helper
+async function sendTelegramMessage(message: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    console.warn('Telegram token or chat ID missing');
+    return;
+  }
+
+  try {
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: message,
+        parse_mode: 'HTML'
+      })
+    });
+  } catch (error) {
+    console.error('Error sending Telegram message:', error);
+  }
+}
 
 // Initialize database tables if they don't exist
 db.exec(`
@@ -49,9 +76,12 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     phone TEXT NOT NULL,
+    age_group TEXT,
+    location TEXT,
     status TEXT DEFAULT 'new',
     value INTEGER DEFAULT 0,
     coach_id INTEGER,
+    source TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -86,6 +116,11 @@ db.exec(`
     name TEXT
   );
 `);
+
+// Ensure columns exist in 'leads' table
+try { db.prepare("ALTER TABLE leads ADD COLUMN source TEXT").run(); } catch (e) {}
+try { db.prepare("ALTER TABLE leads ADD COLUMN age_group TEXT").run(); } catch (e) {}
+try { db.prepare("ALTER TABLE leads ADD COLUMN location TEXT").run(); } catch (e) {}
 
 // Seed default admin if not exists
 const adminExists = db.prepare('SELECT * FROM admin_users WHERE login = ?').get('ihorkot12');
@@ -138,15 +173,39 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/dashboard/stats', (req, res) => {
-  const totalParticipants = db.prepare('SELECT COUNT(*) as count FROM participants WHERE status = "active"').get().count;
-  const activeLeads = db.prepare('SELECT COUNT(*) as count FROM leads WHERE status != "closed"').get().count;
-  const monthlyIncome = db.prepare('SELECT SUM(amount) as total FROM payments WHERE month = ? AND year = ?').get(new Date().getMonth() + 1, new Date().getFullYear()).total || 0;
+  const totals = {
+    total_participants: db.prepare('SELECT COUNT(*) as count FROM participants WHERE status = "active"').get().count,
+    unpaid_participants: db.prepare('SELECT COUNT(*) as count FROM participants WHERE status = "unpaid"').get().count,
+    new_leads: db.prepare('SELECT COUNT(*) as count FROM leads WHERE status = "new"').get().count,
+    total_locations: db.prepare('SELECT COUNT(*) as count FROM locations').get().count,
+    total_coaches: db.prepare('SELECT COUNT(*) as count FROM coaches').get().count,
+  };
+
+  const recentLeads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 5').all();
   
+  // Mock leads over time for chart
+  const leadsOverTime = [
+    { date: new Date(Date.now() - 6*24*60*60*1000).toISOString().split('T')[0], count: 2 },
+    { date: new Date(Date.now() - 5*24*60*60*1000).toISOString().split('T')[0], count: 5 },
+    { date: new Date(Date.now() - 4*24*60*60*1000).toISOString().split('T')[0], count: 3 },
+    { date: new Date(Date.now() - 3*24*60*60*1000).toISOString().split('T')[0], count: 8 },
+    { date: new Date(Date.now() - 2*24*60*60*1000).toISOString().split('T')[0], count: 4 },
+    { date: new Date(Date.now() - 1*24*60*60*1000).toISOString().split('T')[0], count: 6 },
+    { date: new Date().toISOString().split('T')[0], count: 10 },
+  ];
+
+  const groupDistribution = db.prepare(`
+    SELECT l.name as group_name, COUNT(p.id) as count 
+    FROM locations l 
+    LEFT JOIN participants p ON l.id = p.location_id 
+    GROUP BY l.id
+  `).all();
+
   res.json({
-    totalParticipants,
-    activeLeads,
-    monthlyIncome,
-    attendanceRate: 85 // Mocked for now
+    totals,
+    recentLeads,
+    leadsOverTime,
+    groupDistribution
   });
 });
 
@@ -166,9 +225,14 @@ app.get('/api/leads', (req, res) => {
   res.json(leads);
 });
 
-app.post('/api/leads', (req, res) => {
-  const { name, phone } = req.body;
-  const result = db.prepare('INSERT INTO leads (name, phone) VALUES (?, ?)').run(name, phone);
+app.post('/api/leads', async (req, res) => {
+  const { name, phone, age_group, location, source } = req.body;
+  const result = db.prepare('INSERT INTO leads (name, phone, age_group, location, source) VALUES (?, ?, ?, ?, ?)').run(name, phone, age_group, location, source || 'Unknown');
+  
+  // Send Telegram Notification
+  const message = `🚀 <b>Нова заявка!</b>\n\n👤 Ім'я: ${name}\n📞 Телефон: ${phone}\n🏢 Локація: ${location || 'Не вказано'}\n👥 Група: ${age_group || 'Не вказано'}\n📍 Джерело: ${source || 'Не вказано'}`;
+  await sendTelegramMessage(message);
+
   res.json({ id: result.lastInsertRowid });
 });
 
