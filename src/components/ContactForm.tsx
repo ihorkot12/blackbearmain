@@ -8,6 +8,7 @@ interface ContactFormProps {
   subtitle?: string;
   ageGroups?: { value: string; label: string }[];
   source?: string;
+  onSuccess?: () => void;
 }
 
 export const ContactForm = ({ 
@@ -20,7 +21,8 @@ export const ContactForm = ({
     { value: "12+ років", label: "Старша група (12+ років)" },
     { value: "Дорослий", label: "Доросла група" }
   ],
-  source = "main"
+  source = "main",
+  onSuccess
 }: ContactFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -49,8 +51,31 @@ export const ContactForm = ({
       });
 
       if (res.ok) {
-        setIsSubmitted(true);
-        // Track conversion if needed
+        // Conversion Tracking
+        if (typeof window !== 'undefined') {
+          // Google Ads / Analytics
+          if ((window as any).gtag) {
+            (window as any).gtag('event', 'generate_lead', {
+              'event_id': eventId,
+              'value': 1.0,
+              'currency': 'UAH'
+            });
+          }
+          // Meta Pixel
+          if ((window as any).fbq) {
+            (window as any).fbq('track', 'Lead', {
+              content_name: 'Trial Lesson Signup',
+              currency: 'UAH',
+              value: 1.0
+            }, { eventID: eventId });
+          }
+        }
+
+        if (onSuccess) {
+          onSuccess();
+        } else {
+          setIsSubmitted(true);
+        }
       }
     } catch (error) {
       console.error('Error submitting form:', error);

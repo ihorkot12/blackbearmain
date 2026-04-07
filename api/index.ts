@@ -2317,17 +2317,6 @@ async function startServer() {
     }
   });
 
-    // Delete all leads
-    app.delete('/api/leads/delete-all', requireAuth, async (req, res) => {
-      try {
-        await pool.query('DELETE FROM leads');
-        res.json({ message: 'All leads deleted' });
-      } catch (e) {
-        console.error('Delete all leads failed', e);
-        res.status(500).json({ error: 'Server error' });
-      }
-    });
-
     // Parent Portal Endpoints
     app.get("/api/parent/me", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });

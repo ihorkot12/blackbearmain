@@ -374,60 +374,6 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       });
   }, []);
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    const formData = new FormData(e.target as HTMLFormElement);
-    const eventId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    const data = {
-      name: formData.get('name'),
-      phone: formData.get('phone'),
-      age_group: formData.get('age'),
-      location: formData.get('location'),
-      event_id: eventId
-    };
-
-    try {
-      const res = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-
-      if (res.ok) {
-        setIsSubmitted(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    } catch (err) {
-      console.error('Failed to submit lead', err);
-    } finally {
-      setIsSubmitting(false);
-    }
-
-    // Conversion Tracking
-    console.log('Conversion Event: Lead Generated');
-    if (typeof window !== 'undefined') {
-      // Google Ads / Analytics
-      if ((window as any).gtag) {
-        (window as any).gtag('event', 'generate_lead', {
-          'event_id': eventId,
-          'value': 1.0,
-          'currency': 'UAH'
-        });
-      }
-      // Meta Pixel
-      if ((window as any).fbq) {
-        (window as any).fbq('track', 'Lead', {
-          content_name: 'Trial Lesson Signup',
-          currency: 'UAH',
-          value: 1.0
-        }, { eventID: eventId });
-      }
-    }
-  };
-
   if (isInitialLoading && !content) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center space-y-6">
@@ -1311,6 +1257,10 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         title={content?.contact_title}
         subtitle={content?.contact_subtitle}
         source="main"
+        onSuccess={() => {
+          setIsSubmitted(true);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
       />
 
       {/* Footer */}

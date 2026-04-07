@@ -4434,7 +4434,7 @@ const LeadsViewer = () => {
         <div className="flex items-center gap-4">
           <h2 className="text-3xl font-bold">Заявки з сайту</h2>
           <button 
-            onClick={fetchLeads}
+            onClick={fetchData}
             className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500 hover:text-white"
             title="Оновити"
           >
