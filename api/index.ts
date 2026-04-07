@@ -108,10 +108,14 @@ async function initDb() {
         age INTEGER,
         birthday DATE,
         group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
+        coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
+        location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
         parent_login TEXT UNIQUE,
         parent_password TEXT,
         belt TEXT DEFAULT 'Білий',
-        rank_points INTEGER DEFAULT 0,
+        rank_points DECIMAL(10, 2) DEFAULT 0,
+        parent_name TEXT,
+        phone TEXT,
         payment_status TEXT DEFAULT 'unpaid',
         status TEXT DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -156,7 +160,7 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS points_log (
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
-        points INTEGER NOT NULL,
+        points DECIMAL(10, 2) NOT NULL,
         reason TEXT NOT NULL,
         date DATE DEFAULT CURRENT_DATE,
         reference_id TEXT, -- To link to specific badge or competition
@@ -178,6 +182,7 @@ async function initDb() {
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
+      ALTER TABLE schedule ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
       ALTER TABLE groups ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
@@ -895,7 +900,12 @@ async function startServer() {
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
         `),
-        pool.query("SELECT * FROM groups")
+        pool.query(`
+          SELECT g.*, l.name as location_name 
+          FROM groups g
+          LEFT JOIN locations l ON g.location_id = l.id
+          ORDER BY g.order_index ASC
+        `)
       ]);
 
       const content = contentRes.rows.reduce((acc, item) => {
@@ -1216,11 +1226,11 @@ async function startServer() {
 
   app.post("/api/schedule", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index } = req.body;
+    const { location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index, group_id } = req.body;
     try {
       const result = await pool.query(
-        "INSERT INTO schedule (location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0]
+        "INSERT INTO schedule (location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index, group_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+        [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0, group_id ? parseInt(group_id) : null]
       );
       // Invalidate cache
       invalidateInitCache();
@@ -1233,11 +1243,11 @@ async function startServer() {
 
   app.put("/api/schedule/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index } = req.body;
+    const { location_id, coach_id, day_of_week, start_time, end_time, group_name, price, order_index, group_id } = req.body;
     try {
       await pool.query(
-        "UPDATE schedule SET location_id = $1, coach_id = $2, day_of_week = $3, start_time = $4, end_time = $5, group_name = $6, price = $7, order_index = $8 WHERE id = $9",
-        [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0, req.params.id]
+        "UPDATE schedule SET location_id = $1, coach_id = $2, day_of_week = $3, start_time = $4, end_time = $5, group_name = $6, price = $7, order_index = $8, group_id = $9 WHERE id = $10",
+        [parseInt(location_id), coach_id ? parseInt(coach_id) : null, day_of_week, start_time, end_time, group_name, price, order_index || 0, group_id ? parseInt(group_id) : null, req.params.id]
       );
       // Invalidate cache
       invalidateInitCache();
@@ -1440,20 +1450,57 @@ async function startServer() {
 
   app.post("/api/register-member", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_name, phone, belt } = req.body;
+    const { children, name, age, birthday, group_id, parent_name, phone, belt, coach_id, location_id } = req.body;
     
-    // Auto-generate credentials
-    const parent_login = phone || `user_${Math.random().toString(36).substring(2, 8)}`;
-    const rawPassword = Math.random().toString(36).substring(2, 10);
+    // Support both single child and multiple children
+    const childrenList = children && Array.isArray(children) ? children : [{ name, age, birthday, belt }];
     
+    if (childrenList.length === 0 || !childrenList[0].name) {
+      return res.status(400).json({ error: "No children data provided" });
+    }
+
     try {
+      await pool.query("BEGIN");
+
+      const parent_login = phone || `user_${Math.random().toString(36).substring(2, 8)}`;
+      const rawPassword = Math.random().toString(36).substring(2, 10);
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
-      const result = await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
-        [name, age, birthday || null, group_id || null, parent_name, phone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'active']
-      );
+      const registeredIds = [];
+
+      for (const child of childrenList) {
+        // Duplicate check
+        const dupCheck = await pool.query(
+          "SELECT id FROM participants WHERE name = $1 AND (birthday = $2 OR birthday IS NULL)",
+          [child.name, child.birthday || null]
+        );
+
+        if (dupCheck.rows.length > 0) {
+          await pool.query("ROLLBACK");
+          
+          // Notify about duplicate attempt
+          const dupMessage = `
+⚠️ <b>Спроба повторної реєстрації!</b>
+<b>Дитина:</b> ${child.name}
+<b>ДН:</b> ${child.birthday || 'Не вказано'}
+<b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
+<b>Телефон:</b> ${phone}
+          `;
+          sendTelegramMessage(dupMessage).catch(err => console.error('Telegram notification failed:', err));
+
+          return res.status(409).json({ 
+            error: "duplicate", 
+            message: `Дитина ${child.name} вже є в системі. Зверніться до тренера.` 
+          });
+        }
+
+        const result = await pool.query(
+          "INSERT INTO participants (name, age, birthday, group_id, coach_id, location_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id",
+          [child.name, child.age, child.birthday || null, group_id || null, coach_id || null, location_id || null, parent_name, phone, parent_login, hashedPassword, child.belt || 'Білий', 'unpaid', 'active']
+        );
+        registeredIds.push(result.rows[0].id);
+      }
       
-      const participantId = result.rows[0].id;
+      await pool.query("COMMIT");
       
       // Get group info for notification
       let groupName = 'Не вказано';
@@ -1463,11 +1510,11 @@ async function startServer() {
       }
 
       // Send Telegram notification
+      const childrenText = childrenList.map(c => `- ${c.name} (${c.age} р., пояс: ${c.belt || 'Білий'})`).join('\n');
       const message = `
-<b>🆕 Нова реєстрація члена клубу!</b>
-<b>Дитина:</b> ${name}
-<b>Вік:</b> ${age}
-<b>Пояс:</b> ${belt || 'Білий'}
+<b>🆕 Нова реєстрація (${childrenList.length} учн.)!</b>
+<b>Діти:</b>
+${childrenText}
 <b>Група:</b> ${groupName}
 <b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
 <b>Телефон:</b> ${phone}
@@ -1479,11 +1526,12 @@ async function startServer() {
 
       res.json({ 
         success: true, 
-        participant_id: participantId,
+        participant_ids: registeredIds,
         login: parent_login,
         password: rawPassword
       });
     } catch (e) {
+      await pool.query("ROLLBACK");
       console.error(e);
       res.status(500).json({ error: "Failed to register member" });
     }
@@ -1620,7 +1668,7 @@ async function startServer() {
 
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, coach_id, location_id } = req.body;
     
     // Auto-generate credentials if missing
     const finalLogin = parent_login || phone || `parent_${Math.random().toString(36).substring(2, 8)}`;
@@ -1629,8 +1677,8 @@ async function startServer() {
     try {
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
       await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий']
+        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, coach_id, location_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
+        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', coach_id || null, location_id || null]
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -1641,18 +1689,18 @@ async function startServer() {
 
   app.put("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, coach_id, location_id } = req.body;
     try {
       if (parent_password && !parent_password.startsWith('$2a$')) {
         const hashedPassword = await bcrypt.hash(parent_password, 10);
         await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6, payment_status = $7, status = $8, parent_name = $9, phone = $10, belt = $11 WHERE id = $12",
-          [name, age, birthday || null, group_id || null, parent_login, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
+          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6, payment_status = $7, status = $8, parent_name = $9, phone = $10, belt = $11, coach_id = $12, location_id = $13 WHERE id = $14",
+          [name, age, birthday || null, group_id || null, parent_login, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', coach_id || null, location_id || null, req.params.id]
         );
       } else {
         await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, payment_status = $6, status = $7, parent_name = $8, phone = $9, belt = $10 WHERE id = $11",
-          [name, age, birthday || null, group_id || null, parent_login, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
+          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, payment_status = $6, status = $7, parent_name = $8, phone = $9, belt = $10, coach_id = $11, location_id = $12 WHERE id = $13",
+          [name, age, birthday || null, group_id || null, parent_login, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', coach_id || null, location_id || null, req.params.id]
         );
       }
       res.json({ success: true });
@@ -1854,17 +1902,38 @@ async function startServer() {
   });
 
   // Groups
-  app.get("/api/groups", requireAuth, async (req, res) => {
+  app.get("/api/groups", async (req, res) => {
     if (!pool) return res.json([]);
-    const user = (req as any).user;
+    
+    // Optional auth for coach filtering
+    const authHeader = req.headers.authorization;
+    let user: any = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      if (token === ADMIN_TOKEN) {
+        user = { role: 'admin' };
+      } else {
+        try {
+          const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [token.split('-')[0]]);
+          if (result.rows.length > 0) {
+            user = result.rows[0];
+          }
+        } catch (e) {}
+      }
+    }
+
     try {
-      let query = "SELECT * FROM groups";
+      let query = `
+        SELECT g.*, l.name as location_name 
+        FROM groups g
+        LEFT JOIN locations l ON g.location_id = l.id
+      `;
       let params: any[] = [];
-      if (user.role === 'coach' && user.coach_id) {
-        query += " WHERE coach_id = $1";
+      if (user && user.role === 'coach' && user.coach_id) {
+        query += " WHERE g.coach_id = $1";
         params.push(user.coach_id);
       }
-      query += " ORDER BY order_index ASC";
+      query += " ORDER BY g.order_index ASC";
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
@@ -2221,25 +2290,43 @@ async function startServer() {
         [participant_id, date, status]
       );
 
-      // Points logic: +1 for present, -1 if changed from present to absent
+      // Points logic: balanced per week (target 3 points/week)
+      let pointsPerSession = 1.0;
+      const pRes = await pool.query("SELECT group_id FROM participants WHERE id = $1", [participant_id]);
+      if (pRes.rows.length > 0 && pRes.rows[0].group_id) {
+        const sRes = await pool.query("SELECT COUNT(*) FROM schedule WHERE group_id = $1", [pRes.rows[0].group_id]);
+        const count = parseInt(sRes.rows[0].count);
+        if (count > 0) {
+          pointsPerSession = 3.0 / count;
+        }
+      }
+
       if (status === 'present' && (!existing.rows[0] || existing.rows[0].status !== 'present')) {
         await pool.query(
           "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
-          [participant_id, 1, 'attendance', date]
+          [participant_id, pointsPerSession, 'attendance', date]
         );
-        await pool.query("UPDATE participants SET rank_points = rank_points + 1 WHERE id = $1", [participant_id]);
+        await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [pointsPerSession, participant_id]);
       } else if (status === 'absent' && existing.rows[0] && existing.rows[0].status === 'present') {
+        // Find the points awarded previously for this date
+        const logRes = await pool.query(
+          "SELECT points FROM points_log WHERE participant_id = $1 AND date = $2 AND reason = 'attendance' ORDER BY id DESC LIMIT 1",
+          [participant_id, date]
+        );
+        const pointsToRemove = logRes.rows.length > 0 ? parseFloat(logRes.rows[0].points) : pointsPerSession;
+
         await pool.query(
           "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
-          [participant_id, -1, 'attendance_removal', date]
+          [participant_id, -pointsToRemove, 'attendance_removal', date]
         );
-        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1) WHERE id = $1", [participant_id]);
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - $1) WHERE id = $2", [pointsToRemove, participant_id]);
       }
 
       await pool.query("COMMIT");
       res.json({ success: true });
     } catch (e) {
       await pool.query("ROLLBACK");
+      console.error(e);
       res.status(500).json({ error: "Failed to update attendance" });
     }
   });

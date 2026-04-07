@@ -10,7 +10,10 @@ import {
   Users,
   Award,
   Send,
-  Info
+  Info,
+  Plus,
+  Trash2,
+  MapPin
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
@@ -21,16 +24,21 @@ export const RegisterMember = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: '',
-    age: '',
-    birthday: '',
-    group_id: '',
     parent_name: '',
     phone: '',
-    belt: 'Білий'
+    location_id: '',
+    coach_id: '',
+    group_id: '',
+    children: [
+      { name: '', age: '', birthday: '', belt: 'Білий' }
+    ]
   });
 
   useEffect(() => {
@@ -38,24 +46,66 @@ export const RegisterMember = () => {
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
-          // We need groups, but init might only have schedule/locations
-          // Let's try to fetch groups directly if they are not in init
-          if (data.groups && Array.isArray(data.groups)) {
-            setGroups(data.groups);
-          } else {
-            fetch('/api/groups')
-              .then(res => res.json())
-              .then(gData => setGroups(Array.isArray(gData) ? gData : []))
-              .catch(() => setGroups([]));
-          }
+          setSchedule(Array.isArray(data.schedule) ? data.schedule : []);
+          setGroups(Array.isArray(data.groups) ? data.groups : []);
+          setLocations(Array.isArray(data.locations) ? data.locations : []);
+          setCoaches(Array.isArray(data.coaches) ? data.coaches : []);
         }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const addChild = () => {
+    setFormData({
+      ...formData,
+      children: [...formData.children, { name: '', age: '', birthday: '', belt: 'Білий' }]
+    });
+  };
+
+  const removeChild = (index: number) => {
+    if (formData.children.length > 1) {
+      const newChildren = [...formData.children];
+      newChildren.splice(index, 1);
+      setFormData({ ...formData, children: newChildren });
+    }
+  };
+
+  const updateChild = (index: number, field: string, value: string) => {
+    const newChildren = [...formData.children];
+    (newChildren[index] as any)[field] = value;
+    setFormData({ ...formData, children: newChildren });
+  };
+
+  const validateForm = () => {
+    if (!formData.parent_name.trim()) return "Вкажіть ПІБ батьків";
+    
+    // Phone validation: should be at least 10 digits, can include +, -, spaces
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) return "Вкажіть коректний номер телефону (мінімум 10 цифр)";
+    
+    if (!formData.group_id) return "Оберіть групу";
+    
+    for (let i = 0; i < formData.children.length; i++) {
+      const child = formData.children[i];
+      if (!child.name.trim()) return `Вкажіть ПІБ для дитини №${i + 1}`;
+      if (!child.age) return `Вкажіть вік для дитини №${i + 1}`;
+      if (!child.birthday) return `Вкажіть дату народження для дитини №${i + 1}`;
+    }
+    
+    return null;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -65,16 +115,27 @@ export const RegisterMember = () => {
         body: JSON.stringify(formData)
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         setIsSubmitted(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setError(data.message || data.error || 'Помилка реєстрації');
       }
     } catch (err) {
       console.error('Registration failed', err);
+      setError('Сталася помилка при відправці форми. Спробуйте пізніше.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const filteredGroups = groups.filter(g => {
+    const matchLocation = !formData.location_id || g.location_id === parseInt(formData.location_id);
+    const matchCoach = !formData.coach_id || g.coach_id === parseInt(formData.coach_id);
+    return matchLocation && matchCoach;
+  });
 
   if (isSubmitted) {
     return (
@@ -135,106 +196,18 @@ export const RegisterMember = () => {
             onSubmit={handleSubmit}
             className="space-y-12 bg-zinc-900/50 p-8 md:p-12 rounded-[2.5rem] border border-white/5 backdrop-blur-xl"
           >
-            {/* Section 1: Child Info */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-3 text-red-500">
-                <Users size={20} />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em]">Дані про дитину</h3>
-              </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">ПІБ Дитини</label>
-                  <div className="relative">
-                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                    <input 
-                      required
-                      type="text" 
-                      placeholder="Іванов Іван Іванович"
-                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                      value={formData.name}
-                      onChange={e => setFormData({...formData, name: e.target.value})}
-                    />
-                  </div>
-                </div>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="p-4 bg-red-600/10 border border-red-600/20 rounded-2xl text-red-500 text-sm font-bold flex items-center gap-3"
+              >
+                <Info size={18} />
+                {error}
+              </motion.div>
+            )}
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Дата народження</label>
-                  <div className="relative">
-                    <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                    <input 
-                      required
-                      type="date" 
-                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                      value={formData.birthday}
-                      onChange={e => setFormData({...formData, birthday: e.target.value})}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Вік</label>
-                  <input 
-                    required
-                    type="number" 
-                    placeholder="Наприклад: 8"
-                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                    value={formData.age}
-                    onChange={e => setFormData({...formData, age: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Поточний пояс</label>
-                  <div className="relative">
-                    <Award className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                    <select 
-                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                      value={formData.belt}
-                      onChange={e => setFormData({...formData, belt: e.target.value})}
-                    >
-                      <option value="Білий">Білий</option>
-                      <option value="Оранжевий">Оранжевий</option>
-                      <option value="Оранжевий з синьою смужкою">Оранжевий з синьою смужкою</option>
-                      <option value="Синій">Синій</option>
-                      <option value="Синій з жовтою смужкою">Синій з жовтою смужкою</option>
-                      <option value="Жовтий">Жовтий</option>
-                      <option value="Жовтий з зеленою смужкою">Жовтий з зеленою смужкою</option>
-                      <option value="Зелений">Зелений</option>
-                      <option value="Зелений з коричневою смужкою">Зелений з коричневою смужкою</option>
-                      <option value="Коричневий">Коричневий</option>
-                      <option value="Коричневий з чорною смужкою">Коричневий з чорною смужкою</option>
-                      <option value="Чорний">Чорний</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 2: Group & Schedule */}
-            <div className="space-y-8">
-              <div className="flex items-center gap-3 text-red-500">
-                <Calendar size={20} />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em]">Група та графік</h3>
-              </div>
-              
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Оберіть групу</label>
-                <select 
-                  required
-                  className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                  value={formData.group_id}
-                  onChange={e => setFormData({...formData, group_id: e.target.value})}
-                >
-                  <option value="">Оберіть групу зі списку</option>
-                  {Array.isArray(groups) && groups.map(g => (
-                    <option key={g.id} value={g.id}>{g.name} ({g.location_name || 'Локація не вказана'})</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Section 3: Parent Info */}
+            {/* Section 1: Parent Info */}
             <div className="space-y-8">
               <div className="flex items-center gap-3 text-red-500">
                 <Phone size={20} />
@@ -269,6 +242,200 @@ export const RegisterMember = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Section 2: Child Info */}
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 text-red-500">
+                  <Users size={20} />
+                  <h3 className="text-xs font-black uppercase tracking-[0.2em]">Дані про дітей</h3>
+                </div>
+                <button 
+                  type="button"
+                  onClick={addChild}
+                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-400 transition-colors"
+                >
+                  <Plus size={14} />
+                  Додати дитину
+                </button>
+              </div>
+              
+              <div className="space-y-12">
+                {formData.children.map((child, index) => (
+                  <div key={index} className="relative p-6 bg-black/30 rounded-[2rem] border border-white/5 space-y-6">
+                    {formData.children.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => removeChild(index)}
+                        className="absolute right-6 top-6 text-zinc-600 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                    
+                    <div className="flex items-center gap-4 mb-2">
+                      <div className="w-8 h-8 rounded-full bg-red-600/10 border border-red-600/20 flex items-center justify-center text-red-500 text-xs font-black">
+                        {index + 1}
+                      </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Дитина №{index + 1}</span>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">ПІБ Дитини</label>
+                        <div className="relative">
+                          <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <input 
+                            required
+                            type="text" 
+                            placeholder="Іванов Іван Іванович"
+                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                            value={child.name}
+                            onChange={e => updateChild(index, 'name', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Дата народження</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <input 
+                            required
+                            type="date" 
+                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                            value={child.birthday}
+                            onChange={e => updateChild(index, 'birthday', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Вік</label>
+                        <input 
+                          required
+                          type="number" 
+                          placeholder="Наприклад: 8"
+                          className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                          value={child.age}
+                          onChange={e => updateChild(index, 'age', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Поточний пояс</label>
+                        <div className="relative">
+                          <Award className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <select 
+                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                            value={child.belt}
+                            onChange={e => updateChild(index, 'belt', e.target.value)}
+                          >
+                            <option value="Білий">Білий</option>
+                            <option value="Оранжевий">Оранжевий</option>
+                            <option value="Оранжевий з синьою смужкою">Оранжевий з синьою смужкою</option>
+                            <option value="Синій">Синій</option>
+                            <option value="Синій з жовтою смужкою">Синій з жовтою смужкою</option>
+                            <option value="Жовтий">Жовтий</option>
+                            <option value="Жовтий з зеленою смужкою">Жовтий з зеленою смужкою</option>
+                            <option value="Зелений">Зелений</option>
+                            <option value="Зелений з коричневою смужкою">Зелений з коричневою смужкою</option>
+                            <option value="Коричневий">Коричневий</option>
+                            <option value="Коричневий з чорною смужкою">Коричневий з чорною смужкою</option>
+                            <option value="Чорний">Чорний</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Section 3: Group & Schedule */}
+            <div className="space-y-8">
+              <div className="flex items-center gap-3 text-red-500">
+                <Calendar size={20} />
+                <h3 className="text-xs font-black uppercase tracking-[0.2em]">Локація та група</h3>
+              </div>
+              
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Локація</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    <select 
+                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                      value={formData.location_id}
+                      onChange={e => setFormData({...formData, location_id: e.target.value, group_id: ''})}
+                    >
+                      <option value="">Всі локації</option>
+                      {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Тренер</label>
+                  <div className="relative">
+                    <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    <select 
+                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                      value={formData.coach_id}
+                      onChange={e => setFormData({...formData, coach_id: e.target.value, group_id: ''})}
+                    >
+                      <option value="">Всі тренери</option>
+                      {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Оберіть групу</label>
+                <select 
+                  required
+                  className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                  value={formData.group_id}
+                  onChange={e => setFormData({...formData, group_id: e.target.value})}
+                >
+                  <option value="">Оберіть групу зі списку</option>
+                  {filteredGroups.map(g => (
+                    <option key={g.id} value={g.id}>{g.name} ({g.location_name || 'Локація не вказана'})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Display schedule for the selected group */}
+              <AnimatePresence>
+                {formData.group_id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="bg-zinc-900/80 rounded-3xl p-6 border border-white/5 space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-red-500">Графік занять обраної групи:</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {schedule
+                          .filter(s => s.group_id === parseInt(formData.group_id))
+                          .map((s, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-black/40 rounded-xl border border-white/5">
+                              <span className="text-xs font-bold">{s.day_of_week}</span>
+                              <span className="text-xs text-zinc-400 font-mono">{s.start_time} - {s.end_time}</span>
+                            </div>
+                          ))
+                        }
+                        {schedule.filter(s => s.group_id === parseInt(formData.group_id)).length === 0 && (
+                          <p className="text-xs text-zinc-500 italic col-span-full py-2">Графік для цієї групи ще не встановлено</p>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="pt-6">

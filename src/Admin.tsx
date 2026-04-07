@@ -1941,6 +1941,8 @@ const AdminUsersEditor = () => {
 const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: { initialAction?: string | null, onActionComplete?: () => void, role: string, coachId: number | null }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [coaches, setCoaches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingParticipant, setEditingParticipant] = useState<any | null>(null);
   const [search, setSearch] = useState('');
@@ -1956,16 +1958,22 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
     try {
-      const [pRes, gRes] = await Promise.all([
+      const [pRes, gRes, lRes, cRes] = await Promise.all([
         fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/locations', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
       ]);
       setParticipants(Array.isArray(pRes) ? pRes : []);
       setGroups(Array.isArray(gRes) ? gRes : []);
+      setLocations(Array.isArray(lRes) ? lRes : []);
+      setCoaches(Array.isArray(cRes) ? cRes : []);
     } catch (e) {
       console.error('Fetch participants failed', e);
       setParticipants([]);
       setGroups([]);
+      setLocations([]);
+      setCoaches([]);
     }
     setLoading(false);
   };
@@ -1979,7 +1987,13 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       setEditingParticipant({ 
         name: '', 
         age: '', 
+        birthday: '',
         group_id: groups[0]?.id || '', 
+        coach_id: coaches[0]?.id || '',
+        location_id: locations[0]?.id || '',
+        parent_name: '',
+        phone: '',
+        belt: 'Білий',
         parent_login: '', 
         parent_password: '',
         payment_status: 'unpaid',
@@ -2387,13 +2401,41 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Локація</label>
+                  <select 
+                    value={editingParticipant.location_id || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, location_id: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  >
+                    <option value="">Оберіть локацію</option>
+                    {locations.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Тренер</label>
+                  <select 
+                    value={editingParticipant.coach_id || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, coach_id: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  >
+                    <option value="">Оберіть тренера</option>
+                    {coaches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                <div>
                   <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Група</label>
                   <select 
                     value={editingParticipant.group_id}
                     onChange={e => setEditingParticipant({...editingParticipant, group_id: e.target.value})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
-                    {Array.isArray(groups) && groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    <option value="">Оберіть групу</option>
+                    {Array.isArray(groups) && groups
+                      .filter(g => (!editingParticipant.location_id || g.location_id === parseInt(editingParticipant.location_id)) && 
+                                   (!editingParticipant.coach_id || g.coach_id === parseInt(editingParticipant.coach_id)))
+                      .map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -3696,6 +3738,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   const [schedule, setSchedule] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [coaches, setCoaches] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, group_name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -3703,17 +3746,20 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   const fetchData = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const [sRes, lRes, cRes] = await Promise.all([
+      const [sRes, lRes, cRes, gRes] = await Promise.all([
         fetch('/api/admin/schedule', { headers: { 'Authorization': `Bearer ${token}` } }),
         fetch('/api/locations', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch('/api/coaches', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } })
       ]);
       const sData = await sRes.json();
       const lData = await lRes.json();
       const cData = await cRes.json();
+      const gData = await gRes.json();
       
       setSchedule(Array.isArray(sData) ? sData : []);
       setLocations(Array.isArray(lData) ? lData : []);
+      setGroups(Array.isArray(gData) ? gData : []);
       
       let filteredCoaches = Array.isArray(cData) ? cData : [];
       if (role === 'coach' && coachId) {
@@ -3724,6 +3770,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
       setSchedule([]);
       setLocations([]);
       setCoaches([]);
+      setGroups([]);
     }
   };
 
@@ -3919,7 +3966,18 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
               </div>
             </div>
             <div>
-              <label className="block text-sm font-bold text-zinc-300 mb-2">Група</label>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Група (з адмінки)</label>
+              <select 
+                value={editingEntry.group_id || ''} 
+                onChange={e => setEditingEntry({...editingEntry, group_id: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl p-4 text-white outline-none"
+              >
+                <option value="">Оберіть групу</option>
+                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-zinc-300 mb-2">Назва групи (вільно)</label>
               <input 
                 type="text" 
                 value={editingEntry.group_name} 
