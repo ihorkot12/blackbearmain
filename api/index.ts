@@ -122,6 +122,23 @@ try { db.prepare("ALTER TABLE leads ADD COLUMN source TEXT").run(); } catch (e) 
 try { db.prepare("ALTER TABLE leads ADD COLUMN age_group TEXT").run(); } catch (e) {}
 try { db.prepare("ALTER TABLE leads ADD COLUMN location TEXT").run(); } catch (e) {}
 
+// Seed default content if empty
+const contentCount: any = db.prepare('SELECT COUNT(*) as count FROM site_content').get();
+if (contentCount.count === 0) {
+  const defaults = {
+    hero_title: "Формуємо дисципліну,<br />силу та впевненість.",
+    hero_subtitle: "Професійна секція карате Київ під керівництвом 3 дану. 5+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи.",
+    hero_button: "Записатися на пробне",
+    modern_title: 'Ваша дитина проводить занадто багато часу в <span class="text-zinc-600">гаджетах?</span>',
+    modern_description: "Сучасний світ пропонує дітям пасивний відпочинок, що веде до слабкої дисципліни, невпевненості та відсутності фізичної активності.",
+    modern_label: "Виклики сучасності"
+  };
+  const stmt = db.prepare('INSERT INTO site_content (key, value) VALUES (?, ?)');
+  Object.entries(defaults).forEach(([key, value]) => {
+    stmt.run(key, value);
+  });
+}
+
 // Seed default admin if not exists
 const adminExists = db.prepare('SELECT * FROM admin_users WHERE login = ?').get('ihorkot12');
 if (!adminExists) {
@@ -136,6 +153,119 @@ app.use(session({
   saveUninitialized: true,
   cookie: { secure: false }
 }));
+
+app.get('/api/check-auth', (req, res) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer mock_token_')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const userId = authHeader.replace('Bearer mock_token_', '');
+  const user: any = db.prepare('SELECT * FROM admin_users WHERE id = ?').get(userId);
+  if (user) {
+    res.json({
+      id: user.id,
+      login: user.login,
+      role: user.role,
+      name: user.name
+    });
+  } else {
+    res.status(401).json({ error: 'User not found' });
+  }
+});
+
+app.get('/api/content', (req, res) => {
+  const content = db.prepare('SELECT * FROM site_content').all();
+  const contentMap = content.reduce((acc: any, item: any) => {
+    acc[item.key] = item.value;
+    return acc;
+  }, {});
+  res.json(contentMap);
+});
+
+app.post('/api/content', (req, res) => {
+  const payload = req.body;
+  const stmt = db.prepare('INSERT OR REPLACE INTO site_content (key, value) VALUES (?, ?)');
+  const transaction = db.transaction((data) => {
+    for (const [key, value] of Object.entries(data)) {
+      stmt.run(key, value);
+    }
+  });
+  transaction(payload);
+  res.json({ success: true });
+});
+
+app.post('/api/upload', (req, res) => {
+  const { image } = req.body;
+  // In a real app, we'd save to disk or S3. 
+  // For now, we'll just return the base64 as the "URL" or a mock URL if it's too large.
+  // But better-sqlite3 can handle large strings.
+  res.json({ url: image });
+});
+
+app.get('/api/groups', (req, res) => {
+  const groups = db.prepare(`
+    SELECT l.id, l.name as group_name, l.address, COUNT(p.id) as participant_count
+    FROM locations l
+    LEFT JOIN participants p ON l.id = p.location_id
+    GROUP BY l.id
+  `).all();
+  res.json(groups);
+});
+
+app.get('/api/admin/users', (req, res) => {
+  const users = db.prepare('SELECT id, login, role, name FROM admin_users').all();
+  res.json(users);
+});
+
+app.delete('/api/leads/delete-all', (req, res) => {
+  db.prepare('DELETE FROM leads').run();
+  res.json({ success: true });
+});
+
+app.get('/api/admin/schedule', (req, res) => {
+  const schedule = db.prepare(`
+    SELECT s.*, l.name as location_name, c.name as coach_name
+    FROM schedule s
+    JOIN locations l ON s.location_id = l.id
+    JOIN coaches c ON s.coach_id = c.id
+  `).all();
+  res.json(schedule);
+});
+
+app.get('/api/settings', (req, res) => {
+  const settings = db.prepare('SELECT * FROM site_content WHERE key LIKE "settings_%"').all();
+  const settingsMap = settings.reduce((acc: any, item: any) => {
+    acc[item.key] = item.value;
+    return acc;
+  }, {});
+  res.json(settingsMap);
+});
+
+app.post('/api/settings', (req, res) => {
+  const payload = req.body;
+  const stmt = db.prepare('INSERT OR REPLACE INTO site_content (key, value) VALUES (?, ?)');
+  const transaction = db.transaction((data) => {
+    for (const [key, value] of Object.entries(data)) {
+      stmt.run(key, value);
+    }
+  });
+  transaction(payload);
+  res.json({ success: true });
+});
+
+app.get('/api/attendance', (req, res) => {
+  // Mock attendance data or implement table if needed
+  res.json([]);
+});
+
+app.post('/api/attendance', (req, res) => {
+  res.json({ success: true });
+});
+
+app.get('/api/badges', (req, res) => res.json([]));
+app.get('/api/competitions', (req, res) => res.json([]));
+app.post('/api/auth/change-password', (req, res) => res.json({ success: true }));
+app.post('/api/participants/import', (req, res) => res.json({ success: true }));
 
 // API Routes
 app.get('/api/init', (req, res) => {
