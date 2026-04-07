@@ -1,7 +1,6 @@
 import express from 'express';
 import Database from 'better-sqlite3';
 import path from 'path';
-import { createServer as createViteServer } from 'vite';
 import bcrypt from 'bcryptjs';
 import session from 'express-session';
 import fetch from 'node-fetch';
@@ -417,6 +416,8 @@ app.get('/api/locations', (req, res) => {
 
 // Vite middleware for development
 if (process.env.NODE_ENV !== 'production') {
+  const viteModuleName = 'vite';
+  const { createServer: createViteServer } = await import(viteModuleName);
   const vite = await createViteServer({
     server: { middlewareMode: true },
     appType: 'spa',
