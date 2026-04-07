@@ -18,6 +18,7 @@ const JuniorLanding = lazy(() => import('./JuniorLanding').then(m => ({ default:
 const TeenLanding = lazy(() => import('./TeenLanding').then(m => ({ default: m.TeenLanding })));
 const PersonalLanding = lazy(() => import('./PersonalLanding').then(m => ({ default: m.PersonalLanding })));
 const WomenLanding = lazy(() => import('./WomenLanding').then(m => ({ default: m.WomenLanding })));
+const RegisterMember = lazy(() => import('./RegisterMember').then(m => ({ default: m.RegisterMember })));
 
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
@@ -253,6 +254,7 @@ export default function App() {
           <Route path="/teens-12-plus" element={<TeenLanding />} />
           <Route path="/personal-training" element={<PersonalLanding />} />
           <Route path="/women-karate" element={<WomenLanding />} />
+          <Route path="/register-member" element={<RegisterMember />} />
         </Routes>
       </Suspense>
     </>

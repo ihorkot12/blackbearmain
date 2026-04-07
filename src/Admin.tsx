@@ -7,7 +7,7 @@ import {
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard
+  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard, Download
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -1964,6 +1964,8 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       setGroups(Array.isArray(gRes) ? gRes : []);
     } catch (e) {
       console.error('Fetch participants failed', e);
+      setParticipants([]);
+      setGroups([]);
     }
     setLoading(false);
   };
@@ -2070,6 +2072,28 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
     setImportLoading(false);
   };
 
+  const handleExport = async () => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/participants/export', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'participants.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        toast.success('Експорт завершено');
+      }
+    } catch (e) {
+      toast.error('Помилка експорту');
+    }
+  };
+
   const filtered = participants.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -2078,8 +2102,22 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         <div>
           <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Учасники</h2>
           <p className="text-zinc-500 font-medium text-sm lg:text-base">Керування базою учнів клубу</p>
+          <div className="mt-4 p-3 bg-zinc-900/50 rounded-xl border border-white/5 inline-flex items-center gap-3">
+            <Link size={14} className="text-red-600" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Лінк для реєстрації:</span>
+            <code className="text-[10px] font-mono text-zinc-300 bg-black px-2 py-1 rounded select-all">
+              {window.location.origin}/register-member
+            </code>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 w-full lg:w-auto">
+          <button 
+            onClick={handleExport}
+            className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-white/5 flex items-center justify-center gap-3"
+          >
+            <Download size={16} />
+            Експорт
+          </button>
           <button 
             onClick={() => setShowImportModal(true)}
             className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-white/5 flex items-center justify-center gap-3"
@@ -2093,6 +2131,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               age: '', 
               birthday: '',
               group_id: groups[0]?.id || '', 
+              parent_name: '',
+              phone: '',
+              belt: 'Білий',
               parent_login: '', 
               parent_password: '',
               payment_status: 'unpaid',
@@ -2267,7 +2308,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                 >
                   <option value="">Без групи (автоматично)</option>
-                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  {Array.isArray(groups) && groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
 
@@ -2352,8 +2393,49 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                     onChange={e => setEditingParticipant({...editingParticipant, group_id: e.target.value})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
-                    {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                    {Array.isArray(groups) && groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пояс</label>
+                  <select 
+                    value={editingParticipant.belt || 'Білий'}
+                    onChange={e => setEditingParticipant({...editingParticipant, belt: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  >
+                    <option value="Білий">Білий</option>
+                    <option value="Оранжевий">Оранжевий</option>
+                    <option value="Оранжевий з синьою смужкою">Оранжевий з синьою смужкою</option>
+                    <option value="Синій">Синій</option>
+                    <option value="Синій з жовтою смужкою">Синій з жовтою смужкою</option>
+                    <option value="Жовтий">Жовтий</option>
+                    <option value="Жовтий з зеленою смужкою">Жовтий з зеленою смужкою</option>
+                    <option value="Зелений">Зелений</option>
+                    <option value="Зелений з коричневою смужкою">Зелений з коричневою смужкою</option>
+                    <option value="Коричневий">Коричневий</option>
+                    <option value="Коричневий з чорною смужкою">Коричневий з чорною смужкою</option>
+                    <option value="Чорний">Чорний</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">ПІБ Батьків</label>
+                  <input 
+                    type="text" 
+                    value={editingParticipant.parent_name || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, parent_name: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Телефон</label>
+                  <input 
+                    type="text" 
+                    value={editingParticipant.phone || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, phone: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
@@ -2558,7 +2640,10 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
   const [activeSection, setActiveSection] = useState('hero');
 
   useEffect(() => {
-    fetch(`/api/content?t=${Date.now()}`).then(res => res.json()).then(setContent);
+    const token = localStorage.getItem('admin_token');
+    fetch(`/api/content?t=${Date.now()}`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    }).then(res => res.json()).then(setContent);
   }, []);
 
   useEffect(() => {
@@ -2606,7 +2691,9 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
       sessionStorage.removeItem('site_init_data');
       
       // Re-fetch content to get URLs instead of base64 strings
-      const freshContent = await fetch(`/api/content?t=${Date.now()}`).then(res => res.json());
+      const freshContent = await fetch(`/api/content?t=${Date.now()}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      }).then(res => res.json());
       setContent(freshContent);
     } catch (e: any) {
       console.error('Save failed', e);
@@ -3566,7 +3653,7 @@ const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null 
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {groups.map((group) => (
+            {Array.isArray(groups) && groups.map((group) => (
               <tr key={group.id} className="group hover:bg-white/[0.02] transition-colors">
                 <td className="px-10 py-8 font-bold">{group.name}</td>
                 <td className="px-10 py-8 text-zinc-400">{locations.find(l => l.id === group.location_id)?.name || '—'}</td>
@@ -4159,6 +4246,71 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
               ))}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Debtors Section */}
+      <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">
+        <div className="p-8 border-b border-white/5 flex justify-between items-center">
+          <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+            <AlertCircle className="text-red-600" size={24} />
+            Боржники
+          </h3>
+          <span className="px-4 py-2 bg-red-600/10 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest">
+            {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length} учнів
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Учень</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Група</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Телефон</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Дії</th>
+              </tr>
+            </thead>
+            <tbody>
+              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').map(p => (
+                <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                  <td className="px-8 py-6">
+                    <p className="font-bold text-white">{p.name}</p>
+                    <p className="text-[10px] text-zinc-500">{p.parent_name || '—'}</p>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className="px-3 py-1 bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase rounded-full">
+                      {p.group_name || 'Без групи'}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <p className="text-sm font-medium text-zinc-400">{p.phone || '—'}</p>
+                  </td>
+                  <td className="px-8 py-6 text-right">
+                    <button 
+                      onClick={() => {
+                        setNewPayment({
+                          ...newPayment,
+                          participant_id: p.id.toString(),
+                          amount: '1500' // Default amount or fetch from group
+                        });
+                        setIsAddingPayment(true);
+                      }}
+                      className="text-red-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-colors"
+                    >
+                      Оплатити
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-8 py-12 text-center text-zinc-500 font-medium">
+                    Боржників не знайдено. Всі оплати вчасно!
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

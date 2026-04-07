@@ -184,6 +184,8 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS rank_points INTEGER DEFAULT 0;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS parent_name TEXT;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS phone TEXT;
 
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS value DECIMAL(10, 2) DEFAULT 0;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
@@ -574,6 +576,18 @@ async function startServer() {
   app.post("/api/leads", leadLimiter, async (req, res) => {
     const { name, phone, age_group, location, event_id, source } = req.body;
     console.log(`New lead submission: ${name}, ${phone}, source: ${source}`);
+    
+    const sourceMap: Record<string, string> = {
+      'main': 'Головна сторінка',
+      'kids_landing': 'Діти (4-7 років)',
+      'junior_landing': 'Юніори (7-12 років)',
+      'teen_landing': 'Підлітки (12+ років)',
+      'personal_landing': 'Індивідуальні тренування',
+      'women_landing': 'Жіноче карате'
+    };
+
+    const sourceName = sourceMap[source] || source || 'Головна';
+
     try {
       if (pool) {
         await pool.query("INSERT INTO leads (name, phone, age_group, location) VALUES ($1, $2, $3, $4)", [name, phone, age_group, location]);
@@ -584,7 +598,7 @@ async function startServer() {
       
       const message = `
 <b>🔔 Нова заявка на пробне заняття!</b>
-<b>Джерело:</b> ${source || 'Головна'}
+<b>Джерело:</b> ${sourceName}
 <b>Ім'я:</b> ${name}
 <b>Телефон:</b> ${phone}
 <b>Вікова група:</b> ${age_group}
@@ -860,7 +874,7 @@ async function startServer() {
     if (!pool) return res.json({ content: {}, coaches: [], locations: [], schedule: [] });
     
     try {
-      const [contentRes, coachesRes, locationsRes, scheduleRes] = await Promise.all([
+      const [contentRes, coachesRes, locationsRes, scheduleRes, groupsRes] = await Promise.all([
         pool.query(`
           SELECT key, 
                  CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
@@ -880,7 +894,8 @@ async function startServer() {
           FROM schedule s
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
-        `)
+        `),
+        pool.query("SELECT * FROM groups")
       ]);
 
       const content = contentRes.rows.reduce((acc, item) => {
@@ -911,7 +926,8 @@ async function startServer() {
         content,
         coaches,
         locations: locationsRes.rows,
-        schedule: scheduleRes.rows
+        schedule: scheduleRes.rows,
+        groups: groupsRes.rows
       };
 
       // Update caches
@@ -1397,6 +1413,82 @@ async function startServer() {
     res.json({ success: true, message: 'Password change simulated. Please update ADMIN_PASSWORD in your environment variables for a permanent change.' });
   });
 
+  app.get("/api/participants/export", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query(`
+        SELECT p.id, p.name, p.age, p.birthday, p.belt, p.rank_points, p.payment_status, p.status, p.parent_name, p.phone, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        ORDER BY p.name ASC
+      `);
+      
+      const worksheet = xlsx.utils.json_to_sheet(result.rows);
+      const workbook = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(workbook, worksheet, "Participants");
+      
+      const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename=participants.xlsx');
+      res.send(buffer);
+    } catch (e) {
+      console.error('Export failed:', e);
+      res.status(500).json({ error: "Failed to export participants" });
+    }
+  });
+
+  app.post("/api/register-member", async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { name, age, birthday, group_id, parent_name, phone, belt } = req.body;
+    
+    // Auto-generate credentials
+    const parent_login = phone || `user_${Math.random().toString(36).substring(2, 8)}`;
+    const rawPassword = Math.random().toString(36).substring(2, 10);
+    
+    try {
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+      const result = await pool.query(
+        "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
+        [name, age, birthday || null, group_id || null, parent_name, phone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'active']
+      );
+      
+      const participantId = result.rows[0].id;
+      
+      // Get group info for notification
+      let groupName = 'Не вказано';
+      if (group_id) {
+        const gRes = await pool.query("SELECT name FROM groups WHERE id = $1", [group_id]);
+        if (gRes.rows.length > 0) groupName = gRes.rows[0].name;
+      }
+
+      // Send Telegram notification
+      const message = `
+<b>🆕 Нова реєстрація члена клубу!</b>
+<b>Дитина:</b> ${name}
+<b>Вік:</b> ${age}
+<b>Пояс:</b> ${belt || 'Білий'}
+<b>Група:</b> ${groupName}
+<b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
+<b>Телефон:</b> ${phone}
+<b>Логін:</b> ${parent_login}
+<b>Пароль:</b> ${rawPassword}
+      `;
+      
+      sendTelegramMessage(message).catch(err => console.error('Telegram notification failed:', err));
+
+      res.json({ 
+        success: true, 
+        participant_id: participantId,
+        login: parent_login,
+        password: rawPassword
+      });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to register member" });
+    }
+  });
+
   // Participants
   const upload = multer({ storage: multer.memoryStorage() });
 
@@ -1528,17 +1620,17 @@ async function startServer() {
 
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
     
     // Auto-generate credentials if missing
-    const finalLogin = parent_login || `parent_${Math.random().toString(36).substring(2, 8)}`;
+    const finalLogin = parent_login || phone || `parent_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = parent_password || Math.random().toString(36).substring(2, 10);
     
     try {
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
       await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active']
+        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий']
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -1549,18 +1641,18 @@ async function startServer() {
 
   app.put("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
     try {
       if (parent_password && !parent_password.startsWith('$2a$')) {
         const hashedPassword = await bcrypt.hash(parent_password, 10);
         await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6, payment_status = $7, status = $8 WHERE id = $9",
-          [name, age, birthday || null, group_id || null, parent_login, hashedPassword, payment_status || 'unpaid', status || 'active', req.params.id]
+          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6, payment_status = $7, status = $8, parent_name = $9, phone = $10, belt = $11 WHERE id = $12",
+          [name, age, birthday || null, group_id || null, parent_login, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
         );
       } else {
         await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, payment_status = $6, status = $7 WHERE id = $8",
-          [name, age, birthday || null, group_id || null, parent_login, payment_status || 'unpaid', status || 'active', req.params.id]
+          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, payment_status = $6, status = $7, parent_name = $8, phone = $9, belt = $10 WHERE id = $11",
+          [name, age, birthday || null, group_id || null, parent_login, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
         );
       }
       res.json({ success: true });
