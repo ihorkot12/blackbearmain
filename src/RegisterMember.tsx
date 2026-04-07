@@ -80,9 +80,9 @@ export const RegisterMember = () => {
   const validateForm = () => {
     if (!formData.parent_name.trim()) return "Вкажіть ПІБ батьків";
     
-    // Phone validation: should be at least 10 digits, can include +, -, spaces
+    // Phone validation: should be at least 10 digits
     const phoneDigits = formData.phone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) return "Вкажіть коректний номер телефону (мінімум 10 цифр)";
+    if (phoneDigits.length < 10) return "Будь ласка, введіть коректний номер телефону (мінімум 10 цифр)";
     
     if (!formData.group_id) return "Оберіть групу";
     
@@ -109,10 +109,16 @@ export const RegisterMember = () => {
     setIsSubmitting(true);
 
     try {
+      // Sanitize phone for backend (keep only digits for login consistency)
+      const sanitizedData = {
+        ...formData,
+        phone: formData.phone.replace(/\D/g, '')
+      };
+
       const res = await fetch('/api/register-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(sanitizedData)
       });
 
       const data = await res.json();
@@ -230,16 +236,27 @@ export const RegisterMember = () => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Номер телефону</label>
                   <div className="relative">
-                    <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    <Phone className={`absolute left-5 top-1/2 -translate-y-1/2 transition-colors ${formData.phone.replace(/\D/g, '').length >= 10 ? 'text-green-500' : 'text-zinc-600'}`} size={18} />
                     <input 
                       required
-                      type="tel" 
+                      type="text" 
                       placeholder="+380..."
-                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                      maxLength={20}
+                      className={`w-full h-[64px] bg-black border rounded-2xl px-14 text-sm transition-all outline-none ${
+                        formData.phone.replace(/\D/g, '').length >= 10 
+                          ? 'border-green-500/50 focus:border-green-500 focus:ring-green-500' 
+                          : 'border-white/5 focus:border-red-600 focus:ring-red-600'
+                      }`}
                       value={formData.phone}
-                      onChange={e => setFormData({...formData, phone: e.target.value})}
+                      onChange={e => {
+                        let val = e.target.value;
+                        // Allow digits, spaces, parentheses, dashes, and plus
+                        const cleaned = val.replace(/[^\d\s()+-]/g, '');
+                        setFormData({...formData, phone: cleaned});
+                      }}
                     />
                   </div>
+                  <p className="text-[9px] text-zinc-600 ml-4 mt-1 uppercase font-bold tracking-widest">Це буде ваш логін для входу</p>
                 </div>
               </div>
             </div>

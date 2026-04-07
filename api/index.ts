@@ -110,7 +110,7 @@ async function initDb() {
         group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
         coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
         location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
-        parent_login TEXT UNIQUE,
+        parent_login TEXT,
         parent_password TEXT,
         belt TEXT DEFAULT 'Білий',
         rank_points DECIMAL(10, 2) DEFAULT 0,
@@ -191,6 +191,7 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS parent_name TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS phone TEXT;
+      ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key;
 
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS value DECIMAL(10, 2) DEFAULT 0;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
