@@ -386,8 +386,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       phone: formData.get('phone'),
       age_group: formData.get('age'),
       location: formData.get('location'),
-      event_id: eventId,
-      source: 'main'
+      event_id: eventId
     };
 
     try {
