@@ -421,6 +421,7 @@ async function startServer() {
   
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.set('trust proxy', 1);
 
   const normalizePhone = (phone: string) => {
     if (!phone) return phone;
@@ -1326,28 +1327,42 @@ async function startServer() {
 
       // Check if it's a parent login
       const normalizedLogin = normalizePhone(login);
+      console.log(`Parent login attempt: ${login} (normalized: ${normalizedLogin})`);
+      
       const parentUsers = await pool.query(
-        "SELECT id, name, parent_password FROM participants WHERE parent_login = $1 OR parent_login = $2 OR REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') = $1", 
+        `SELECT id, name, parent_password, phone, parent_login 
+         FROM participants 
+         WHERE parent_login = $1 
+            OR parent_login = $2 
+            OR phone = $1 
+            OR phone = $2 
+            OR REGEXP_REPLACE(parent_login, '[^\\d]', '', 'g') = REGEXP_REPLACE($1, '[^\\d]', '', 'g')
+            OR REGEXP_REPLACE(phone, '[^\\d]', '', 'g') = REGEXP_REPLACE($1, '[^\\d]', '', 'g')`, 
         [normalizedLogin, login]
       );
       
       if (parentUsers.rows.length > 0) {
+        console.log(`Found ${parentUsers.rows.length} potential parent matches`);
         for (const user of parentUsers.rows) {
           let isMatch = false;
           try {
-            isMatch = await bcrypt.compare(password, user.parent_password);
+            if (user.parent_password) {
+              isMatch = await bcrypt.compare(password, user.parent_password);
+            }
           } catch (e) {
             isMatch = password === user.parent_password;
           }
 
           if (isMatch) {
-            console.log(`Login successful (Parent: ${user.name})`);
+            console.log(`Login successful (Parent: ${user.name}, ID: ${user.id})`);
             (req.session as any).participantId = user.id;
-            return req.session.save(() => {
-              res.json({ success: true, role: 'parent', name: user.name });
+            return req.session.save((err) => {
+              if (err) console.error('Session save error:', err);
+              res.json({ success: true, role: 'parent', name: user.name, id: user.id });
             });
           }
         }
+        console.log('No password match found for any potential parent record');
       }
 
       console.log('Login failed: Invalid credentials');
@@ -1671,23 +1686,36 @@ ${childrenList}
 
   app.put("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
+    
     try {
-      if (parent_password && !parent_password.startsWith('$2a$')) {
-        const hashedPassword = await bcrypt.hash(parent_password, 10);
-        await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, parent_password = $6, payment_status = $7, status = $8, parent_name = $9, phone = $10, belt = $11 WHERE id = $12",
-          [name, age, birthday || null, group_id || null, parent_login, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
-        );
-      } else {
-        await pool.query(
-          "UPDATE participants SET name = $1, age = $2, birthday = $3, group_id = $4, parent_login = $5, payment_status = $6, status = $7, parent_name = $8, phone = $9, belt = $10 WHERE id = $11",
-          [name, age, birthday || null, group_id || null, parent_login, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', req.params.id]
-        );
+      const updateData = { ...req.body };
+      
+      // Handle password hashing if provided
+      if (updateData.parent_password && !updateData.parent_password.startsWith('$2a$')) {
+        updateData.parent_password = await bcrypt.hash(updateData.parent_password, 10);
       }
+
+      // Handle empty birthday
+      if (updateData.birthday === '') updateData.birthday = null;
+
+      const keys = Object.keys(updateData).filter(key => updateData[key] !== undefined);
+      
+      if (keys.length === 0) {
+        return res.json({ success: true, message: "No fields to update" });
+      }
+
+      const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
+      const values = keys.map(key => updateData[key]);
+      values.push(req.params.id);
+
+      await pool.query(
+        `UPDATE participants SET ${setClause} WHERE id = $${values.length}`,
+        values
+      );
+
       res.json({ success: true });
     } catch (e) {
-      console.error(e);
+      console.error('Update participant failed:', e);
       res.status(500).json({ error: "Failed to update participant" });
     }
   });
