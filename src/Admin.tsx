@@ -94,27 +94,72 @@ export const LoginPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="max-w-md w-full bg-zinc-900 p-8 rounded-2xl border border-white/10">
-        <h2 className="text-2xl font-bold text-white text-center mb-6">Вхід для адміністратора</h2>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6">
+      <div className="max-w-md w-full bg-zinc-900 p-8 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl -mr-16 -mt-16" />
+        
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
+            <Shield size={32} className="text-white" />
+          </div>
+          <h2 className="text-2xl font-black uppercase tracking-tight text-white">Вхід до кабінету</h2>
+          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Black Bear Dojo</p>
+        </div>
+
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Логін</label>
-            <input type="text" value={login} onChange={e => setLogin(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg px-4 py-2 text-white" />
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Логін (телефон)</label>
+            <input 
+              type="text" 
+              placeholder="+380..."
+              value={login} 
+              onChange={e => setLogin(e.target.value)} 
+              className="w-full bg-black border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-red-600/50 outline-none transition-all placeholder:text-zinc-800" 
+            />
           </div>
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Пароль</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black border border-white/10 rounded-lg px-4 py-2 text-white" />
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Пароль</label>
+            <input 
+              type="password" 
+              placeholder="••••••••"
+              value={password} 
+              onChange={e => setPassword(e.target.value)} 
+              className="w-full bg-black border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-red-600/50 outline-none transition-all placeholder:text-zinc-800" 
+            />
           </div>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
-          <div className="flex flex-col gap-4">
-            <button type="submit" className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">Увійти</button>
+          
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-red-600/10 border border-red-600/20 rounded-xl text-red-500 text-xs font-bold text-center"
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <div className="flex flex-col gap-3 pt-2">
+            <button 
+              type="submit" 
+              className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-[0.98]"
+            >
+              Увійти
+            </button>
+            
+            <button 
+              type="button"
+              onClick={() => navigate('/register-member')}
+              className="w-full bg-white/5 text-white font-black uppercase tracking-widest text-[10px] py-5 rounded-2xl hover:bg-white/10 transition-all border border-white/5"
+            >
+              Реєстрація дитини
+            </button>
           </div>
         </form>
-        <div className="mt-6 pt-6 border-t border-white/5">
+
+        <div className="mt-8 pt-6 border-t border-white/5">
           <button 
             onClick={() => navigate('/')}
-            className="w-full text-zinc-500 hover:text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+            className="w-full text-zinc-600 hover:text-white text-[10px] font-black uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2"
           >
             ← На головну
           </button>

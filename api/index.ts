@@ -105,8 +105,10 @@ async function initDb() {
       // Ensure parent_login is not unique to allow multiple children per parent
       try {
         await pool.query("ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key");
+        // Normalize existing parent_login values (remove spaces, dashes, etc.)
+        await pool.query("UPDATE participants SET parent_login = REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') WHERE parent_login IS NOT NULL AND parent_login ~ '[^\\d+]'");
       } catch (e) {
-        console.log("Note: Could not drop unique constraint, it might not exist or have a different name.");
+        console.log("Note: Could not update participants table constraints or data.", e);
       }
 
       CREATE TABLE IF NOT EXISTS participants (
@@ -420,10 +422,16 @@ async function startServer() {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+  const normalizePhone = (phone: string) => {
+    if (!phone) return phone;
+    // Remove all non-digits except +
+    return phone.replace(/[^\d+]/g, '');
+  };
+
   app.use(session({
     secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
+    resave: true,
+    saveUninitialized: true,
     cookie: { 
       secure: true, 
       httpOnly: true, 
@@ -1317,21 +1325,28 @@ async function startServer() {
       }
 
       // Check if it's a parent login
-      const parentUser = await pool.query("SELECT id, name, parent_password FROM participants WHERE parent_login = $1", [login]);
-      if (parentUser.rows.length > 0) {
-        const user = parentUser.rows[0];
-        
-        let isMatch = false;
-        try {
-          isMatch = await bcrypt.compare(password, user.parent_password);
-        } catch (e) {
-          isMatch = password === user.parent_password;
-        }
+      const normalizedLogin = normalizePhone(login);
+      const parentUsers = await pool.query(
+        "SELECT id, name, parent_password FROM participants WHERE parent_login = $1 OR parent_login = $2 OR REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') = $1", 
+        [normalizedLogin, login]
+      );
+      
+      if (parentUsers.rows.length > 0) {
+        for (const user of parentUsers.rows) {
+          let isMatch = false;
+          try {
+            isMatch = await bcrypt.compare(password, user.parent_password);
+          } catch (e) {
+            isMatch = password === user.parent_password;
+          }
 
-        if (isMatch) {
-          console.log('Login successful (Parent)');
-          (req.session as any).participantId = user.id;
-          return res.json({ success: true, role: 'parent', name: user.name });
+          if (isMatch) {
+            console.log(`Login successful (Parent: ${user.name})`);
+            (req.session as any).participantId = user.id;
+            return req.session.save(() => {
+              res.json({ success: true, role: 'parent', name: user.name });
+            });
+          }
         }
       }
 
@@ -1461,7 +1476,8 @@ async function startServer() {
     }
 
     // Auto-generate credentials
-    const parent_login = phone || `user_${Math.random().toString(36).substring(2, 8)}`;
+    const normalizedPhone = normalizePhone(phone);
+    const parent_login = normalizedPhone || `user_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = Math.random().toString(36).substring(2, 10);
     
     try {
@@ -2444,6 +2460,52 @@ ${childrenList}
         res.json(participant);
       } catch (e) {
         res.status(500).json({ error: "Failed to fetch parent data" });
+      }
+    });
+
+    app.get("/api/parent/children", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = (req.session as any).participantId;
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const meRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [participantId]);
+        if (meRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
+        
+        const parentLogin = meRes.rows[0].parent_login;
+        if (!parentLogin) return res.json([]);
+
+        const childrenRes = await pool.query(`
+          SELECT p.id, p.name, p.age, p.belt, g.name as group_name 
+          FROM participants p 
+          LEFT JOIN groups g ON p.group_id = g.id 
+          WHERE p.parent_login = $1
+        `, [parentLogin]);
+        
+        res.json(childrenRes.rows);
+      } catch (e) {
+        res.status(500).json({ error: "Failed to fetch children" });
+      }
+    });
+
+    app.post("/api/parent/switch-child", async (req, res) => {
+      const { childId } = req.body;
+      const participantId = (req.session as any).participantId;
+      if (!participantId) return res.status(401).json({ error: "Not logged in" });
+
+      try {
+        const meRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [participantId]);
+        const childRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [childId]);
+        
+        if (meRes.rows.length > 0 && childRes.rows.length > 0 && meRes.rows[0].parent_login === childRes.rows[0].parent_login) {
+          (req.session as any).participantId = childId;
+          return req.session.save(() => {
+            res.json({ success: true });
+          });
+        }
+        res.status(403).json({ error: "Forbidden" });
+      } catch (e) {
+        res.status(500).json({ error: "Failed to switch child" });
       }
     });
 

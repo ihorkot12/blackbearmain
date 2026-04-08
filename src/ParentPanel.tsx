@@ -13,13 +13,15 @@ import {
   Activity,
   MapPin,
   Menu,
-  X
+  X,
+  LayoutDashboard
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 
 const ParentPanel = () => {
   const [participant, setParticipant] = useState<any>(null);
+  const [children, setChildren] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
   const [schedule, setSchedule] = useState<any[]>([]);
@@ -35,11 +37,12 @@ const ParentPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pRes, aRes, bRes, sRes] = await Promise.all([
+      const [pRes, aRes, bRes, sRes, cRes] = await Promise.all([
         fetch('/api/parent/me'),
         fetch('/api/parent/attendance'),
         fetch('/api/parent/badges'),
-        fetch('/api/parent/schedule')
+        fetch('/api/parent/schedule'),
+        fetch('/api/parent/children')
       ]);
 
       if (pRes.status === 401) {
@@ -51,15 +54,33 @@ const ParentPanel = () => {
       const aData = await aRes.json();
       const bData = await bRes.json();
       const sData = await sRes.json();
+      const cData = await cRes.json();
 
       setParticipant(pData);
       setAttendance(aData);
       setBadges(bData);
       setSchedule(sData);
+      setChildren(cData);
     } catch (e) {
       toast.error('Помилка завантаження даних');
     }
     setLoading(false);
+  };
+
+  const handleSwitchChild = async (childId: number) => {
+    try {
+      const res = await fetch('/api/parent/switch-child', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ childId })
+      });
+      if (res.ok) {
+        fetchData();
+        toast.success('Дитину змінено');
+      }
+    } catch (e) {
+      toast.error('Не вдалося змінити дитину');
+    }
   };
 
   const handleLogout = async () => {
@@ -170,6 +191,27 @@ const ParentPanel = () => {
                 <div className="text-sm font-bold text-zinc-300">{participant?.belt || 'Білий'}</div>
               </div>
             </div>
+
+            {children.length > 1 && (
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="text-[8px] text-zinc-500 uppercase font-black mb-2 px-1">Ваші діти:</div>
+                <div className="flex flex-col gap-1">
+                  {children.map(child => (
+                    <button
+                      key={child.id}
+                      onClick={() => handleSwitchChild(child.id)}
+                      className={`text-left px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+                        child.id === participant?.id 
+                        ? 'bg-red-600/20 text-red-500' 
+                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                      }`}
+                    >
+                      {child.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -475,14 +517,5 @@ const ParentPanel = () => {
     </div>
   );
 };
-
-const LayoutDashboard = ({ size }: { size: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect width="7" height="9" x="3" y="3" rx="1" />
-    <rect width="7" height="5" x="14" y="3" rx="1" />
-    <rect width="7" height="9" x="14" y="12" rx="1" />
-    <rect width="7" height="5" x="3" y="16" rx="1" />
-  </svg>
-);
 
 export default ParentPanel;
