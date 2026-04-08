@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
+  User,
   Settings, Users, MessageSquare, LogOut, Save, Image as ImageIcon, 
   Plus, Trash2, MapPin, Clock, UserCheck, RefreshCw, 
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard, Download
+  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard, Download, Phone
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -541,6 +542,7 @@ export const AdminPage = () => {
         { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
         { id: 'rank_management', label: 'Пояси та Досягнення', icon: Award, roles: ['admin', 'coach'] },
         { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
+        { id: 'registrations', label: 'Реєстрації', icon: UserPlus, roles: ['admin', 'coach'] },
         { id: 'groups', label: 'Групи', icon: Users, roles: ['admin', 'coach'] },
         { id: 'schedule', label: 'Розклад', icon: Clock, roles: ['admin', 'coach'] },
       ]
@@ -759,6 +761,7 @@ export const AdminPage = () => {
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
               {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
+              {activeTab === 'registrations' && <RegistrationManager />}
               {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'rank_management' && <RankManagement initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
@@ -2223,9 +2226,13 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </td>
                   <td className="p-6 lg:p-8">
                     <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[9px] font-black uppercase tracking-widest ${
-                      p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 'bg-zinc-800 text-zinc-500'
+                      p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 
+                      p.status === 'new' ? 'bg-red-600/20 text-red-500' :
+                      'bg-zinc-800 text-zinc-500'
                     }`}>
-                      {p.status === 'active' ? 'Активний' : 'Архів'}
+                      {p.status === 'active' ? 'Активний' : 
+                       p.status === 'new' ? 'Новий' :
+                       'Архів'}
                     </span>
                   </td>
                   <td className="p-6 lg:p-8 text-right">
@@ -4479,6 +4486,139 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           </motion.div>
         </div>
       )}
+    </div>
+  );
+};
+
+const RegistrationManager = () => {
+  const [newParticipants, setNewParticipants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = async () => {
+    setLoading(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/participants', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setNewParticipants(data.filter(p => p.status === 'new'));
+      }
+    } catch (e) {
+      toast.error('Помилка завантаження');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleConfirm = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/participants/${id}`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'active' })
+      });
+      if (res.ok) {
+        toast.success('Учасника підтверджено');
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка підтвердження');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/participants/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Заявку видалено');
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
+    }
+  };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-96">
+      <RefreshCw className="animate-spin text-red-600" size={48} />
+    </div>
+  );
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Нові реєстрації</h2>
+        <p className="text-zinc-500 font-medium">Учасники, які зареєструвалися через сайт та очікують підтвердження</p>
+      </div>
+
+      <div className="grid gap-4">
+        {newParticipants.length > 0 ? newParticipants.map(p => (
+          <motion.div 
+            key={p.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-zinc-900/30 backdrop-blur-md p-6 rounded-3xl border border-white/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-red-600 text-white rounded-xl flex items-center justify-center font-black text-xl">
+                {p.name[0]}
+              </div>
+              <div>
+                <h4 className="text-lg font-black uppercase tracking-tight">{p.name}</h4>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <User size={10} /> {p.parent_name || 'Не вказано'}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <Phone size={10} /> {p.phone}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <Users size={10} /> {p.group_name || 'Без групи'}
+                  </p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <Calendar size={10} /> {p.age} років
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-3 w-full md:w-auto">
+              <button 
+                onClick={() => handleConfirm(p.id)}
+                className="flex-1 md:flex-none px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={14} />
+                Підтвердити
+              </button>
+              <button 
+                onClick={() => handleDelete(p.id)}
+                className="flex-1 md:flex-none px-6 py-3 bg-white/5 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 flex items-center justify-center gap-2"
+              >
+                <Trash2 size={14} />
+                Видалити
+              </button>
+            </div>
+          </motion.div>
+        )) : (
+          <div className="text-center py-20 bg-zinc-900/10 rounded-[3rem] border border-dashed border-white/5">
+            <Smile size={48} className="text-zinc-800 mx-auto mb-4" />
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Нових реєстрацій немає</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

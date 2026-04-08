@@ -102,19 +102,28 @@ async function initDb() {
         order_index INTEGER DEFAULT 0
       );
 
+      // Ensure parent_login is not unique to allow multiple children per parent
+      try {
+        await pool.query("ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key");
+      } catch (e) {
+        console.log("Note: Could not drop unique constraint, it might not exist or have a different name.");
+      }
+
       CREATE TABLE IF NOT EXISTS participants (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         age INTEGER,
         birthday DATE,
         group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
-        parent_login TEXT UNIQUE,
+        parent_login TEXT,
         parent_password TEXT,
         belt TEXT DEFAULT 'Білий',
         rank_points INTEGER DEFAULT 0,
         payment_status TEXT DEFAULT 'unpaid',
         status TEXT DEFAULT 'active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        parent_name TEXT,
+        phone TEXT
       );
 
       CREATE TABLE IF NOT EXISTS attendance (
@@ -895,7 +904,12 @@ async function startServer() {
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
         `),
-        pool.query("SELECT * FROM groups")
+        pool.query(`
+          SELECT g.*, l.name as location_name, c.name as coach_name 
+          FROM groups g
+          LEFT JOIN locations l ON g.location_id = l.id
+          LEFT JOIN coaches c ON g.coach_id = c.id
+        `)
       ]);
 
       const content = contentRes.rows.reduce((acc, item) => {
@@ -1440,37 +1454,37 @@ async function startServer() {
 
   app.post("/api/register-member", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_name, phone, belt } = req.body;
+    const { children, parent_name, phone } = req.body;
     
+    if (!children || !Array.isArray(children) || children.length === 0) {
+      return res.status(400).json({ error: "No children data provided" });
+    }
+
     // Auto-generate credentials
     const parent_login = phone || `user_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = Math.random().toString(36).substring(2, 10);
     
     try {
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
-      const result = await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
-        [name, age, birthday || null, group_id || null, parent_name, phone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'active']
-      );
-      
-      const participantId = result.rows[0].id;
-      
-      // Get group info for notification
-      let groupName = 'Не вказано';
-      if (group_id) {
-        const gRes = await pool.query("SELECT name FROM groups WHERE id = $1", [group_id]);
-        if (gRes.rows.length > 0) groupName = gRes.rows[0].name;
-      }
+      const results = [];
 
+      for (const child of children) {
+        const { name, age, birthday, group_id, belt } = child;
+        const result = await pool.query(
+          "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
+          [name, age, birthday || null, group_id || null, parent_name, phone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'new']
+        );
+        results.push(result.rows[0].id);
+      }
+      
       // Send Telegram notification
+      const childrenList = children.map(c => `- ${c.name} (${c.age} р.)`).join('\n');
       const message = `
-<b>🆕 Нова реєстрація члена клубу!</b>
-<b>Дитина:</b> ${name}
-<b>Вік:</b> ${age}
-<b>Пояс:</b> ${belt || 'Білий'}
-<b>Група:</b> ${groupName}
+<b>🆕 Нова реєстрація (${children.length} уч.)</b>
 <b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
 <b>Телефон:</b> ${phone}
+<b>Діти:</b>
+${childrenList}
 <b>Логін:</b> ${parent_login}
 <b>Пароль:</b> ${rawPassword}
       `;
@@ -1479,13 +1493,13 @@ async function startServer() {
 
       res.json({ 
         success: true, 
-        participant_id: participantId,
-        login: parent_login,
-        password: rawPassword
+        count: children.length,
+        login: parent_login, 
+        password: rawPassword 
       });
     } catch (e) {
-      console.error(e);
-      res.status(500).json({ error: "Failed to register member" });
+      console.error('Registration failed:', e);
+      res.status(500).json({ error: "Failed to register members" });
     }
   });
 
