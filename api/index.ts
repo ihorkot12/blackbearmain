@@ -1484,16 +1484,16 @@ async function startServer() {
 
   app.post("/api/register-member", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { children, parent_name, phone } = req.body;
+    const { children, parent_name, phone, password } = req.body;
     
     if (!children || !Array.isArray(children) || children.length === 0) {
       return res.status(400).json({ error: "No children data provided" });
     }
 
-    // Auto-generate credentials
+    // Auto-generate credentials if not provided
     const normalizedPhone = normalizePhone(phone);
     const parent_login = normalizedPhone || `user_${Math.random().toString(36).substring(2, 8)}`;
-    const rawPassword = Math.random().toString(36).substring(2, 10);
+    const rawPassword = password || Math.random().toString(36).substring(2, 10);
     
     try {
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
@@ -1521,6 +1521,20 @@ ${childrenList}
       `;
       
       sendTelegramMessage(message).catch(err => console.error('Telegram notification failed:', err));
+
+      // Auto-login: set session for the first registered child
+      if (results.length > 0) {
+        (req.session as any).participantId = results[0];
+        return req.session.save((err) => {
+          if (err) console.error('Session save error after registration:', err);
+          res.json({ 
+            success: true, 
+            count: children.length,
+            login: parent_login, 
+            password: rawPassword 
+          });
+        });
+      }
 
       res.json({ 
         success: true, 
@@ -1672,7 +1686,10 @@ ${childrenList}
     const rawPassword = parent_password || Math.random().toString(36).substring(2, 10);
     
     try {
-      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+      let hashedPassword = rawPassword;
+      if (!hashedPassword.startsWith('$2a$')) {
+        hashedPassword = await bcrypt.hash(rawPassword, 10);
+      }
       await pool.query(
         "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
         [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий']
@@ -1690,6 +1707,10 @@ ${childrenList}
     try {
       const updateData = { ...req.body };
       
+      // Get current participant to check parent_login
+      const currentRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [req.params.id]);
+      const oldParentLogin = currentRes.rows[0]?.parent_login;
+
       // Handle password hashing if provided
       if (updateData.parent_password && !updateData.parent_password.startsWith('$2a$')) {
         updateData.parent_password = await bcrypt.hash(updateData.parent_password, 10);
@@ -1706,12 +1727,35 @@ ${childrenList}
 
       const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
       const values = keys.map(key => updateData[key]);
-      values.push(req.params.id);
+      const participantId = req.params.id;
+      values.push(participantId);
 
       await pool.query(
         `UPDATE participants SET ${setClause} WHERE id = $${values.length}`,
         values
       );
+
+      // If parent credentials changed, sync them for all children of this parent
+      if ((updateData.parent_login || updateData.parent_password) && oldParentLogin) {
+        const syncFields = [];
+        const syncValues = [];
+        if (updateData.parent_login) {
+          syncFields.push(`parent_login = $${syncValues.length + 1}`);
+          syncValues.push(updateData.parent_login);
+        }
+        if (updateData.parent_password) {
+          syncFields.push(`parent_password = $${syncValues.length + 1}`);
+          syncValues.push(updateData.parent_password);
+        }
+        
+        if (syncFields.length > 0) {
+          syncValues.push(oldParentLogin);
+          await pool.query(
+            `UPDATE participants SET ${syncFields.join(', ')} WHERE parent_login = $${syncValues.length}`,
+            syncValues
+          );
+        }
+      }
 
       res.json({ success: true });
     } catch (e) {
@@ -2576,6 +2620,8 @@ ${childrenList}
         if (!groupId) return res.json([]);
 
         const gRes = await pool.query("SELECT name FROM groups WHERE id = $1", [groupId]);
+        if (gRes.rows.length === 0) return res.json([]);
+        
         const groupName = gRes.rows[0].name;
 
         const sRes = await pool.query(`

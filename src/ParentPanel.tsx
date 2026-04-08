@@ -50,13 +50,13 @@ const ParentPanel = () => {
         return;
       }
 
-      const pData = await pRes.json();
-      const aData = await aRes.json();
-      const bData = await bRes.json();
-      const sData = await sRes.json();
-      const cData = await cRes.json();
+      const pData = pRes.ok ? await pRes.json() : null;
+      const aData = aRes.ok ? await aRes.json() : [];
+      const bData = bRes.ok ? await bRes.json() : [];
+      const sData = sRes.ok ? await sRes.json() : [];
+      const cData = cRes.ok ? await cRes.json() : [];
 
-      setParticipant(pData);
+      if (pData) setParticipant(pData);
       setAttendance(aData);
       setBadges(bData);
       setSchedule(sData);

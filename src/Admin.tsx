@@ -69,27 +69,36 @@ export const LoginPage = () => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ login: login.trim(), password: password.trim() })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.role === 'parent') {
-        navigate('/parent');
-        return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: login.trim(), password: password.trim() })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.role === 'parent') {
+          navigate('/parent');
+          return;
+        }
+        localStorage.setItem('admin_token', data.token);
+        localStorage.setItem('admin_role', data.role);
+        localStorage.setItem('admin_name', data.name);
+        navigate('/admin');
+      } else {
+        setError('Неправильний логін або пароль');
       }
-      localStorage.setItem('admin_token', data.token);
-      localStorage.setItem('admin_role', data.role);
-      localStorage.setItem('admin_name', data.name);
-      navigate('/admin');
-    } else {
-      setError('Неправильний логін або пароль');
+    } catch (err) {
+      setError('Помилка з\'єднання');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -141,9 +150,10 @@ export const LoginPage = () => {
           <div className="flex flex-col gap-3 pt-2">
             <button 
               type="submit" 
-              className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-[0.98]"
+              disabled={isLoading}
+              className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-[0.98] disabled:opacity-50"
             >
-              Увійти
+              {isLoading ? 'Вхід...' : 'Увійти'}
             </button>
             
             <button 
@@ -806,7 +816,7 @@ export const AdminPage = () => {
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
               {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
-              {activeTab === 'registrations' && <RegistrationManager />}
+              {activeTab === 'registrations' && <RegistrationManager onEdit={(id) => handleQuickAction('participants', `edit:${id}`)} />}
               {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'rank_management' && <RankManagement initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
@@ -2525,21 +2535,36 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   />
                 </div>
                 <div>
-                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків (введіть новий для зміни)</label>
                   <div className="relative">
                     <input 
                       type={showPasswords['editing'] ? 'text' : 'password'} 
-                      value={editingParticipant.parent_password}
+                      value={editingParticipant.parent_password || ''}
                       onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                      className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-12 text-sm"
+                      placeholder="Введіть новий пароль..."
+                      className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-24 text-sm"
                     />
-                    <button 
-                      type="button"
-                      onClick={() => setShowPasswords(prev => ({...prev, editing: !prev.editing}))}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
-                    >
-                      {showPasswords['editing'] ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const pass = Math.random().toString(36).substring(2, 10);
+                          setEditingParticipant({...editingParticipant, parent_password: pass});
+                          setShowPasswords(prev => ({...prev, editing: true}));
+                        }}
+                        className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
+                        title="Згенерувати пароль"
+                      >
+                        <Plus size={16} />
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setShowPasswords(prev => ({...prev, editing: !prev.editing}))}
+                        className="p-2 text-zinc-500 hover:text-white transition-colors"
+                      >
+                        {showPasswords['editing'] ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4535,7 +4560,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
   );
 };
 
-const RegistrationManager = () => {
+const RegistrationManager = ({ onEdit }: { onEdit?: (id: number) => void }) => {
   const [newParticipants, setNewParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -4641,6 +4666,13 @@ const RegistrationManager = () => {
             </div>
             
             <div className="flex gap-3 w-full md:w-auto">
+              <button 
+                onClick={() => onEdit?.(p.id)}
+                className="flex-1 md:flex-none px-6 py-3 bg-white/5 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-white/10 transition-all border border-white/5 flex items-center justify-center gap-2"
+              >
+                <Edit2 size={14} />
+                Редагувати
+              </button>
               <button 
                 onClick={() => handleConfirm(p.id)}
                 className="flex-1 md:flex-none px-6 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 flex items-center justify-center gap-2"

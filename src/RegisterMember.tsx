@@ -30,7 +30,9 @@ export const RegisterMember = () => {
 
   const [parentInfo, setParentInfo] = useState({
     parent_name: '',
-    phone: ''
+    phone: '',
+    password: '',
+    confirmPassword: ''
   });
 
   const [children, setChildren] = useState<any[]>([
@@ -107,6 +109,12 @@ export const RegisterMember = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (parentInfo.password !== parentInfo.confirmPassword) {
+      alert('Паролі не співпадають');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -122,6 +130,26 @@ export const RegisterMember = () => {
       if (res.ok) {
         const data = await res.json();
         setRegistrationResult({ login: data.login, password: data.password });
+        
+        // Auto-login after registration
+        try {
+          const loginRes = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              login: data.login,
+              password: parentInfo.password
+            })
+          });
+          
+          if (loginRes.ok) {
+            window.location.href = '/parent';
+            return;
+          }
+        } catch (loginErr) {
+          console.error('Auto-login failed', loginErr);
+        }
+
         setIsSubmitted(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
@@ -139,6 +167,14 @@ export const RegisterMember = () => {
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 2000);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (isSubmitted && registrationResult) {
     return (
@@ -211,7 +247,9 @@ export const RegisterMember = () => {
                 }]);
                 setParentInfo({
                   parent_name: '',
-                  phone: ''
+                  phone: '',
+                  password: '',
+                  confirmPassword: ''
                 });
               }} 
               showIcon={false}
@@ -459,6 +497,30 @@ export const RegisterMember = () => {
                       onChange={e => setParentInfo({...parentInfo, phone: e.target.value})}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Придумайте пароль</label>
+                  <input 
+                    required
+                    type="password" 
+                    placeholder="••••••••"
+                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                    value={parentInfo.password}
+                    onChange={e => setParentInfo({...parentInfo, password: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Підтвердіть пароль</label>
+                  <input 
+                    required
+                    type="password" 
+                    placeholder="••••••••"
+                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                    value={parentInfo.confirmPassword}
+                    onChange={e => setParentInfo({...parentInfo, confirmPassword: e.target.value})}
+                  />
                 </div>
               </div>
             </div>
