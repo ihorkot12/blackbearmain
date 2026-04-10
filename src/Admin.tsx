@@ -3171,7 +3171,10 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
       { key: 'women_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
     ],
     encyclopedia: [
-      { key: 'encyclopedia_history_image', label: 'Історія: Зображення Оями', type: 'image' },
+      { key: 'encyclopedia_main_label', label: 'Головна: Малий заголовок', type: 'text' },
+      { key: 'encyclopedia_main_title', label: 'Головна: Головний заголовок', type: 'textarea' },
+      { key: 'encyclopedia_main_description', label: 'Головна: Опис', type: 'textarea' },
+      { key: 'encyclopedia_history_image', label: 'Зображення (Головна та Історія)', type: 'image' },
       { key: 'encyclopedia_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
       { key: 'encyclopedia_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
       { key: 'encyclopedia_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },

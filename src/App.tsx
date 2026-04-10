@@ -723,7 +723,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/5 order-2 lg:order-1"
             >
               <img 
-                src="https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop" 
+                src={content?.encyclopedia_history_image || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop"} 
                 alt="Карате нормативи та історія Кіокушинкай Київ" 
                 className="w-full h-full object-cover grayscale"
                 referrerPolicy="no-referrer"
@@ -742,12 +742,15 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               viewport={{ once: true }}
               className="order-1 lg:order-2"
             >
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Методичка та нормативи</h2>
-              <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight">
-                Велика книга <span className="text-red-600">воїна</span>
-              </h3>
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
+                {content?.encyclopedia_main_label || "Методичка та нормативи"}
+              </h2>
+              <h3 
+                className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
+                dangerouslySetInnerHTML={{ __html: content?.encyclopedia_main_title || 'Велика книга <span class="text-red-600">воїна</span>' }}
+              />
               <p className="text-zinc-400 text-lg mb-8 leading-relaxed">
-                Ми створили повну онлайн-енциклопедію для наших учнів та батьків. Все про Кіокушинкай карате в одному місці: від історії засновника до детальних нормативів на кожен пояс.
+                {content?.encyclopedia_main_description || "Ми створили повну онлайн-енциклопедію для наших учнів та батьків. Все про Кіокушинкай карате в одному місці: від історії засновника до детальних нормативів на кожен пояс."}
               </p>
               <div className="grid grid-cols-2 gap-4 mb-10">
                 {[
