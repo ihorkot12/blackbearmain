@@ -131,9 +131,9 @@ export const WomenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.women_seo_title || "Карате для дівчат"}
-        description={content?.women_seo_description || "Секція карате для дівчат у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате краще за бокс? Запишіться на безкоштовне тренування!"}
-        keywords={content?.women_seo_keywords || "карате для дівчат київ, самооборона для дівчат київ, фітнес карате київ, секція карате шулявка"}
+        title={content?.women_seo_title || "Карате для дівчат Київ | Секція карате Шулявка"}
+        description={content?.women_seo_description || "Секція карате для дівчат у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате Київ краще за бокс? Запишіться на безкоштовне тренування (Шулявка, Сирець)!"}
+        keywords={content?.women_seo_keywords || "карате для дівчат київ, самооборона для дівчат київ, фітнес карате київ, секція карате шулявка, карате сирець дівчата"}
       />
       
       <Navbar />
@@ -163,11 +163,11 @@ export const WomenLanding = () => {
             </div>
             <h1 
               className="text-4xl sm:text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[1] md:leading-[0.9] mb-8"
-              dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Дівчат</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_title || 'Карате для <br /> <span className="text-red-600">Дівчат у Києві</span>' }}
             />
             <p 
               className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed max-w-xl"
-              dangerouslySetInnerHTML={{ __html: content?.women_hero_subtitle || 'Відкрийте для себе мистецтво, яке дарує ідеальне тіло, непохитний спокій та навички самооборони без ризику для вашої краси.' }}
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_subtitle || 'Шукаєте секцію карате для дівчат на Шулявці чи Сирці? Відкрийте для себе мистецтво, яке дарує ідеальне тіло, спокій та навички самооборони.' }}
             />
             <div className="flex flex-col sm:flex-row gap-4">
               <Button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>

@@ -182,6 +182,7 @@ async function initDb() {
         month INTEGER,
         year INTEGER,
         type TEXT DEFAULT 'subscription', -- 'subscription', 'exam', 'equipment', 'other'
+        method TEXT DEFAULT 'cash', -- 'cash', 'card', 'online'
         notes TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
@@ -1920,9 +1921,10 @@ ${childrenList}
       
       if (type === 'competition') {
         const normalizedResult = result?.toLowerCase()?.trim() || "";
-        if (normalizedResult.startsWith('1') || normalizedResult.includes('1 місце')) points = 15;
-        else if (normalizedResult.startsWith('2') || normalizedResult.includes('2 місце')) points = 10;
-        else if (normalizedResult.startsWith('3') || normalizedResult.includes('3 місце')) points = 7;
+        if (normalizedResult.includes('1 місце') || normalizedResult === '1') points = 15;
+        else if (normalizedResult.includes('2 місце') || normalizedResult === '2') points = 10;
+        else if (normalizedResult.includes('3 місце') || normalizedResult === '3') points = 7;
+        else if (normalizedResult === 'participation' || normalizedResult === 'участь') points = 5;
       } else if (type === 'certification') {
         points = 20; // Certification is high value
       } else if (type === 'seminar') {
@@ -2173,11 +2175,11 @@ ${childrenList}
 
   app.post("/api/payments", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { participant_id, amount, date, month, year, type, notes } = req.body;
+    const { participant_id, amount, date, month, year, type, method, notes } = req.body;
     try {
       const result = await pool.query(
-        "INSERT INTO payments (participant_id, amount, date, month, year, type, notes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
-        [participant_id, amount, date || new Date(), month, year, type || 'subscription', notes]
+        "INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        [participant_id, amount, date || new Date(), month, year, type || 'subscription', method || 'cash', notes]
       );
       
       // Update participant payment status if it's a subscription for current month
@@ -2188,6 +2190,7 @@ ${childrenList}
 
       res.json({ success: true, id: result.rows[0].id });
     } catch (e) {
+      console.error("Failed to create payment:", e);
       res.status(500).json({ error: "Failed to create payment" });
     }
   });
@@ -2700,23 +2703,24 @@ ${content}
         const groupId = pRes.rows[0].group_id;
         if (!groupId) return res.json([]);
 
-        const gRes = await pool.query("SELECT name FROM groups WHERE id = $1", [groupId]);
+        const gRes = await pool.query("SELECT name, location_id, coach_id FROM groups WHERE id = $1", [groupId]);
         if (gRes.rows.length === 0) return res.json([]);
         
-        const groupName = gRes.rows[0].name;
+        const { name: groupName, location_id: locId, coach_id: coachId } = gRes.rows[0];
 
         const sRes = await pool.query(`
           SELECT s.*, c.name as coach_name, l.name as location_name 
           FROM schedule s 
           LEFT JOIN coaches c ON s.coach_id = c.id 
           LEFT JOIN locations l ON s.location_id = l.id 
-          WHERE s.group_name ILIKE $1 || '%'
-             OR s.group_name ILIKE '%' || $1 || '%'
+          WHERE (s.group_name ILIKE $1 || '%' OR s.group_name ILIKE '%' || $1 || '%' OR $1 ILIKE '%' || s.group_name || '%')
+             OR (s.location_id = $2 AND s.coach_id = $3 AND s.group_name IS NOT NULL)
           ORDER BY s.order_index ASC
-        `, [groupName]);
+        `, [groupName, locId, coachId]);
         
         res.json(sRes.rows);
       } catch (e) {
+        console.error("Failed to fetch parent schedule:", e);
         res.status(500).json({ error: "Failed to fetch schedule" });
       }
     });

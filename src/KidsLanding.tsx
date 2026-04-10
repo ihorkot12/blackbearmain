@@ -170,9 +170,9 @@ export const KidsLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.kids_seo_title || "Карате для дітей 4-7 років"}
-        description={content?.kids_seo_description || "Секція карате для дітей 4-7 років у Києві (Шулявка, Відрадний). Ігрова форма навчання, розвиток координації та дисципліни. Перше тренування безкоштовно!"}
-        keywords={content?.kids_seo_keywords || "карате для дітей 4 роки київ, карате для дітей 5 років київ, дитяче карате шулявка, карате для малюків київ, секція карате для дітей відрадний"}
+        title={content?.kids_seo_title || "Карате для дітей 4-7 років Київ | Секція карате Шулявка"}
+        description={content?.kids_seo_description || "Професійна секція карате для дітей 4-7 років у Києві (Шулявка, Відрадний, Сирець). Ігрова форма навчання, розвиток координації та дисципліни. Дитяче карате Київ — перше тренування безкоштовно!"}
+        keywords={content?.kids_seo_keywords || "карате для дітей 4 роки київ, карате для дітей 5 років київ, дитяче карате шулявка, карате для малюків київ, секція карате для дітей відрадний, карате сирець діти"}
       />
       <Navbar />
 
@@ -202,11 +202,11 @@ export const KidsLanding = () => {
             </div>
             <h1 
               className="text-5xl sm:text-6xl md:text-[120px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
-              dangerouslySetInnerHTML={{ __html: content?.kids_hero_title || 'Фундамент <br /> <span className="text-red-600">майбутнього</span> <br /> лідера' }}
+              dangerouslySetInnerHTML={{ __html: content?.kids_hero_title || 'Дитяче <br /> <span className="text-red-600">карате</span> <br /> у Києві' }}
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.kids_hero_subtitle || 'Ми не просто вчимо карате. Ми формуємо характер, який допоможе вашій дитині бути успішною в школі та житті. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.kids_hero_subtitle || 'Шукаєте найкращу секцію карате для дітей на Шулявці, Відрадному чи Сирці? Ми формуємо характер та лідерські якості. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
             />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 

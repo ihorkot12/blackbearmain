@@ -138,9 +138,9 @@ export const TeenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.teen_seo_title || "Карате для підлітків 12+ років"}
-        description={content?.teen_seo_description || "Секція карате для підлітків у Києві. Професійні турніри, самооборона, лідерство та впевненість у собі. Локації: Шулявка, Відрадний. Перше тренування безкоштовно!"}
-        keywords={content?.teen_seo_keywords || "карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ"}
+        title={content?.teen_seo_title || "Карате для підлітків 12+ років Київ | Секція карате Шулявка"}
+        description={content?.teen_seo_description || "Секція карате для підлітків у Києві. Професійні турніри, самооборона, лідерство та впевненість у собі. Карате Кіокушинкай Київ (Шулявка, Відрадний, Сирець). Перше тренування безкоштовно!"}
+        keywords={content?.teen_seo_keywords || "карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ, карате сирець підлітки"}
       />
       <Navbar />
 
@@ -170,11 +170,11 @@ export const TeenLanding = () => {
             </div>
             <h1 
               className="text-5xl sm:text-6xl md:text-[130px] font-black uppercase leading-[0.9] md:leading-[0.8] tracking-tighter mb-10"
-              dangerouslySetInnerHTML={{ __html: content?.teen_hero_title || 'Стань <br /> <span className="text-red-600 text-glow">найкращою</span> <br /> версією себе' }}
+              dangerouslySetInnerHTML={{ __html: content?.teen_hero_title || 'Карате <br /> <span className="text-red-600 text-glow">Кіокушинкай</span> <br /> у Києві' }}
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.teen_hero_subtitle || 'Карате для підлітків — це не просто спорт. Це твоя перевага в житті, впевненість у будь-якій компанії та сталевий характер. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.teen_hero_subtitle || 'Карате для підлітків на Шулявці та Сирці — це твоя перевага в житті, впевненість у будь-якій компанії та сталевий характер. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
             />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 

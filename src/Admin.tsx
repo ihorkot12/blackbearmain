@@ -8,7 +8,7 @@ import {
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, FileUp, Link, CreditCard, Download, Phone
+  Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -838,11 +838,48 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   const [showCompModal, setShowCompModal] = useState<any>(null);
   const [showDetails, setShowDetails] = useState<any>(null);
   const [badgeType, setBadgeType] = useState('');
+  const [badgeDate, setBadgeDate] = useState(new Date().toISOString().split('T')[0]);
   const [compName, setCompName] = useState('');
-  const [compResult, setCompResult] = useState('');
+  const [compResult, setCompResult] = useState('participation');
   const [compType, setCompType] = useState('competition');
+  const [compDate, setCompDate] = useState(new Date().toISOString().split('T')[0]);
   const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
   const [search, setSearch] = useState('');
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [newPayment, setNewPayment] = useState({
+    participant_id: '',
+    amount: '',
+    type: 'subscription',
+    method: 'cash',
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    notes: ''
+  });
+
+  const handleAddPayment = async () => {
+    if (!newPayment.participant_id || !newPayment.amount) {
+      toast.error('Заповніть обов\'язкові поля');
+      return;
+    }
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/payments', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newPayment)
+      });
+      if (res.ok) {
+        toast.success('Оплату додано');
+        setIsAddingPayment(false);
+        fetchParticipants();
+      }
+    } catch (e) {
+      toast.error('Помилка додавання оплати');
+    }
+  };
 
   const fetchParticipants = async () => {
     setLoading(true);
@@ -927,12 +964,17 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ participant_id: participantId, type: badgeType })
+        body: JSON.stringify({ 
+          participant_id: participantId, 
+          type: badgeType,
+          date: badgeDate
+        })
       });
       if (res.ok) {
         toast.success('Досягнення додано (+10 балів)');
         setShowBadgeModal(null);
         setBadgeType('');
+        setBadgeDate(new Date().toISOString().split('T')[0]);
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
       } else {
@@ -962,7 +1004,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           name: compName, 
           type: compType,
           result: compResult,
-          date: new Date().toISOString().split('T')[0]
+          date: compDate
         })
       });
       if (res.ok) {
@@ -970,8 +1012,9 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         toast.success(`Активність додано (+${data.points_awarded || 0} балів)`);
         setShowCompModal(null);
         setCompName('');
-        setCompResult('');
+        setCompResult('participation');
         setCompType('competition');
+        setCompDate(new Date().toISOString().split('T')[0]);
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
       } else {
@@ -1119,6 +1162,27 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                       title="Додати змагання"
                     >
                       <TrendingUp size={18} />
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setNewPayment({
+                          participant_id: p.id.toString(),
+                          amount: '1500',
+                          type: 'subscription',
+                          method: 'cash',
+                          month: new Date().getMonth() + 1,
+                          year: new Date().getFullYear(),
+                          notes: ''
+                        });
+                        setIsAddingPayment(true);
+                        // We need to switch to CRM tab or just show the modal
+                        // Since CRMFinance is a sub-component, we might need to lift state
+                        // But wait, CRMFinance is rendered when activeTab === 'crm'
+                      }}
+                      className="p-2 text-zinc-500 hover:text-green-500 hover:bg-green-500/10 rounded-lg transition-colors"
+                      title="Прийняти оплату (готівка)"
+                    >
+                      <CreditCard size={18} />
                     </button>
                   </div>
                 </td>
@@ -1275,6 +1339,15 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                     className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Дата</label>
+                  <input 
+                    type="date"
+                    value={badgeDate}
+                    onChange={e => setBadgeDate(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
               </div>
               <div className="flex gap-4 pt-4">
                 <button 
@@ -1331,16 +1404,28 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                 </div>
                 {compType === 'competition' && (
                   <div>
-                    <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Результат (місце)</label>
-                    <input 
-                      type="text"
-                      placeholder="Наприклад: 1 місце"
+                    <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Результат</label>
+                    <select 
                       value={compResult}
                       onChange={e => setCompResult(e.target.value)}
-                      className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
-                    />
+                      className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all appearance-none"
+                    >
+                      <option value="1 місце">1 місце</option>
+                      <option value="2 місце">2 місце</option>
+                      <option value="3 місце">3 місце</option>
+                      <option value="participation">Участь</option>
+                    </select>
                   </div>
                 )}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Дата</label>
+                  <input 
+                    type="date"
+                    value={compDate}
+                    onChange={e => setCompDate(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
+                  />
+                </div>
               </div>
               <div className="flex gap-4 pt-4">
                 <button 
@@ -1360,6 +1445,108 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           </div>
         )}
       </AnimatePresence>
+
+      {/* Add Payment Modal */}
+      {isAddingPayment && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingPayment(false)} />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl bg-zinc-900 border border-white/10 rounded-[2.5rem] p-10 shadow-2xl"
+          >
+            <h3 className="text-3xl font-black uppercase tracking-tighter mb-8">Нова оплата</h3>
+            <div className="grid grid-cols-2 gap-6 mb-8">
+              <div className="col-span-2">
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Учень</label>
+                <select 
+                  value={newPayment.participant_id}
+                  onChange={e => setNewPayment({...newPayment, participant_id: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="">Оберіть учня</option>
+                  {participants.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Сума (₴)</label>
+                <input 
+                  type="number"
+                  value={newPayment.amount}
+                  onChange={e => setNewPayment({...newPayment, amount: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                  placeholder="1500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Тип</label>
+                <select 
+                  value={newPayment.type}
+                  onChange={e => setNewPayment({...newPayment, type: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="subscription">Абонемент</option>
+                  <option value="exam">Атестація</option>
+                  <option value="equipment">Екіпірування</option>
+                  <option value="other">Інше</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Метод</label>
+                <select 
+                  value={newPayment.method}
+                  onChange={e => setNewPayment({...newPayment, method: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="cash">Готівка</option>
+                  <option value="card">Карта</option>
+                  <option value="online">Онлайн</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Місяць</label>
+                <select 
+                  value={newPayment.month}
+                  onChange={e => setNewPayment({...newPayment, month: parseInt(e.target.value)})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  {['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'].map((m, i) => (
+                    <option key={m} value={i + 1}>{m}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Рік</label>
+                <select 
+                  value={newPayment.year}
+                  onChange={e => setNewPayment({...newPayment, year: parseInt(e.target.value)})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  {[2024, 2025, 2026].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={handleAddPayment}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+              >
+                Зберегти оплату
+              </button>
+              <button 
+                onClick={() => setIsAddingPayment(false)}
+                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white font-black uppercase tracking-widest text-xs py-4 rounded-2xl transition-all"
+              >
+                Скасувати
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2851,6 +3038,7 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
     { id: 'teen_landing', title: 'Підлітки', icon: Zap },
     { id: 'personal_landing', title: 'Персональні', icon: Target },
     { id: 'women_landing', title: 'Жінки', icon: Heart },
+    { id: 'encyclopedia', title: 'Енциклопедія', icon: Book },
     { id: 'visibility', title: 'Видимість блоків', icon: Eye },
     { id: 'analytics', title: 'Аналітика', icon: Shield },
   ];
@@ -2981,6 +3169,12 @@ const ContentEditor = ({ initialAction, onActionComplete }: { initialAction?: st
       { key: 'women_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
       { key: 'women_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
       { key: 'women_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
+    ],
+    encyclopedia: [
+      { key: 'encyclopedia_history_image', label: 'Історія: Зображення Оями', type: 'image' },
+      { key: 'encyclopedia_seo_title', label: 'SEO: Заголовок сторінки', type: 'text' },
+      { key: 'encyclopedia_seo_description', label: 'SEO: Опис (Meta Description)', type: 'textarea' },
+      { key: 'encyclopedia_seo_keywords', label: 'SEO: Ключові слова', type: 'text' },
     ],
     analytics: [
       { key: 'meta_pixel_code', label: 'Meta Pixel Code (Facebook)', type: 'textarea', placeholder: 'Вставте повний код пікселя <script>...</script>' },
@@ -4144,6 +4338,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
     participant_id: '',
     amount: '',
     type: 'subscription',
+    method: 'cash',
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     notes: ''
@@ -4286,10 +4481,21 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
             className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3"
           >
             <MessageSquare size={18} />
-            Надіслати оголошення
+            Надіслати SMS-оголошення
           </button>
           <button 
-            onClick={() => setIsAddingPayment(true)}
+            onClick={() => {
+              setNewPayment({
+                participant_id: '',
+                amount: '',
+                type: 'subscription',
+                method: 'cash',
+                month: new Date().getMonth() + 1,
+                year: new Date().getFullYear(),
+                notes: ''
+              });
+              setIsAddingPayment(true);
+            }}
             className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-red-600/20 flex items-center gap-3"
           >
             <Plus size={18} />
@@ -4425,15 +4631,19 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
                       <button 
                         onClick={() => {
                           setNewPayment({
-                            ...newPayment,
                             participant_id: p.id.toString(),
-                            amount: '1500'
+                            amount: '1500',
+                            type: 'subscription',
+                            method: 'cash',
+                            month: new Date().getMonth() + 1,
+                            year: new Date().getFullYear(),
+                            notes: ''
                           });
                           setIsAddingPayment(true);
                         }}
                         className="text-red-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-colors"
                       >
-                        Оплатити
+                        Оплатити готівкою
                       </button>
                     </td>
                   </tr>
@@ -4514,6 +4724,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Учень</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Група</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Тип</th>
+                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Метод</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата</th>
                 <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Сума</th>
               </tr>
@@ -4536,6 +4747,15 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
                       'bg-zinc-500/10 text-zinc-500'
                     }`}>
                       {pay.type === 'subscription' ? 'Абонемент' : pay.type === 'exam' ? 'Атестація' : pay.type}
+                    </span>
+                  </td>
+                  <td className="px-8 py-6">
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${
+                      pay.method === 'cash' ? 'bg-amber-500/10 text-amber-500' :
+                      pay.method === 'card' ? 'bg-green-500/10 text-green-500' :
+                      'bg-blue-500/10 text-blue-500'
+                    }`}>
+                      {pay.method === 'cash' ? 'Готівка' : pay.method === 'card' ? 'Карта' : pay.method || 'Онлайн'}
                     </span>
                   </td>
                   <td className="px-8 py-6 text-zinc-400 text-sm">
@@ -4603,6 +4823,18 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
                   <option value="exam">Атестація</option>
                   <option value="equipment">Екіпірування</option>
                   <option value="other">Інше</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Метод</label>
+                <select 
+                  value={newPayment.method}
+                  onChange={e => setNewPayment({...newPayment, method: e.target.value})}
+                  className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white focus:border-red-600 outline-none"
+                >
+                  <option value="cash">Готівка</option>
+                  <option value="card">Карта</option>
+                  <option value="online">Онлайн</option>
                 </select>
               </div>
               <div>

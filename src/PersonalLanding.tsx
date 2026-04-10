@@ -111,9 +111,9 @@ export const PersonalLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.personal_seo_title || "Персональні тренування з карате"}
-        description={content?.personal_seo_description || "Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Швидкий результат для дорослих та дітей."}
-        keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ"}
+        title={content?.personal_seo_title || "Персональні тренування з карате Київ | Індивідуальні заняття"}
+        description={content?.personal_seo_description || "Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Найкращий тренер з карате Київ (Шулявка, Сирець). Швидкий результат!"}
+        keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ, карате шулявка індивідуально"}
       />
       <Navbar />
 
@@ -143,11 +143,11 @@ export const PersonalLanding = () => {
             </div>
             <h1 
               className="text-5xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
-              dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Максимальний <br /> <span className="text-red-600 text-glow">результат</span> <br /> тет-а-тет' }}
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Індивідуальне <br /> <span className="text-red-600 text-glow">карате</span> <br /> у Києві' }}
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Персональні тренування з карате Кіокушинкай — це найшвидший спосіб опанувати бойове мистецтво, зміцнити тіло та загартувати дух під наглядом майстра. <span className="text-white">Перша консультація — БЕЗКОШТОВНО.</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Персональні тренування з карате Кіокушинкай на Шулявці та Сирці — це найшвидший спосіб опанувати бойове мистецтво під наглядом майстра. <span className="text-white">Перша консультація — БЕЗКОШТОВНО.</span>' }}
             />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 

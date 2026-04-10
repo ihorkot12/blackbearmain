@@ -143,9 +143,9 @@ export const JuniorLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.junior_seo_title || "Карате для дітей 7-12 років"}
-        description={content?.junior_seo_description || "Секція карате для дітей 7-12 років у Києві. Формування характеру, фізична підготовка та підготовка до змагань. Локації: Шулявка, Відрадний. Перше тренування безкоштовно!"}
-        keywords={content?.junior_seo_keywords || "карате для дітей 7 років київ, карате для дітей 8 років київ, карате для дітей 10 років київ, дитяча секція карате київ, карате на шулявці для дітей"}
+        title={content?.junior_seo_title || "Карате для дітей 7-12 років Київ | Секція карате Шулявка"}
+        description={content?.junior_seo_description || "Секція карате для дітей 7-12 років у Києві. Формування характеру, фізична підготовка та підготовка до змагань. Найкраще дитяче карате Київ (Шулявка, Відрадний, Сирець). Перше тренування безкоштовно!"}
+        keywords={content?.junior_seo_keywords || "карате для дітей 7 років київ, карате для дітей 8 років київ, карате для дітей 10 років київ, дитяча секція карате київ, карате на шулявці для дітей, карате сирець"}
       />
       <Navbar />
 
@@ -175,11 +175,11 @@ export const JuniorLanding = () => {
             </div>
             <h1 
               className="text-5xl sm:text-6xl md:text-[120px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
-              dangerouslySetInnerHTML={{ __html: content?.junior_hero_title || 'Виховання <br /> <span className="text-red-600">переможців</span> <br /> у житті' }}
+              dangerouslySetInnerHTML={{ __html: content?.junior_hero_title || 'Секція <br /> <span className="text-red-600">карате</span> <br /> для дітей' }}
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.junior_hero_subtitle || 'Допоможіть дитині відірватися від гаджетів, знайти впевненість та стати частиною сильної спільноти. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.junior_hero_subtitle || 'Професійні тренування з карате в Києві (Шулявка, Сирець, Відрадний). Допоможіть дитині знайти впевненість та стати частиною сильної спільноти. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
             />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 

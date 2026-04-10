@@ -19,6 +19,7 @@ const TeenLanding = lazy(() => import('./TeenLanding').then(m => ({ default: m.T
 const PersonalLanding = lazy(() => import('./PersonalLanding').then(m => ({ default: m.PersonalLanding })));
 const WomenLanding = lazy(() => import('./WomenLanding').then(m => ({ default: m.WomenLanding })));
 const RegisterMember = lazy(() => import('./RegisterMember').then(m => ({ default: m.RegisterMember })));
+const Encyclopedia = lazy(() => import('./Encyclopedia'));
 
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
@@ -255,6 +256,7 @@ export default function App() {
           <Route path="/personal-training" element={<PersonalLanding />} />
           <Route path="/women-karate" element={<WomenLanding />} />
           <Route path="/register-member" element={<RegisterMember />} />
+          <Route path="/encyclopedia" element={<Encyclopedia />} />
         </Routes>
       </Suspense>
     </>
@@ -389,9 +391,9 @@ function LandingPage({ initialContent }: { initialContent: any }) {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title="Головна"
-        description="Black Bear Dojo — професійна школа карате Кіокушинкай у Києві. Тренування для дітей від 4 років, підлітків та дорослих. Локації: Шулявка та Відрадний. Перше тренування безкоштовно!"
-        keywords="карате київ, кіокушинкай карате київ, карате для дітей київ, секція карате шулявка, карате відрадний, бойові мистецтва київ, black bear dojo"
+        title="Головна | Секція Карате Київ Шулявка | Дитяче Карате"
+        description="Black Bear Dojo — професійна школа карате Кіокушинкай у Києві. Тренування для дітей від 4 років, підлітків та дорослих. Локації: Шулявка та Сирець. Найкраща секція карате Київ Шулявка. Перше тренування безкоштовно! Нормативи на пояси та історія карате."
+        keywords="карате київ, кіокушинкай карате київ, карате для дітей київ, секція карате шулявка, карате сирець, карате відрадний, бойові мистецтва київ, нормативи карате, екзамен на пояс карате, карате для дорослих київ, дитяче карате шулявка, black bear dojo"
       />
       
       <AnimatePresence>
@@ -710,6 +712,68 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           </div>
         </div>
       </section>
+      {/* Encyclopedia Section (SEO & Authority) */}
+      <section className="py-24 bg-zinc-950 relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="relative aspect-square rounded-[3rem] overflow-hidden border border-white/5 order-2 lg:order-1"
+            >
+              <img 
+                src="https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop" 
+                alt="Карате нормативи та історія Кіокушинкай Київ" 
+                className="w-full h-full object-cover grayscale"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
+              <div className="absolute bottom-10 left-10 right-10 flex justify-center">
+                <Link to="/encyclopedia" className="bg-white/10 backdrop-blur-md border border-white/20 px-8 py-4 rounded-2xl text-white font-bold uppercase tracking-widest text-xs hover:bg-white/20 transition-all">
+                  Відкрити енциклопедію
+                </Link>
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="order-1 lg:order-2"
+            >
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Методичка та нормативи</h2>
+              <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight">
+                Велика книга <span className="text-red-600">воїна</span>
+              </h3>
+              <p className="text-zinc-400 text-lg mb-8 leading-relaxed">
+                Ми створили повну онлайн-енциклопедію для наших учнів та батьків. Все про Кіокушинкай карате в одному місці: від історії засновника до детальних нормативів на кожен пояс.
+              </p>
+              <div className="grid grid-cols-2 gap-4 mb-10">
+                {[
+                  { title: 'Історія', desc: 'Шлях Сосая Оями' },
+                  { title: 'Філософія', desc: 'Етикет та Додзьо Кун' },
+                  { title: 'Нормативи', desc: 'Вимоги на всі пояси' },
+                  { title: 'Словник', desc: 'Японська термінологія' }
+                ].map((item, i) => (
+                  <div key={i} className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="text-red-500 font-black text-xs uppercase mb-1">{item.title}</div>
+                    <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-widest">{item.desc}</div>
+                  </div>
+                ))}
+              </div>
+              <Button 
+                variant="secondary" 
+                className="w-full sm:w-auto"
+                onClick={() => window.location.href = '/encyclopedia'}
+              >
+                Читати методичку
+              </Button>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Directions Section */}
       {content?.hide_section_directions !== 'true' && (
         <section id="directions" className="py-16 md:py-24 bg-black relative overflow-hidden">
