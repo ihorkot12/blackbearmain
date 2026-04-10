@@ -930,11 +930,14 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         body: JSON.stringify({ participant_id: participantId, type: badgeType })
       });
       if (res.ok) {
-        toast.success('Досягнення додано');
+        toast.success('Досягнення додано (+10 балів)');
         setShowBadgeModal(null);
         setBadgeType('');
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
+      } else {
+        const err = await res.json();
+        toast.error(`Помилка: ${err.error || 'Невідома помилка'}`);
       }
     } catch (e) {
       toast.error('Помилка');
@@ -963,13 +966,17 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         })
       });
       if (res.ok) {
-        toast.success('Активність додано');
+        const data = await res.json();
+        toast.success(`Активність додано (+${data.points_awarded || 0} балів)`);
         setShowCompModal(null);
         setCompName('');
         setCompResult('');
         setCompType('competition');
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
+      } else {
+        const err = await res.json();
+        toast.error(`Помилка: ${err.error || 'Невідома помилка'}`);
       }
     } catch (e) {
       toast.error('Помилка');
@@ -4127,6 +4134,9 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
   const [leads, setLeads] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '' });
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -4143,16 +4153,18 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
     setLoading(true);
     const token = localStorage.getItem('admin_token');
     try {
-      const [payRes, repRes, leadsRes, partRes] = await Promise.all([
+      const [payRes, repRes, leadsRes, partRes, annRes] = await Promise.all([
         fetch(`/api/payments?month=${month}&year=${year}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
         fetch(`/api/reports/finance?year=${year}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
         fetch('/api/leads', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/announcements', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
       ]);
       setPayments(Array.isArray(payRes) ? payRes : []);
       setReport(repRes);
       setLeads(Array.isArray(leadsRes) ? leadsRes : []);
       setParticipants(Array.isArray(partRes) ? partRes : []);
+      setAnnouncements(Array.isArray(annRes) ? annRes : []);
     } catch (e) {
       console.error(e);
     }
@@ -4185,6 +4197,49 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
       }
     } catch (e) {
       toast.error('Помилка додавання оплати');
+    }
+  };
+
+  const handleAddAnnouncement = async () => {
+    if (!newAnnouncement.title || !newAnnouncement.content) {
+      toast.error('Заповніть заголовок та зміст');
+      return;
+    }
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/announcements', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(newAnnouncement)
+      });
+      if (res.ok) {
+        toast.success('Оголошення надіслано');
+        setIsAddingAnnouncement(false);
+        setNewAnnouncement({ title: '', content: '' });
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка надсилання оголошення');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: number) => {
+    if (!confirm('Видалити це оголошення?')) return;
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/announcements/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Оголошення видалено');
+        fetchData();
+      }
+    } catch (e) {
+      toast.error('Помилка видалення');
     }
   };
 
@@ -4226,6 +4281,13 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           <p className="text-zinc-500 font-medium max-w-2xl">Керування лідами, оплатами та фінансова звітність.</p>
         </div>
         <div className="flex gap-4">
+          <button 
+            onClick={() => setIsAddingAnnouncement(true)}
+            className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3"
+          >
+            <MessageSquare size={18} />
+            Надіслати оголошення
+          </button>
           <button 
             onClick={() => setIsAddingPayment(true)}
             className="bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-red-600/20 flex items-center gap-3"
@@ -4326,68 +4388,97 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
         </div>
       </div>
 
-      {/* Debtors Section */}
-      <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">
-        <div className="p-8 border-b border-white/5 flex justify-between items-center">
-          <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-            <AlertCircle className="text-red-600" size={24} />
-            Боржники
-          </h3>
-          <span className="px-4 py-2 bg-red-600/10 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest">
-            {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length} учнів
-          </span>
+      {/* Debtors & Announcements Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">
+          <div className="p-8 border-b border-white/5 flex justify-between items-center">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <AlertCircle className="text-red-600" size={24} />
+              Боржники
+            </h3>
+            <span className="px-4 py-2 bg-red-600/10 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest">
+              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length} учнів
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-white/5">
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Учень</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Група</th>
+                  <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Дії</th>
+                </tr>
+              </thead>
+              <tbody>
+                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').map(p => (
+                  <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                    <td className="px-8 py-6">
+                      <p className="font-bold text-white text-sm">{p.name}</p>
+                      <p className="text-[10px] text-zinc-500">{p.parent_name || '—'}</p>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className="px-3 py-1 bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase rounded-full">
+                        {p.group_name || 'Без групи'}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <button 
+                        onClick={() => {
+                          setNewPayment({
+                            ...newPayment,
+                            participant_id: p.id.toString(),
+                            amount: '1500'
+                          });
+                          setIsAddingPayment(true);
+                        }}
+                        className="text-red-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-colors"
+                      >
+                        Оплатити
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-8 py-12 text-center text-zinc-500 font-medium">
+                      Боржників не знайдено.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-white/5">
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Учень</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Група</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500">Телефон</th>
-                <th className="px-8 py-6 text-[10px] font-black uppercase tracking-widest text-zinc-500 text-right">Дії</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').map(p => (
-                <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                  <td className="px-8 py-6">
-                    <p className="font-bold text-white">{p.name}</p>
-                    <p className="text-[10px] text-zinc-500">{p.parent_name || '—'}</p>
-                  </td>
-                  <td className="px-8 py-6">
-                    <span className="px-3 py-1 bg-zinc-800 text-zinc-400 text-[10px] font-black uppercase rounded-full">
-                      {p.group_name || 'Без групи'}
-                    </span>
-                  </td>
-                  <td className="px-8 py-6">
-                    <p className="text-sm font-medium text-zinc-400">{p.phone || '—'}</p>
-                  </td>
-                  <td className="px-8 py-6 text-right">
-                    <button 
-                      onClick={() => {
-                        setNewPayment({
-                          ...newPayment,
-                          participant_id: p.id.toString(),
-                          amount: '1500' // Default amount or fetch from group
-                        });
-                        setIsAddingPayment(true);
-                      }}
-                      className="text-red-600 hover:text-red-500 text-[10px] font-black uppercase tracking-widest transition-colors"
-                    >
-                      Оплатити
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-8 py-12 text-center text-zinc-500 font-medium">
-                    Боржників не знайдено. Всі оплати вчасно!
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+
+        <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col">
+          <div className="p-8 border-b border-white/5 flex justify-between items-center">
+            <h3 className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <MessageSquare className="text-zinc-500" size={24} />
+              Останні оголошення
+            </h3>
+          </div>
+          <div className="p-8 space-y-4 overflow-y-auto max-h-[500px] flex-1">
+            {announcements.map(ann => (
+              <div key={ann.id} className="bg-white/5 p-6 rounded-3xl border border-white/5 group relative">
+                <button 
+                  onClick={() => handleDeleteAnnouncement(ann.id)}
+                  className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-zinc-500 hover:text-red-500 transition-all"
+                >
+                  <Trash2 size={16} />
+                </button>
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-white text-sm">{ann.title}</h4>
+                  <span className="text-[10px] text-zinc-500">{new Date(ann.created_at).toLocaleDateString()}</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">{ann.content}</p>
+              </div>
+            ))}
+            {announcements.length === 0 && (
+              <div className="text-center py-12 text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                Оголошень поки немає
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -4556,6 +4647,57 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           </motion.div>
         </div>
       )}
+
+      {/* Add Announcement Modal */}
+      <AnimatePresence>
+        {isAddingAnnouncement && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-zinc-900 w-full max-w-lg rounded-[2.5rem] border border-white/10 p-10 space-y-8"
+            >
+              <div className="flex justify-between items-center">
+                <h3 className="text-2xl font-black uppercase tracking-tight">Нове оголошення</h3>
+                <button onClick={() => setIsAddingAnnouncement(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Заголовок</label>
+                  <input 
+                    type="text"
+                    value={newAnnouncement.title}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-red-600 outline-none transition-all"
+                    placeholder="Наприклад: Зміна розкладу"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Зміст оголошення</label>
+                  <textarea 
+                    value={newAnnouncement.content}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
+                    className="w-full bg-black/50 border border-white/10 rounded-2xl px-6 py-4 text-white focus:border-red-600 outline-none transition-all h-32 resize-none"
+                    placeholder="Введіть текст оголошення для всіх батьків..."
+                  />
+                </div>
+                <p className="text-[10px] text-zinc-500 italic px-4">
+                  * Це оголошення з'явиться в особистих кабінетах усіх батьків та буде надіслано в Telegram.
+                </p>
+                <button 
+                  onClick={handleAddAnnouncement}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-red-600/20"
+                >
+                  Надіслати всім
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

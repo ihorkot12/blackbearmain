@@ -25,6 +25,8 @@ const ParentPanel = () => {
   const [attendance, setAttendance] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
   const [schedule, setSchedule] = useState<any[]>([]);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -37,12 +39,14 @@ const ParentPanel = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pRes, aRes, bRes, sRes, cRes] = await Promise.all([
+      const [pRes, aRes, bRes, sRes, cRes, payRes, annRes] = await Promise.all([
         fetch('/api/parent/me'),
         fetch('/api/parent/attendance'),
         fetch('/api/parent/badges'),
         fetch('/api/parent/schedule'),
-        fetch('/api/parent/children')
+        fetch('/api/parent/children'),
+        fetch('/api/parent/payments'),
+        fetch('/api/announcements')
       ]);
 
       if (pRes.status === 401) {
@@ -55,12 +59,16 @@ const ParentPanel = () => {
       const bData = bRes.ok ? await bRes.json() : [];
       const sData = sRes.ok ? await sRes.json() : [];
       const cData = cRes.ok ? await cRes.json() : [];
+      const payData = payRes.ok ? await payRes.json() : [];
+      const annData = annRes.ok ? await annRes.json() : [];
 
       if (pData) setParticipant(pData);
       setAttendance(aData);
       setBadges(bData);
       setSchedule(sData);
       setChildren(cData);
+      setPayments(payData);
+      setAnnouncements(annData);
     } catch (e) {
       toast.error('Помилка завантаження даних');
     }
@@ -107,12 +115,21 @@ const ParentPanel = () => {
           </div>
           <span className="text-sm font-black uppercase tracking-tighter">Black Bear <span className="text-zinc-600">Dojo</span></span>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-zinc-400"
-        >
-          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleLogout}
+            className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-zinc-500 hover:text-red-500 transition-colors"
+            title="Вийти"
+          >
+            <LogOut size={18} />
+          </button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="w-10 h-10 bg-white/5 rounded-xl flex items-center justify-center text-zinc-400"
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile Menu Overlay */}
@@ -239,13 +256,15 @@ const ParentPanel = () => {
           ))}
         </nav>
 
-        <button 
-          onClick={handleLogout}
-          className="mt-auto flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold"
-        >
-          <LogOut size={20} />
-          Вийти
-        </button>
+        <div className="mt-auto pt-8 border-t border-white/5">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold"
+          >
+            <LogOut size={20} />
+            Вийти
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -372,30 +391,36 @@ const ParentPanel = () => {
             <div className="space-y-8">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Історія <span className="text-red-600">відвідувань</span></h2>
               <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-white/5">
-                      <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата</th>
-                      <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
-                      <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Примітка</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attendance.map((record, i) => (
-                      <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="p-8 font-bold">{new Date(record.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
-                        <td className="p-8">
-                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                            record.status === 'present' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
-                          }`}>
-                            {record.status === 'present' ? 'Присутній' : 'Відсутній'}
-                          </span>
-                        </td>
-                        <td className="p-8 text-zinc-500 italic">{record.note || '—'}</td>
+                {attendance.length > 0 ? (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-white/5">
+                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Дата</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
+                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Примітка</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {attendance.map((record, i) => (
+                        <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                          <td className="p-8 font-bold">{new Date(record.date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</td>
+                          <td className="p-8">
+                            <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                              record.status === 'present' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
+                            }`}>
+                              {record.status === 'present' ? 'Присутній' : 'Відсутній'}
+                            </span>
+                          </td>
+                          <td className="p-8 text-zinc-500 italic">{record.note || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">
+                    Даних про відвідуваність поки немає
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -457,31 +482,40 @@ const ParentPanel = () => {
                 </div>
                 
                 <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-hidden">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-white/5">
-                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Місяць</th>
-                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Сума</th>
-                        <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="p-8 font-bold">Квітень 2026</td>
-                        <td className="p-8">1500 грн</td>
-                        <td className="p-8">
-                          <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-500">Оплачено</span>
-                        </td>
-                      </tr>
-                      <tr className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
-                        <td className="p-8 font-bold">Березень 2026</td>
-                        <td className="p-8">1500 грн</td>
-                        <td className="p-8">
-                          <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-500">Оплачено</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  {payments.length > 0 ? (
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-white/5">
+                          <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Місяць / Дата</th>
+                          <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Сума</th>
+                          <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Тип</th>
+                          <th className="p-8 text-[10px] font-black uppercase tracking-widest text-zinc-500">Статус</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {payments.map((payment, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                            <td className="p-8 font-bold">
+                              {payment.month && payment.year 
+                                ? `${['Січень', 'Лютий', 'Березень', 'Квітень', 'Травень', 'Червень', 'Липень', 'Серпень', 'Вересень', 'Жовтень', 'Листопад', 'Грудень'][payment.month - 1]} ${payment.year}`
+                                : new Date(payment.date).toLocaleDateString('uk-UA')}
+                            </td>
+                            <td className="p-8">{payment.amount} грн</td>
+                            <td className="p-8 text-xs text-zinc-500 uppercase tracking-widest font-bold">
+                              {payment.type === 'subscription' ? 'Абонемент' : payment.type === 'exam' ? 'Атестація' : 'Інше'}
+                            </td>
+                            <td className="p-8">
+                              <span className="px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest bg-green-500/20 text-green-500">Оплачено</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">
+                      Історія оплат порожня
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -491,24 +525,22 @@ const ParentPanel = () => {
             <div className="space-y-8">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Повідомлення від <span className="text-red-600">додзьо</span></h2>
               <div className="space-y-4">
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 border-l-4 border-l-red-600">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="font-black uppercase tracking-tight text-xl">Зміна розкладу на свята</div>
-                    <div className="text-xs text-zinc-500">Сьогодні, 10:45</div>
+                {announcements.map(ann => (
+                  <div key={ann.id} className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 border-l-4 border-l-red-600">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="font-black uppercase tracking-tight text-xl">{ann.title}</div>
+                      <div className="text-xs text-zinc-500">{new Date(ann.created_at).toLocaleString('uk-UA')}</div>
+                    </div>
+                    <p className="text-zinc-400 leading-relaxed">
+                      {ann.content}
+                    </p>
                   </div>
-                  <p className="text-zinc-400 leading-relaxed">
-                    Шановні батьки! Зверніть увагу, що у зв'язку зі святами, тренування в понеділок буде перенесено на 18:00.
-                  </p>
-                </div>
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="font-black uppercase tracking-tight text-xl">Атестація на пояси</div>
-                    <div className="text-xs text-zinc-500">Вчора, 15:20</div>
+                ))}
+                {announcements.length === 0 && (
+                  <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">
+                    Повідомлень поки немає
                   </div>
-                  <p className="text-zinc-400 leading-relaxed">
-                    Нагадуємо, що наступна атестація відбудеться 25 квітня. Прохання перевірити наявність допуску у тренера.
-                  </p>
-                </div>
+                )}
               </div>
             </div>
           )}

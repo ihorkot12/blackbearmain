@@ -186,6 +186,14 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS announcements (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        author_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL
+      );
+
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
@@ -431,13 +439,14 @@ async function startServer() {
 
   app.use(session({
     secret: SESSION_SECRET,
-    resave: true,
-    saveUninitialized: true,
+    resave: false,
+    saveUninitialized: false,
+    proxy: true,
     cookie: { 
       secure: true, 
       httpOnly: true, 
       sameSite: 'none',
-      maxAge: 24 * 60 * 60 * 1000 
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     }
   }));
 
@@ -1833,9 +1842,11 @@ ${childrenList}
       );
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
-      res.json({ success: true });
+      console.log(`Badge added for participant ${participant_id}: 10 points awarded`);
+      res.json({ success: true, points_awarded: 10 });
     } catch (e) {
       await pool.query("ROLLBACK");
+      console.error("Failed to create badge:", e);
       res.status(500).json({ error: "Failed to create badge" });
     }
   });
@@ -1893,6 +1904,9 @@ ${childrenList}
   app.post("/api/competitions", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participant_id, name, result, date, type = 'competition' } = req.body;
+    if (!participant_id || !name) {
+      return res.status(400).json({ error: "Participant ID and name are required" });
+    }
     try {
       await pool.query("BEGIN");
       const insertRes = await pool.query(
@@ -1924,9 +1938,11 @@ ${childrenList}
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
-      res.json({ success: true });
+      console.log(`Competition added for participant ${participant_id}: ${points} points awarded`);
+      res.json({ success: true, points_awarded: points });
     } catch (e) {
       await pool.query("ROLLBACK");
+      console.error("Failed to create competition entry:", e);
       res.status(500).json({ error: "Failed to create entry" });
     }
   });
@@ -2512,7 +2528,59 @@ ${childrenList}
   });
 
     // Parent Portal Endpoints
-    app.get("/api/parent/me", async (req, res) => {
+    // Announcements
+  app.get("/api/announcements", async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query("SELECT * FROM announcements ORDER BY created_at DESC LIMIT 50");
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+
+  app.post("/api/announcements", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { title, content } = req.body;
+    const adminId = (req as any).adminId;
+
+    if (!title || !content) {
+      return res.status(400).json({ error: "Title and content are required" });
+    }
+
+    try {
+      const result = await pool.query(
+        "INSERT INTO announcements (title, content, author_id) VALUES ($1, $2, $3) RETURNING *",
+        [title, content, adminId]
+      );
+      
+      // Also send to Telegram if configured
+      const telegramMessage = `
+<b>📢 НОВЕ ОГОЛОШЕННЯ!</b>
+<b>${title}</b>
+
+${content}
+      `;
+      sendTelegramMessage(telegramMessage).catch(err => console.error('Failed to send announcement to Telegram:', err));
+
+      res.json(result.rows[0]);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+
+  app.delete("/api/announcements/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { id } = req.params;
+    try {
+      await pool.query("DELETE FROM announcements WHERE id = $1", [id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  app.get("/api/parent/me", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
       const participantId = (req.session as any).participantId;
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
@@ -2594,6 +2662,19 @@ ${childrenList}
       }
     });
 
+    app.get("/api/parent/payments", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = (req.session as any).participantId;
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const result = await pool.query("SELECT * FROM payments WHERE participant_id = $1 ORDER BY year DESC, month DESC", [participantId]);
+        res.json(result.rows);
+      } catch (e) {
+        res.status(500).json({ error: "Failed to fetch payments" });
+      }
+    });
+
     app.get("/api/parent/badges", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
       const participantId = (req.session as any).participantId;
@@ -2629,7 +2710,8 @@ ${childrenList}
           FROM schedule s 
           LEFT JOIN coaches c ON s.coach_id = c.id 
           LEFT JOIN locations l ON s.location_id = l.id 
-          WHERE s.group_name = $1
+          WHERE s.group_name ILIKE $1 || '%'
+             OR s.group_name ILIKE '%' || $1 || '%'
           ORDER BY s.order_index ASC
         `, [groupName]);
         
