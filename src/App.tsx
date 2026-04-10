@@ -288,7 +288,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
   const defaultLocations = [
     { id: 1, name: "Шулявка", address: "вул. Сім'ї Бродських, 31/33\nКиїв, 03057 (м. Шулявська)", map_link: "https://maps.app.goo.gl/9Z9Z9Z" },
-    { id: 2, name: "Віктора Некрасова", address: "вул. Віктора Некрасова, 1-3\nКиїв, 04136", map_link: "https://maps.app.goo.gl/8Y8Y8Y" }
+    { id: 2, name: "Відрадний / Сирець", address: "вул. Віктора Некрасова, 1-3\nКиїв, 04136", map_link: "https://maps.app.goo.gl/8Y8Y8Y" }
   ];
 
   const defaultSchedule = [
@@ -437,7 +437,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             </motion.div>
 
             <h1 className="text-xl md:text-2xl font-bold mb-4 tracking-tight uppercase text-red-600">
-              Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Дитяче карате Київ • Секція карате Київ</span>
+              Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Сирець • Відрадний • Дитяче карате Київ</span>
             </h1>
 
     <div className="text-3xl sm:text-5xl md:text-7xl font-black mb-6 tracking-tighter leading-[1.1] md:leading-none uppercase">

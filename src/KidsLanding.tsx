@@ -345,6 +345,44 @@ export const KidsLanding = () => {
         </div>
       </section>
 
+      {/* Locations Section */}
+      <section className="py-16 md:py-24 bg-black">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-4">Де ми тренуємо</h2>
+            <h3 className="text-3xl md:text-5xl font-black uppercase tracking-tighter">Наші зали у <span className="text-zinc-600 text-glow">Києві</span></h3>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all group">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
+                  <MapPin size={24} />
+                </div>
+                <h4 className="text-2xl font-black uppercase tracking-tight">Шулявка</h4>
+              </div>
+              <p className="text-zinc-400 mb-6 font-medium">вул. Сім'ї Бродських, 31/33 (м. Шулявська). Зручна локація для мешканців КПІ, Шулявки та Лук'янівки.</p>
+              <div className="flex items-center gap-2 text-red-600 font-bold uppercase tracking-widest text-[10px]">
+                <Clock size={14} />
+                Пн, Ср, Пт: 17:00 - 20:30
+              </div>
+            </div>
+            <div className="p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all group">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">
+                  <MapPin size={24} />
+                </div>
+                <h4 className="text-2xl font-black uppercase tracking-tight">Відрадний / Сирець</h4>
+              </div>
+              <p className="text-zinc-400 mb-6 font-medium">вул. Віктора Некрасова, 1-3. Секція карате для мешканців Відрадного, Сирця та Нивок.</p>
+              <div className="flex items-center gap-2 text-red-600 font-bold uppercase tracking-widest text-[10px]">
+                <Clock size={14} />
+                Пн, Ср, Пт: 17:00 - 19:00
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Testimonial Section */}
       <section className="py-16 md:py-24 bg-black">
         <div className="max-w-4xl mx-auto px-6">
