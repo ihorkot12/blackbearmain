@@ -30,7 +30,7 @@ export const RegisterMember = () => {
 
   const [parentInfo, setParentInfo] = useState({
     parent_name: '',
-    phone: '',
+    parent_phone: '',
     password: '',
     confirmPassword: ''
   });
@@ -232,7 +232,7 @@ export const RegisterMember = () => {
                 }]);
                 setParentInfo({
                   parent_name: '',
-                  phone: '',
+                  parent_phone: '',
                   password: '',
                   confirmPassword: ''
                 });
@@ -478,8 +478,8 @@ export const RegisterMember = () => {
                       type="tel" 
                       placeholder="+380..."
                       className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                      value={parentInfo.phone}
-                      onChange={e => setParentInfo({...parentInfo, phone: e.target.value})}
+                      value={parentInfo.parent_phone}
+                      onChange={e => setParentInfo({...parentInfo, parent_phone: e.target.value})}
                     />
                   </div>
                 </div>

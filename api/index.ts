@@ -131,12 +131,21 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         parent_name TEXT,
         phone TEXT,
+        parent_phone TEXT,
         telegram_chat_id TEXT,
-        exam_readiness TEXT DEFAULT 'not_started', -- 'not_started', 'in_progress', 'ready', 'certified'
+        exam_readiness TEXT DEFAULT 'not_started',
         skill_checklist JSONB DEFAULT '[]',
         streak INTEGER DEFAULT 0,
         last_attendance_date DATE
       );
+
+      -- Ensure parent_phone exists if table was created before
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='parent_phone') THEN
+          ALTER TABLE participants ADD COLUMN parent_phone TEXT;
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
@@ -1406,11 +1415,13 @@ async function startServer() {
       let user = null;
       if (normalizedPhone.length >= 9) {
         const result = await pool.query(
-          `SELECT id, name, phone, parent_password, parent_login 
+          `SELECT id, name, phone, parent_phone, parent_password, parent_login 
            FROM participants 
-           WHERE phone IS NOT NULL AND (
+           WHERE (phone IS NOT NULL OR parent_phone IS NOT NULL) AND (
              phone LIKE '%' || $1 OR 
              phone LIKE '%' || $2 OR
+             parent_phone LIKE '%' || $1 OR
+             parent_phone LIKE '%' || $2 OR
              parent_login = $3
            )
            LIMIT 1`,
@@ -1643,14 +1654,15 @@ async function startServer() {
 
   app.post("/api/register-member", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { children, parent_name, phone, password } = req.body;
+    const { children, parent_name, phone, parent_phone, password } = req.body;
     
     if (!children || !Array.isArray(children) || children.length === 0) {
       return res.status(400).json({ error: "No children data provided" });
     }
 
     // Use provided phone as login, or generate if missing
-    const normalizedPhone = normalizePhone(phone);
+    const contactPhone = parent_phone || phone;
+    const normalizedPhone = normalizePhone(contactPhone);
     const parent_login = normalizedPhone || `user_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = password;
     
@@ -1665,8 +1677,8 @@ async function startServer() {
       for (const child of children) {
         const { name, age, birthday, group_id, belt } = child;
         const result = await pool.query(
-          "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
-          [name, age, birthday || null, group_id || null, parent_name, phone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'new']
+          "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+          [name, age, birthday || null, group_id || null, parent_name, phone, contactPhone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'new']
         );
         results.push(result.rows[0].id);
       }
