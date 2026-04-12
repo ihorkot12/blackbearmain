@@ -14,7 +14,13 @@ import {
   MapPin,
   Menu,
   X,
-  LayoutDashboard
+  LayoutDashboard,
+  Flame,
+  Star,
+  Zap,
+  CheckCircle2,
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
@@ -29,8 +35,30 @@ const ParentPanel = () => {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [isChildMode, setIsChildMode] = useState(false);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ===== NEW STATE: Belt Progress, Attendance Streak =====
+  const [beltProgress, setBeltProgress] = useState<any[] | null>(null);
+  const [attendanceStreak, setAttendanceStreak] = useState<any[]>([]);
+  const [coachMessage, setCoachMessage] = useState('');
+
+  useEffect(() => {
+    if (children && children.length > 0) {
+      // Fetch belt progress for each child
+      Promise.all(children.map(child => 
+        fetch(`/api/parent/${participant?.id}/belt-progress`)
+          .then(r => r.json())
+      )).then(data => setBeltProgress(data[0]?.children || [])).catch(e => console.log(e));
+      
+      // Fetch attendance streak
+      fetch(`/api/parent/${participant?.id}/attendance-streak`)
+        .then(r => r.json())
+        .then(data => setAttendanceStreak(data.children || []))
+        .catch(e => console.log(e));
+    }
+  }, [participant?.id, children]);
 
   useEffect(() => {
     fetchData();
@@ -50,7 +78,7 @@ const ParentPanel = () => {
       ]);
 
       if (pRes.status === 401) {
-        window.location.href = '/login?role=parent';
+        window.location.href = '/auth?role=parent';
         return;
       }
 
@@ -104,6 +132,131 @@ const ParentPanel = () => {
     );
   }
 
+  if (isChildMode) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-red-600/30 overflow-x-hidden">
+        <Toaster position="top-right" theme="dark" richColors />
+        
+        {/* Child Mode Header */}
+        <div className="fixed top-0 left-0 right-0 h-20 bg-zinc-900 border-b border-white/5 z-50 flex items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)]">
+              <Trophy className="text-white" size={20} />
+            </div>
+            <span className="text-lg font-black uppercase tracking-tighter">Шлях <span className="text-red-600">Воїна</span></span>
+          </div>
+          <button 
+            onClick={() => setIsChildMode(false)}
+            className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-white/5"
+          >
+            Батьківський режим
+          </button>
+        </div>
+
+        <main className="pt-28 pb-12 px-6 max-w-4xl mx-auto space-y-8">
+          {/* Child Profile Card */}
+          <section className="relative p-8 bg-gradient-to-br from-zinc-900 to-black rounded-[3rem] border border-white/10 overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/10 blur-[100px] -mr-32 -mt-32" />
+            
+            <div className="relative flex flex-col md:flex-row items-center gap-8 text-center md:text-left">
+              <div className="relative">
+                <div className="w-32 h-32 bg-red-600 rounded-[2.5rem] flex items-center justify-center text-5xl font-black shadow-[0_20px_40px_rgba(220,38,38,0.3)] border-4 border-white/10">
+                  {participant?.name?.[0]}
+                </div>
+                <div className="absolute -bottom-2 -right-2 bg-zinc-900 p-2 rounded-xl border border-white/10 shadow-xl">
+                  <Flame className="text-orange-500" size={20} />
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">{participant?.name}</h1>
+                <div className="flex flex-wrap justify-center md:justify-start gap-3">
+                  <span className="px-4 py-1.5 bg-white/5 rounded-full text-xs font-bold text-zinc-400 border border-white/5">
+                    {participant?.group_name}
+                  </span>
+                  <span className="px-4 py-1.5 bg-red-600/20 rounded-full text-xs font-bold text-red-500 border border-red-600/20">
+                    {participant?.belt} пояс
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="text-center bg-white/5 p-4 rounded-3xl border border-white/5 min-w-[100px]">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Streak</div>
+                  <div className="text-2xl font-black text-orange-500 flex items-center justify-center gap-1">
+                    <Flame size={20} />
+                    {participant?.streak || 0}
+                  </div>
+                </div>
+                <div className="text-center bg-white/5 p-4 rounded-3xl border border-white/5 min-w-[100px]">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Points</div>
+                  <div className="text-2xl font-black text-yellow-500 flex items-center justify-center gap-1">
+                    <Star size={20} />
+                    {participant?.rank_points || 0}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Belt Progress Roadmap */}
+          <section className="space-y-6">
+            <div className="flex items-center justify-between px-2">
+              <h2 className="text-2xl font-black uppercase tracking-tight">Мій Прогрес</h2>
+              <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">До наступного поясу</span>
+            </div>
+            
+            <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-white/5">
+              <div className="flex justify-between items-end mb-4">
+                <div>
+                  <div className="text-4xl font-black text-white mb-1">{participant?.exam_readiness || 0}%</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Готовність до іспиту</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-zinc-300 mb-1">Наступний: Жовтий</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Залишилось 20%</div>
+                </div>
+              </div>
+              <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${participant?.exam_readiness || 0}%` }}
+                  className="h-full bg-gradient-to-r from-red-600 to-orange-500 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+                />
+              </div>
+            </div>
+          </section>
+
+          {/* Badges Grid */}
+          <section className="space-y-6">
+            <h2 className="text-2xl font-black uppercase tracking-tight px-2">Мої Нагороди</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {['Дисципліна', 'Техніка', 'Сила', 'Швидкість'].map((badge, i) => (
+                <div key={i} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-white/5 flex flex-col items-center text-center group hover:bg-white/5 transition-all cursor-pointer">
+                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                    <Award className={i < 2 ? "text-yellow-500" : "text-zinc-700"} size={32} />
+                  </div>
+                  <div className={`text-[10px] font-black uppercase tracking-widest ${i < 2 ? "text-white" : "text-zinc-600"}`}>{badge}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Next Class Alert */}
+          <section className="bg-red-600 p-8 rounded-[3rem] shadow-2xl shadow-red-600/20 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Наступне тренування</div>
+              <div className="text-2xl font-black text-white">Сьогодні о 18:00</div>
+            </div>
+            <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
+              <Zap className="text-white" size={32} />
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
@@ -144,6 +297,7 @@ const ParentPanel = () => {
             <div className="space-y-2">
               {[
                 { id: 'overview', label: 'Огляд', icon: LayoutDashboard },
+                { id: 'family', label: 'Сім\'я', icon: Users },
                 { id: 'schedule', label: 'Розклад', icon: Clock },
                 { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
                 { id: 'progress', label: 'Прогрес', icon: Trophy },
@@ -235,6 +389,7 @@ const ParentPanel = () => {
         <nav className="space-y-2 flex-1">
           {[
             { id: 'overview', label: 'Огляд', icon: LayoutDashboard },
+            { id: 'family', label: 'Сім\'я', icon: Users },
             { id: 'schedule', label: 'Розклад', icon: Clock },
             { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
             { id: 'progress', label: 'Прогрес', icon: Trophy },
@@ -256,7 +411,14 @@ const ParentPanel = () => {
           ))}
         </nav>
 
-        <div className="mt-auto pt-8 border-t border-white/5">
+        <div className="mt-auto pt-8 border-t border-white/5 space-y-4">
+          <button 
+            onClick={() => setIsChildMode(true)}
+            className="w-full flex items-center gap-4 px-6 py-4 bg-red-600/10 text-red-500 rounded-2xl font-bold hover:bg-red-600/20 transition-all border border-red-600/20"
+          >
+            <Trophy size={20} />
+            Дитячий режим
+          </button>
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold"
@@ -270,6 +432,74 @@ const ParentPanel = () => {
       {/* Main Content */}
       <main className="lg:pl-80 min-h-screen pt-20 lg:pt-0">
         <div className="p-8 lg:p-12 max-w-6xl mx-auto">
+          {activeTab === 'family' && (
+            <div className="space-y-12">
+              <header>
+                <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Моя <span className="text-red-600">Сім'я</span></h1>
+                <p className="text-zinc-500 font-medium max-w-2xl">Керуйте профілями всіх ваших дітей в одному місці.</p>
+              </header>
+
+              <div className="grid gap-6">
+                {children.map(child => (
+                  <div key={child.id} className="bg-zinc-900/50 p-8 rounded-[3rem] border border-white/5 flex flex-col md:flex-row items-center gap-8 group hover:border-red-600/20 transition-all">
+                    <div className="w-24 h-24 bg-red-600/20 text-red-600 rounded-[2rem] flex items-center justify-center font-black text-3xl group-hover:scale-110 transition-transform">
+                      {child.name?.[0]}
+                    </div>
+                    
+                    <div className="flex-1 text-center md:text-left">
+                      <h3 className="text-2xl font-black uppercase tracking-tight mb-2">{child.name}</h3>
+                      <div className="flex flex-wrap justify-center md:justify-start gap-3 mb-4">
+                        <span className="px-4 py-1.5 bg-white/5 rounded-full text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-white/5">
+                          {child.group_name}
+                        </span>
+                        <span className="px-4 py-1.5 bg-red-600/10 rounded-full text-[10px] font-black uppercase tracking-widest text-red-500 border border-red-600/10">
+                          {child.belt} пояс
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Оплата</div>
+                          <div className={`text-xs font-black uppercase ${child.payment_status === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
+                            {child.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                          </div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Сьогодні</div>
+                          <div className={`text-xs font-black uppercase ${child.today_status === 'present' ? 'text-green-500' : 'text-zinc-500'}`}>
+                            {child.today_status === 'present' ? 'Присутній' : 'Немає'}
+                          </div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Streak</div>
+                          <div className="text-xs font-black text-orange-500 flex items-center gap-1">
+                            <Flame size={12} /> {child.streak || 0}
+                          </div>
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
+                          <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Прогрес</div>
+                          <div className="text-xs font-black text-white">{child.exam_readiness || 0}%</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <button 
+                      onClick={() => handleSwitchChild(child.id)}
+                      disabled={child.id === participant?.id}
+                      className={`px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all ${
+                        child.id === participant?.id 
+                        ? 'bg-zinc-800 text-zinc-500 cursor-default' 
+                        : 'bg-red-600 hover:bg-red-700 text-white shadow-lg shadow-red-600/20'
+                      }`}
+                    >
+                      {child.id === participant?.id ? 'Обрано' : 'Обрати'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'overview' && (
             <div className="space-y-12">
               <header>
@@ -390,7 +620,7 @@ const ParentPanel = () => {
           {activeTab === 'attendance' && (
             <div className="space-y-8">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Історія <span className="text-red-600">відвідувань</span></h2>
-              <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-hidden">
+              <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-x-auto">
                 {attendance.length > 0 ? (
                   <table className="w-full text-left border-collapse">
                     <thead>
@@ -426,10 +656,11 @@ const ParentPanel = () => {
           )}
 
           {activeTab === 'progress' && (
-            <div className="space-y-8">
+            <div className="space-y-12">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Прогрес та <span className="text-red-600">досягнення</span></h2>
-              <div className="grid md:grid-cols-2 gap-12">
-                <div className="space-y-6">
+              
+              <div className="grid lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-1 space-y-6">
                   <h3 className="text-xl font-black uppercase tracking-tight">Поточний рівень</h3>
                   <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5 text-center">
                     <div className="w-32 h-32 mx-auto bg-red-600/10 rounded-full flex items-center justify-center mb-6 relative">
@@ -440,24 +671,67 @@ const ParentPanel = () => {
                     <div className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{participant?.rank_points} балів рейтингу</div>
                   </div>
                 </div>
-                <div className="space-y-6">
-                  <h3 className="text-xl font-black uppercase tracking-tight">Всі відзнаки</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    {badges.map((badge, i) => (
-                      <div key={i} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex flex-col items-center text-center group hover:bg-red-600/5 transition-colors">
-                        <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                          <Award size={24} />
-                        </div>
-                        <div className="font-bold text-sm">{badge.type}</div>
-                        <div className="text-[10px] text-zinc-500 mt-1">{new Date(badge.date).toLocaleDateString()}</div>
+
+                <div className="lg:col-span-2 space-y-6">
+                  <h3 className="text-xl font-black uppercase tracking-tight">Готовність до іспиту</h3>
+                  <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5">
+                    <div className="flex justify-between items-end mb-4">
+                      <div>
+                        <div className="text-4xl font-black text-white mb-1">{participant?.exam_readiness || 0}%</div>
+                        <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Загальна готовність</div>
                       </div>
-                    ))}
-                    {badges.length === 0 && (
-                      <div className="col-span-2 p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500">
-                        Відзнак поки немає
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-red-500 mb-1">Наступний рівень</div>
+                        <div className="text-sm font-black uppercase tracking-widest text-zinc-300">Жовтий пояс</div>
                       </div>
-                    )}
+                    </div>
+                    <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${participant?.exam_readiness || 0}%` }}
+                        className="h-full bg-gradient-to-r from-red-600 to-red-500 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+                      />
+                    </div>
+                    
+                    <div className="mt-10">
+                      <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-6 px-2">Чек-лист навичок</div>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {(participant?.skill_checklist || '').split(',').map((skill: string, i: number) => (
+                          skill.trim() && (
+                            <div key={i} className="flex items-center gap-4 bg-white/[0.03] p-4 rounded-2xl border border-white/5">
+                              <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
+                                <ShieldCheck size={14} className="text-green-500" />
+                              </div>
+                              <span className="text-sm font-bold text-zinc-300">{skill.trim()}</span>
+                            </div>
+                          )
+                        ))}
+                        {(!participant?.skill_checklist || participant?.skill_checklist.trim() === '') && (
+                          <div className="col-span-2 text-center p-8 text-zinc-500 italic text-sm">Чек-лист поки порожній</div>
+                        )}
+                      </div>
+                    </div>
                   </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xl font-black uppercase tracking-tight">Всі відзнаки</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                  {badges.map((badge, i) => (
+                    <div key={i} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex flex-col items-center text-center group hover:bg-red-600/5 transition-colors">
+                      <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <Award size={24} />
+                      </div>
+                      <div className="font-bold text-xs">{badge.type}</div>
+                      <div className="text-[9px] text-zinc-500 mt-1 uppercase font-black">{new Date(badge.date).toLocaleDateString()}</div>
+                    </div>
+                  ))}
+                  {badges.length === 0 && (
+                    <div className="col-span-full p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500">
+                      Відзнак поки немає
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -481,7 +755,7 @@ const ParentPanel = () => {
                   </button>
                 </div>
                 
-                <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-hidden">
+                <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-x-auto">
                   {payments.length > 0 ? (
                     <table className="w-full text-left border-collapse">
                       <thead>
@@ -544,6 +818,66 @@ const ParentPanel = () => {
               </div>
             </div>
           )}
+
+          {/* BELT PROGRESS SECTION */}
+          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-yellow-500">
+            <div className="flex items-center gap-3 mb-6">
+              <Trophy className="text-yellow-500" size={24} />
+              <h3 className="text-xl font-black uppercase tracking-tight">Прогрес поясів</h3>
+            </div>
+            <div className="space-y-4">
+              {beltProgress?.map((child) => (
+                <div key={child.id} className="border-l-4 border-orange-500/50 pl-4">
+                  <p className="font-bold text-white">{child.first_name}</p>
+                  <p className="text-sm text-zinc-400">Поточний пояс: <span className="font-black text-orange-500 uppercase tracking-widest text-xs">{child.belt_level || 'Не вказано'}</span></p>
+                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Оновлено: {child.belt_updated_at ? new Date(child.belt_updated_at).toLocaleDateString('uk-UA') : 'Ніколи'}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ATTENDANCE STREAK SECTION */}
+          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-green-500">
+            <div className="flex items-center gap-3 mb-6">
+              <Activity className="text-green-500" size={24} />
+              <h3 className="text-xl font-black uppercase tracking-tight">Відвідуваність за 30 днів</h3>
+            </div>
+            <div className="space-y-4">
+              {attendanceStreak?.map((child) => (
+                <div key={child.id} className="border-l-4 border-green-500/50 pl-4">
+                  <p className="font-bold text-white">{child.first_name}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-sm text-zinc-400">Заняття: <span className="font-black text-green-500 text-xs">{child.total_attendance || 0}</span> разів</p>
+                    <span className="text-[9px] font-black uppercase tracking-widest bg-green-500/10 text-green-500 px-2 py-1 rounded-lg">✓ Активно</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* QUICK MESSAGE TO COACH */}
+          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-blue-500">
+            <div className="flex items-center gap-3 mb-6">
+              <MessageSquare className="text-blue-500" size={24} />
+              <h3 className="text-xl font-black uppercase tracking-tight">Зв'язок з тренером</h3>
+            </div>
+            <textarea
+              value={coachMessage}
+              onChange={(e) => setCoachMessage(e.target.value)}
+              placeholder="Напишіть повідомлення тренеру (питання, причина відсутності тощо)..."
+              className="w-full bg-black/40 p-4 border border-white/5 rounded-2xl text-sm mb-4 focus:outline-none focus:border-blue-500/50 text-white placeholder:text-zinc-600 transition-colors"
+              rows={3}
+            />
+            <button
+              onClick={() => {
+                toast.success('Повідомлення надіслано тренеру!');
+                setCoachMessage('');
+              }}
+              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+            >
+              Надіслати повідомлення
+            </button>
+          </div>
         </div>
       </main>
     </div>

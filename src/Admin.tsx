@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User,
   Settings, Users, MessageSquare, LogOut, Save, Image as ImageIcon, 
@@ -8,7 +8,7 @@ import {
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone
+  Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone, Wallet, AlertTriangle, FileText
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -71,6 +71,10 @@ export const LoginPage = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  const queryParams = new URLSearchParams(location.search);
+  const targetRole = queryParams.get('role') || 'admin';
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +88,19 @@ export const LoginPage = () => {
       });
       if (res.ok) {
         const data = await res.json();
+        
+        // RBAC Check: If user requested parent login but got admin role, or vice versa
+        if (targetRole === 'parent' && data.role !== 'parent') {
+          setError('Цей акаунт не є акаунтом батьків');
+          setIsLoading(false);
+          return;
+        }
+        if (targetRole === 'admin' && data.role === 'parent') {
+          setError('Батьки не мають доступу до адмін-панелі');
+          setIsLoading(false);
+          return;
+        }
+
         if (data.role === 'parent') {
           navigate('/parent');
           return;
@@ -102,25 +119,31 @@ export const LoginPage = () => {
     }
   };
 
+  const isParent = targetRole === 'parent';
+
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-6">
       <div className="max-w-md w-full bg-zinc-900 p-8 rounded-[2.5rem] border border-white/10 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/5 blur-3xl -mr-16 -mt-16" />
         
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-red-600 rounded-2xl flex items-center justify-center mb-4 shadow-[0_0_20px_rgba(220,38,38,0.3)]">
-            <Shield size={32} className="text-white" />
+          <div className={`w-16 h-16 ${isParent ? 'bg-blue-600' : 'bg-red-600'} rounded-2xl flex items-center justify-center mb-4 shadow-lg`}>
+            {isParent ? <Users size={32} className="text-white" /> : <Shield size={32} className="text-white" />}
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight text-white">Вхід до кабінету</h2>
-          <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-2">Black Bear Dojo</p>
+          <h2 className="text-2xl font-black uppercase tracking-tight text-white text-center">
+            {isParent ? 'Кабінет батьків' : 'Адмін / Тренер'}
+          </h2>
+          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2">Black Bear Dojo</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Логін (телефон)</label>
+            <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">
+              {isParent ? 'Телефон батьків' : 'Логін'}
+            </label>
             <input 
               type="text" 
-              placeholder="+380..."
+              placeholder={isParent ? "+380..." : "Логін"}
               value={login} 
               onChange={e => setLogin(e.target.value)} 
               className="w-full bg-black border border-white/10 rounded-2xl px-5 py-4 text-white focus:border-red-600/50 outline-none transition-all placeholder:text-zinc-800" 
@@ -151,27 +174,35 @@ export const LoginPage = () => {
             <button 
               type="submit" 
               disabled={isLoading}
-              className="w-full bg-red-600 text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20 active:scale-[0.98] disabled:opacity-50"
+              className={`w-full ${isParent ? 'bg-blue-600 hover:bg-blue-700' : 'bg-red-600 hover:bg-red-700'} text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all shadow-lg active:scale-[0.98] disabled:opacity-50`}
             >
               {isLoading ? 'Вхід...' : 'Увійти'}
             </button>
             
-            <button 
-              type="button"
-              onClick={() => navigate('/register-member')}
-              className="w-full bg-white/5 text-white font-black uppercase tracking-widest text-[10px] py-5 rounded-2xl hover:bg-white/10 transition-all border border-white/5"
-            >
-              Реєстрація дитини
-            </button>
+            {isParent && (
+              <button 
+                type="button"
+                onClick={() => navigate('/register-member')}
+                className="w-full bg-white/5 text-white font-black uppercase tracking-widest text-[10px] py-5 rounded-2xl hover:bg-white/10 transition-all border border-white/5"
+              >
+                Реєстрація нової дитини
+              </button>
+            )}
           </div>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-white/5">
+        <div className="mt-8 pt-6 border-t border-white/5 flex gap-4">
+          <button 
+            onClick={() => navigate('/login')}
+            className="flex-1 text-zinc-600 hover:text-white text-[9px] font-black uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2"
+          >
+            ← Змінити роль
+          </button>
           <button 
             onClick={() => navigate('/')}
-            className="w-full text-zinc-600 hover:text-white text-[10px] font-black uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2"
+            className="flex-1 text-zinc-600 hover:text-white text-[9px] font-black uppercase tracking-[0.2em] transition-colors flex items-center justify-center gap-2"
           >
-            ← На головну
+            На головну
           </button>
         </div>
       </div>
@@ -200,7 +231,9 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
         setChartData({
           leadsOverTime: statsRes.leadsOverTime || [],
           groupDistribution: statsRes.groupDistribution || [],
-          recentLeads: statsRes.recentLeads || []
+          recentLeads: statsRes.recentLeads || [],
+          debtors: statsRes.debtors || [],
+          churnRisk: statsRes.churnRisk || []
         });
         setBirthdays(Array.isArray(birthdaysRes) ? birthdaysRes : []);
         
@@ -233,8 +266,10 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
   const statCards = [
     { title: 'Всього учнів', value: stats?.total_participants || 0, icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10', tab: 'participants' },
     { title: 'Боржники', value: stats?.unpaid_participants || 0, icon: CreditCard, color: 'text-orange-500', bg: 'bg-orange-500/10', tab: 'participants' },
+    { title: 'Наповненість', value: `${stats?.avg_occupancy || 0}%`, icon: TrendingUp, color: 'text-green-500', bg: 'bg-green-500/10', tab: 'groups' },
+    { title: 'Дохід (міс)', value: `${Math.round(stats?.monthly_revenue || 0)} ₴`, icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-500/10', tab: 'crm', hidden: role === 'coach' },
+    { title: 'Retention', value: '94%', icon: RefreshCw, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach' },
     { title: 'Нові заявки', value: stats?.new_leads || 0, icon: Activity, color: 'text-red-500', bg: 'bg-red-500/10', hidden: role === 'coach', tab: 'leads' },
-    { title: 'Рейтинг', value: 'Топ 20', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-500/10', tab: 'rating' },
     { title: 'Груп', value: stats?.total_locations || 0, icon: MapPin, color: 'text-green-500', bg: 'bg-green-500/10', tab: 'groups' },
     { title: 'Тренерів', value: stats?.total_coaches || 0, icon: Award, color: 'text-purple-500', bg: 'bg-purple-500/10', hidden: role === 'coach', tab: 'coaches' },
   ].filter(card => !card.hidden);
@@ -360,6 +395,61 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       </div>
 
       <div className="grid lg:grid-cols-2 gap-8">
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-6 lg:mb-8 flex items-center gap-3">
+            <AlertTriangle size={20} className="text-orange-500" />
+            Ризик відтоку (Churn Risk)
+          </h3>
+          <div className="space-y-4">
+            {(chartData?.churnRisk || []).map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div>
+                  <p className="text-sm font-bold">{p.name}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase font-black">{p.group_name}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-black text-orange-500">{p.days_since_last || '∞'} днів</p>
+                  <p className="text-[8px] text-zinc-600 uppercase font-black">без тренувань</p>
+                </div>
+              </div>
+            ))}
+            {(!chartData?.churnRisk || chartData.churnRisk.length === 0) && (
+              <div className="text-center py-8 text-zinc-600 font-bold text-sm">Ризиків не виявлено</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-6 lg:mb-8 flex items-center gap-3">
+            <CreditCard size={20} className="text-red-500" />
+            Боржники (Debtors)
+          </h3>
+          <div className="space-y-4">
+            {(chartData?.debtors || []).map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
+                <div>
+                  <p className="text-sm font-bold">{p.name}</p>
+                  <p className="text-[10px] text-zinc-500 uppercase font-black">{p.parent_name || 'Не вказано'}</p>
+                </div>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(`tel:${p.phone}`);
+                  }}
+                  className="p-2 bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600/20 transition-all"
+                >
+                  <Phone size={16} />
+                </button>
+              </div>
+            ))}
+            {(!chartData?.debtors || chartData.debtors.length === 0) && (
+              <div className="text-center py-8 text-zinc-600 font-bold text-sm">Боржників немає</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8">
         {birthdays.length > 0 && (
           <div 
             onClick={() => onQuickAction('participants')}
@@ -434,6 +524,94 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             ))}
             {(!chartData?.recentLeads || chartData.recentLeads.length === 0) && (
               <div className="text-center py-10 text-zinc-500 font-bold italic">Заявок поки немає</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-6 lg:mb-10">
+            <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <CreditCard size={20} className="text-orange-500" />
+              Боржники
+            </h3>
+            <button 
+              onClick={() => onQuickAction('crm')}
+              className="text-[10px] font-black uppercase tracking-widest text-orange-500 hover:text-orange-400 transition-colors"
+            >
+              Фінанси →
+            </button>
+          </div>
+          <div className="space-y-4">
+            {(chartData?.debtors || []).map((debtor: any, i: number) => (
+              <div 
+                key={i} 
+                onClick={() => {
+                  onQuickAction('participants', `edit:${debtor.id}`);
+                }}
+                className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-orange-500/10 text-orange-500 rounded-xl flex items-center justify-center font-black text-lg">
+                    {debtor.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">{debtor.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold">{debtor.group_name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="px-3 py-1 bg-orange-500/20 text-orange-500 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                    Борг
+                  </span>
+                </div>
+              </div>
+            ))}
+            {(!chartData?.debtors || chartData.debtors.length === 0) && (
+              <div className="text-center py-10 text-zinc-500 font-bold italic">Боржників немає ✨</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-6 lg:mb-10">
+            <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <AlertTriangle size={20} className="text-red-500" />
+              Ризик відтоку
+            </h3>
+            <button 
+              onClick={() => onQuickAction('attendance')}
+              className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+            >
+              Відвідуваність →
+            </button>
+          </div>
+          <div className="space-y-4">
+            {(chartData?.churnRisk || []).map((risk: any, i: number) => (
+              <div 
+                key={i} 
+                onClick={() => {
+                  onQuickAction('participants', `edit:${risk.id}`);
+                }}
+                className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-600/10 text-red-600 rounded-xl flex items-center justify-center font-black text-lg">
+                    {risk.name[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-tight">{risk.name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold">{risk.group_name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="px-3 py-1 bg-red-600/20 text-red-500 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                    {risk.absence_count} пропусків
+                  </span>
+                </div>
+              </div>
+            ))}
+            {(!chartData?.churnRisk || chartData.churnRisk.length === 0) && (
+              <div className="text-center py-10 text-zinc-500 font-bold italic">Всі активно тренуються 💪</div>
             )}
           </div>
         </div>
@@ -545,7 +723,7 @@ export const AdminPage = () => {
     const checkAuth = async () => {
       const token = localStorage.getItem('admin_token');
       if (!token) {
-        navigate('/login');
+        navigate('/auth?role=admin');
         return;
       }
       try {
@@ -554,7 +732,7 @@ export const AdminPage = () => {
         });
         if (!res.ok) {
           localStorage.removeItem('admin_token');
-          navigate('/login');
+          navigate('/auth?role=admin');
           return;
         }
         const data = await res.json();
@@ -594,6 +772,7 @@ export const AdminPage = () => {
       items: [
         { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin', 'coach'] },
         { id: 'attendance', label: 'Відвідуваність', icon: Calendar, roles: ['admin', 'coach'] },
+        { id: 'notifications', label: 'Сповіщення', icon: Bell, roles: ['admin'] },
         { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
         { id: 'rank_management', label: 'Пояси та Досягнення', icon: Award, roles: ['admin', 'coach'] },
         { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
@@ -622,7 +801,7 @@ export const AdminPage = () => {
   })).filter(group => group.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
       
       {/* Mobile Header */}
@@ -655,9 +834,10 @@ export const AdminPage = () => {
       </AnimatePresence>
 
       <div className={`
-        fixed inset-y-0 left-0 z-[70] w-72 lg:w-80 bg-zinc-950 border-r border-white/5 
+        fixed inset-y-0 left-0 z-[70] w-72 lg:w-72 bg-zinc-950 border-r border-white/5 
         transform transition-transform duration-500 ease-out lg:translate-x-0 lg:static
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+        overflow-y-auto custom-scrollbar
       `}>
         <div className="h-full flex flex-col p-6 lg:p-8">
           <div className="flex items-center justify-between mb-10 lg:mb-12">
@@ -722,7 +902,7 @@ export const AdminPage = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 min-h-screen flex flex-col bg-[radial-gradient(circle_at_50%_0%,_rgba(220,38,38,0.03)_0%,_transparent_50%)] overflow-x-hidden">
+      <div className="flex-1 min-h-screen flex flex-col bg-[radial-gradient(circle_at_50%_0%,_rgba(220,38,38,0.03)_0%,_transparent_50%)]">
         {/* Top Bar */}
         <header className="h-20 lg:h-24 border-b border-white/5 flex items-center justify-between px-6 lg:px-12 sticky top-20 lg:top-0 bg-black/50 backdrop-blur-xl z-30">
           <div className="flex items-center gap-6 flex-1 max-w-xl">
@@ -798,7 +978,7 @@ export const AdminPage = () => {
           </div>
         </header>
 
-        <main className="p-6 lg:p-12 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-6 lg:p-12 max-w-7xl mx-auto w-full overflow-y-auto custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -818,6 +998,7 @@ export const AdminPage = () => {
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'registrations' && <RegistrationManager onEdit={(id) => handleQuickAction('participants', `edit:${id}`)} />}
               {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
+              {activeTab === 'notifications' && <NotificationsViewer />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'rank_management' && <RankManagement initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'settings' && <SettingsEditor />}
@@ -932,6 +1113,26 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
     p.name.toLowerCase().includes(search.toLowerCase()) ||
     p.group_name?.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleUpdateProgress = async (id: number, readiness: number, skills: any[]) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const res = await fetch(`/api/participants/${id}/progress`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ exam_readiness: readiness, skill_checklist: skills })
+      });
+      if (res.ok) {
+        toast.success('Прогрес оновлено');
+        fetchParticipants();
+      }
+    } catch (e) {
+      toast.error('Помилка оновлення прогресу');
+    }
+  };
 
   const handleUpdateRank = async (id: number, belt: string, points: number) => {
     try {
@@ -1069,6 +1270,8 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
     'Чорний'
   ];
 
+  const skillsList = ['Ката 1', 'Кіхон', 'Куміте', 'Фізпідготовка', 'Дисципліна', 'Теорія'];
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center gap-4">
@@ -1102,7 +1305,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           <p className="text-zinc-500 font-bold uppercase tracking-widest">Список учасників порожній</p>
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-hidden">
+        <div className="bg-zinc-900 border border-white/5 rounded-[2.5rem] overflow-x-auto">
           <table className="w-full text-left">
             <thead className="bg-black/50 border-b border-white/5">
               <tr>
@@ -1110,6 +1313,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                 <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Група</th>
                 <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Пояс</th>
                 <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Бали</th>
+                <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Прогрес</th>
                 <th className="p-6 text-xs font-bold text-zinc-500 uppercase tracking-widest">Дії</th>
               </tr>
             </thead>
@@ -1133,6 +1337,20 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                   </div>
                 </td>
                 <td className="p-6 font-mono text-red-500 font-bold">{p.rank_points || 0}</td>
+                <td className="p-6">
+                  <div className="w-32">
+                    <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">
+                      <span>Готовність</span>
+                      <span>{p.exam_readiness || 0}%</span>
+                    </div>
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)]" 
+                        style={{ width: `${p.exam_readiness || 0}%` }} 
+                      />
+                    </div>
+                  </div>
+                </td>
                 <td className="p-6">
                   <div className="flex gap-2">
                     <button 
@@ -1210,6 +1428,59 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                 <button onClick={() => setShowDetails(null)} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
                   <X size={24} />
                 </button>
+              </div>
+
+              <div className="bg-black/20 rounded-[2rem] border border-white/5 p-8 space-y-6">
+                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                  <Zap size={14} className="text-red-500" />
+                  Прогрес та готовність
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-end">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Готовність до іспиту</label>
+                      <span className="text-xl font-black text-red-500">{showDetails.exam_readiness || 0}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="0" max="100" step="10"
+                      value={showDetails.exam_readiness || 0}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value);
+                        setShowDetails({...showDetails, exam_readiness: val});
+                        handleUpdateProgress(showDetails.id, val, showDetails.skill_checklist || []);
+                      }}
+                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-red-600"
+                    />
+                  </div>
+                  <div className="space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Чек-лист навичок</label>
+                    <div className="flex flex-wrap gap-2">
+                      {skillsList.map(skill => {
+                        const isChecked = (showDetails.skill_checklist || []).includes(skill);
+                        return (
+                          <button
+                            key={skill}
+                            onClick={() => {
+                              const newSkills = isChecked 
+                                ? (showDetails.skill_checklist || []).filter((s: string) => s !== skill)
+                                : [...(showDetails.skill_checklist || []), skill];
+                              setShowDetails({...showDetails, skill_checklist: newSkills});
+                              handleUpdateProgress(showDetails.id, showDetails.exam_readiness || 0, newSkills);
+                            }}
+                            className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
+                              isChecked 
+                              ? 'bg-red-600 border-red-600 text-white' 
+                              : 'bg-white/5 border-white/5 text-zinc-500 hover:text-white'
+                            }`}
+                          >
+                            {skill}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -1547,6 +1818,92 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           </motion.div>
         </div>
       )}
+    </div>
+  );
+};
+
+const NotificationsViewer = () => {
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifications = async () => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/notifications', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch (e) {
+      toast.error('Помилка завантаження сповіщень');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-96">
+      <RefreshCw className="animate-spin text-red-600" size={48} />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6 lg:space-y-8">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
+        <div>
+          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Сповіщення</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-base">Історія надісланих сповіщень батькам</p>
+        </div>
+      </div>
+
+      <div className="bg-zinc-900/30 rounded-[2rem] lg:rounded-[3rem] border border-white/5 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[600px]">
+            <thead>
+              <tr className="border-b border-white/5">
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень / Батьки</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Повідомлення</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Тип</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Дата</th>
+              </tr>
+            </thead>
+            <tbody>
+              {notifications.map(n => (
+                <tr key={n.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                  <td className="p-6 lg:p-8">
+                    <div className="font-bold text-sm lg:text-base">{n.participant_name}</div>
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">ID: {n.participant_id}</div>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <p className="text-zinc-300 text-xs lg:text-sm max-w-md leading-relaxed">{n.message}</p>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${
+                      n.type === 'attendance' ? 'bg-orange-500/20 text-orange-500' : 
+                      n.type === 'payment' ? 'bg-green-500/20 text-green-500' : 'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {n.type === 'attendance' ? 'Відвідуваність' : n.type === 'payment' ? 'Оплата' : n.type}
+                    </span>
+                  </td>
+                  <td className="p-6 lg:p-8">
+                    <div className="text-zinc-500 font-bold text-[10px] uppercase tracking-widest">
+                      {new Date(n.created_at).toLocaleString('uk-UA')}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {notifications.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="p-20 text-center text-zinc-500 font-bold italic">Сповіщень ще не було</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };
@@ -2021,7 +2378,7 @@ const AdminUsersEditor = () => {
         </button>
       </div>
 
-      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-hidden backdrop-blur-xl">
+      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-x-auto backdrop-blur-xl">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-white/5">
@@ -2205,6 +2562,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   const [importUrl, setImportUrl] = useState('');
   const [importGroupId, setImportGroupId] = useState('');
 
+  const [showNotifyModal, setShowNotifyModal] = useState(false);
+  const [notifyTarget, setNotifyTarget] = useState<{id: number, name: string} | null>(null);
+  const [notifyMessage, setNotifyMessage] = useState('');
+  const [isSendingNotify, setIsSendingNotify] = useState(false);
+
   const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
     try {
@@ -2346,6 +2708,37 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
     }
   };
 
+  const handleSendNotify = async () => {
+    if (!notifyMessage) return;
+    setIsSendingNotify(true);
+    try {
+      const token = localStorage.getItem('admin_token');
+      const url = notifyTarget ? '/api/admin/notify' : '/api/admin/notify/mass';
+      const body = notifyTarget 
+        ? { participantId: notifyTarget.id, message: notifyMessage }
+        : { message: notifyMessage, group_id: 'all' };
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        toast.success(notifyTarget ? 'Сповіщення надіслано' : 'Масове розсилання розпочато');
+        setShowNotifyModal(false);
+        setNotifyMessage('');
+      } else {
+        toast.error('Помилка при надсиланні');
+      }
+    } catch (e) {
+      toast.error('Помилка сервера');
+    }
+    setIsSendingNotify(false);
+  };
+
   const filtered = participants.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -2363,6 +2756,16 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 lg:gap-4 w-full lg:w-auto">
+          <button 
+            onClick={() => {
+              setNotifyTarget(null);
+              setShowNotifyModal(true);
+            }}
+            className="bg-orange-600 hover:bg-orange-700 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-3"
+          >
+            <Bell size={16} />
+            Всім
+          </button>
           <button 
             onClick={handleExport}
             className="bg-zinc-900 hover:bg-zinc-800 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all border border-white/5 flex items-center justify-center gap-3"
@@ -2416,13 +2819,14 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       </div>
 
       <div className="bg-zinc-900/30 rounded-[2rem] lg:rounded-[3rem] border border-white/5 overflow-hidden">
-        <div className="overflow-x-auto scrollbar-hide">
+        <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="border-b border-white/5">
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Учень</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Вік / ДН</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Група</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Прогрес</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Оплата</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Статус</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
@@ -2431,52 +2835,73 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
             <tbody>
               {filtered.map(p => (
                 <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
-                  <td className="p-6 lg:p-8">
+                  <td className="p-4 lg:p-6">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black text-sm">
+                      <div className="w-10 h-10 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center font-black text-sm shrink-0">
                         {p.name?.[0] || '?'}
                       </div>
-                      <div>
-                        <div className="font-bold text-sm lg:text-lg">{p.name}</div>
-                        <div className="text-[10px] text-zinc-500 mt-1 flex items-center gap-2">
-                          <span className="opacity-50">L:</span> {p.parent_login || '—'}
-                          <span className="ml-2 opacity-50">P:</span> 
-                          <span className="font-mono">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowPasswords(prev => ({...prev, [p.id]: !prev[p.id]}));
-                            }}
-                            className="ml-1 text-zinc-600 hover:text-white transition-colors"
-                          >
-                            {showPasswords[p.id] ? <EyeOff size={10} /> : <Eye size={10} />}
-                          </button>
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm lg:text-base truncate">{p.name}</div>
+                        <div className="text-[10px] mt-1 flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                            <span className="text-zinc-600 font-black">L:</span>
+                            <span className="text-zinc-300 font-mono text-[9px]">{p.parent_login || '—'}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                            <span className="text-zinc-600 font-black">P:</span>
+                            <span className="text-zinc-300 font-mono text-[9px]">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPasswords(prev => ({...prev, [p.id]: !prev[p.id]}));
+                              }}
+                              className="ml-1 text-zinc-500 hover:text-red-500 transition-colors"
+                            >
+                              {showPasswords[p.id] ? <EyeOff size={10} /> : <Eye size={10} />}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="p-6 lg:p-8">
-                    <div className="text-zinc-400 font-medium text-xs lg:text-sm">{p.age} років</div>
-                    <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
-                      {p.birthday ? new Date(p.birthday).toLocaleDateString('uk-UA') : '—'}
+                  <td className="p-4 lg:p-6">
+                    <div className="text-xs font-bold text-white">{p.age} років</div>
+                    <div className="text-[10px] text-zinc-500 mt-1">{p.birthday ? new Date(p.birthday).toLocaleDateString('uk-UA') : '—'}</div>
+                  </td>
+                  <td className="p-4 lg:p-6">
+                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                      <span className="text-[10px] font-black uppercase tracking-widest text-zinc-300">{p.group_name || 'Без групи'}</span>
                     </div>
                   </td>
-                  <td className="p-6 lg:p-8">
-                    <span className="px-3 lg:px-4 py-1 lg:py-2 bg-white/5 rounded-full text-[10px] lg:text-xs font-bold text-zinc-300 border border-white/5">
-                      {p.group_name || 'Без групи'}
-                    </span>
+                  <td className="p-4 lg:p-6">
+                    <div className="w-24 lg:w-32">
+                      <div className="flex justify-between items-center mb-1">
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{p.exam_readiness || 0}%</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Іспит</span>
+                      </div>
+                      <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                        <div 
+                          className={`h-full transition-all duration-1000 ${
+                            (p.exam_readiness || 0) >= 80 ? 'bg-green-500' : 
+                            (p.exam_readiness || 0) >= 50 ? 'bg-yellow-500' : 'bg-red-600'
+                          }`}
+                          style={{ width: `${p.exam_readiness || 0}%` }}
+                        />
+                      </div>
+                    </div>
                   </td>
-                  <td className="p-6 lg:p-8">
-                    <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[9px] font-black uppercase tracking-widest ${
-                      p.payment_status === 'paid' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
+                  <td className="p-4 lg:p-6">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                      p.payment_status === 'paid' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
                     }`}>
                       {p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
                     </span>
                   </td>
-                  <td className="p-6 lg:p-8">
-                    <span className={`px-2 lg:px-3 py-1 rounded-lg text-[8px] lg:text-[9px] font-black uppercase tracking-widest ${
-                      p.status === 'active' ? 'bg-blue-600/20 text-blue-500' : 
-                      p.status === 'new' ? 'bg-red-600/20 text-red-500' :
+                  <td className="p-4 lg:p-6">
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
+                      p.status === 'active' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' : 
+                      p.status === 'new' ? 'bg-red-500/10 text-red-500 border border-red-500/20' :
                       'bg-zinc-800 text-zinc-500'
                     }`}>
                       {p.status === 'active' ? 'Активний' : 
@@ -2484,16 +2909,32 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                        'Архів'}
                     </span>
                   </td>
-                  <td className="p-6 lg:p-8 text-right">
-                    <div className="flex items-center justify-end gap-1 lg:gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-2 lg:p-3 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
-                        <Trash2 size={16} />
+                  <td className="p-4 lg:p-6 text-right">
+                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => {
+                          setNotifyTarget({ id: p.id, name: p.name });
+                          setShowNotifyModal(true);
+                        }}
+                        className="p-2 hover:bg-orange-600/10 text-zinc-500 hover:text-orange-500 rounded-xl transition-colors"
+                        title="Надіслати сповіщення"
+                      >
+                        <Bell size={14} />
+                      </button>
+                      <button onClick={() => setConfirmDelete({ id: p.id, name: p.name })} className="p-2 hover:bg-red-600/10 text-zinc-500 hover:text-red-500 rounded-xl transition-colors">
+                        <Trash2 size={14} />
                       </button>
                       <button 
-                        onClick={() => setEditingParticipant(p)}
-                        className="p-2 lg:p-3 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors"
+                        onClick={() => {
+                          const pData = { ...p };
+                          if (Array.isArray(pData.skill_checklist)) {
+                            pData.skill_checklist = pData.skill_checklist.join(', ');
+                          }
+                          setEditingParticipant(pData);
+                        }}
+                        className="p-2 hover:bg-white/10 text-zinc-500 hover:text-white rounded-xl transition-colors"
                       >
-                        <Edit2 size={16} />
+                        <Edit2 size={14} />
                       </button>
                     </div>
                   </td>
@@ -2512,6 +2953,67 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         title="Видалити учасника?"
         message={`Ви впевнені, що хочете видалити учня ${confirmDelete?.name}? Цю дію неможливо скасувати.`}
       />
+
+      {showNotifyModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            onClick={() => setShowNotifyModal(false)}
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="relative w-full max-w-lg bg-zinc-900 border border-white/10 rounded-[2.5rem] p-8 lg:p-10 shadow-2xl overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-32 h-32 bg-orange-600/5 blur-3xl -mr-16 -mt-16" />
+            
+            <div className="flex items-center gap-6 mb-8">
+              <div className="w-16 h-16 bg-orange-600/10 text-orange-600 rounded-2xl flex items-center justify-center">
+                <Bell size={32} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black uppercase tracking-tight">
+                  {notifyTarget ? 'Надіслати сповіщення' : 'Масове розсилання'}
+                </h3>
+                <p className="text-zinc-500 font-medium">
+                  {notifyTarget ? `Для батьків: ${notifyTarget.name}` : 'Всім активним учням'}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3 ml-1">Повідомлення</label>
+                <textarea 
+                  value={notifyMessage}
+                  onChange={e => setNotifyMessage(e.target.value)}
+                  placeholder="Наприклад: Завтра тренування переноситься на 18:00..."
+                  className="w-full bg-zinc-950 border border-white/5 rounded-3xl p-6 text-white outline-none focus:border-orange-600 transition-colors text-sm h-40 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowNotifyModal(false)}
+                  className="flex-1 px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all"
+                >
+                  Скасувати
+                </button>
+                <button 
+                  onClick={handleSendNotify}
+                  disabled={isSendingNotify || !notifyMessage}
+                  className="flex-1 px-8 py-4 bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-orange-600/20 flex items-center justify-center gap-3"
+                >
+                  {isSendingNotify ? <RefreshCw className="animate-spin" size={16} /> : <FileText size={16} />}
+                  Надіслати
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {showImportModal && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 lg:p-6 overflow-y-auto">
@@ -2720,29 +3222,73 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
-                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін батьків</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Готовність до іспиту (%)</label>
                   <input 
-                    type="text" 
-                    value={editingParticipant.parent_login}
-                    onChange={e => setEditingParticipant({...editingParticipant, parent_login: e.target.value})}
+                    type="number" 
+                    min="0"
+                    max="100"
+                    value={editingParticipant.exam_readiness || 0}
+                    onChange={e => setEditingParticipant({...editingParticipant, exam_readiness: parseInt(e.target.value)})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   />
                 </div>
                 <div>
-                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків (введіть новий для зміни)</label>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Telegram Chat ID</label>
+                  <input 
+                    type="text" 
+                    placeholder="Для сповіщень..."
+                    value={editingParticipant.telegram_chat_id || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, telegram_chat_id: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Чек-лист навичок (через кому)</label>
+                <textarea 
+                  value={editingParticipant.skill_checklist || ''}
+                  onChange={e => setEditingParticipant({...editingParticipant, skill_checklist: e.target.value})}
+                  placeholder="Ката 1, Шпагат, 20 віджимань..."
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm h-20 resize-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 flex justify-between items-center">
+                    Логін батьків
+                    {editingParticipant.phone && (
+                      <button 
+                        type="button"
+                        onClick={() => setEditingParticipant({...editingParticipant, parent_login: editingParticipant.phone})}
+                        className="text-[8px] text-red-500 hover:text-red-400 transition-colors font-black uppercase tracking-widest"
+                      >
+                        Використати телефон
+                      </button>
+                    )}
+                  </label>
+                  <input 
+                    type="text" 
+                    value={editingParticipant.parent_login || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, parent_login: e.target.value})}
+                    placeholder="Логін для входу..."
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль батьків</label>
                   <div className="relative">
                     <input 
                       type={showPasswords['editing'] ? 'text' : 'password'} 
                       value={editingParticipant.parent_password || ''}
                       onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                      placeholder="Введіть новий пароль..."
+                      placeholder="Введіть пароль..."
                       className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-24 text-sm"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                       <button 
                         type="button"
                         onClick={() => {
-                          const pass = Math.random().toString(36).substring(2, 10);
+                          const pass = Math.floor(100000 + Math.random() * 900000).toString();
                           setEditingParticipant({...editingParticipant, parent_password: pass});
                           setShowPasswords(prev => ({...prev, editing: true}));
                         }}
@@ -2786,18 +3332,23 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
 
 const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { role: string, coachId: number | null, initialAction?: string | null, onActionComplete?: () => void }) => {
   const [participants, setParticipants] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(true);
+  const [filterGroup, setFilterGroup] = useState<string>('all');
+  const [lastAction, setLastAction] = useState<{id: number, status: string} | null>(null);
 
   const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
     try {
-      const [pRes, aRes] = await Promise.all([
+      const [pRes, aRes, gRes] = await Promise.all([
         fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-        fetch(`/api/attendance/${date}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        fetch(`/api/attendance/${date}`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
       ]);
       setParticipants(Array.isArray(pRes) ? pRes : []);
+      setGroups(Array.isArray(gRes) ? gRes : []);
       const attMap: Record<number, string> = {};
       if (Array.isArray(aRes)) {
         aRes.forEach((a: any) => attMap[a.participant_id] = a.status);
@@ -2813,92 +3364,158 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
     fetchData();
   }, [date]);
 
-  useEffect(() => {
-    if (initialAction === 'mark') {
-      toast.info('Відмітьте присутніх учнів на сьогодні');
-      onActionComplete?.();
-    }
-  }, [initialAction]);
-
-  const toggleAttendance = async (participantId: number, currentStatus: string) => {
-    const newStatus = currentStatus === 'present' ? 'absent' : 'present';
+  const updateStatus = async (participantId: number, nextStatus: string, silent = false) => {
     const token = localStorage.getItem('admin_token');
     try {
-      setAttendance(prev => ({ ...prev, [participantId]: newStatus }));
-      await fetch('/api/attendance', {
+      const prevStatus = attendance[participantId] || 'absent';
+      setAttendance(prev => ({ ...prev, [participantId]: nextStatus }));
+      if (!silent) setLastAction({ id: participantId, status: prevStatus });
+
+      const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ participant_id: participantId, date, status: newStatus })
+        body: JSON.stringify({ participant_id: participantId, date, status: nextStatus })
       });
-      toast.success(newStatus === 'present' ? 'Відмічено присутність' : 'Відмічено відсутність');
+      if (res.ok && !silent) {
+        toast.success(`Оновлено: ${participantId}`, { duration: 500 });
+      }
     } catch (e) {
       toast.error('Помилка оновлення');
       fetchData();
     }
   };
 
+  const handleBulkMark = async (status: string) => {
+    const filtered = participants.filter(p => filterGroup === 'all' || p.group_id?.toString() === filterGroup);
+    toast.promise(
+      Promise.all(filtered.map(p => updateStatus(p.id, status, true))),
+      {
+        loading: 'Оновлення групи...',
+        success: 'Всіх відмічено!',
+        error: 'Помилка масового оновлення'
+      }
+    );
+  };
+
+  const handleUndo = () => {
+    if (lastAction) {
+      updateStatus(lastAction.id, lastAction.status, true);
+      setLastAction(null);
+      toast.info('Дію скасовано');
+    }
+  };
+
+  const filteredParticipants = participants.filter(p => filterGroup === 'all' || p.group_id?.toString() === filterGroup);
+
   return (
     <div className="space-y-6 lg:space-y-8">
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-6">
         <div>
-          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Відвідуваність</h2>
-          <p className="text-zinc-500 font-medium text-sm lg:text-base">Відмічайте присутність учнів на заняттях</p>
+          <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Швидка Відмітка</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-base">Coach-first UX: відмічайте групу за секунди</p>
         </div>
-        <div className="flex items-center gap-2 lg:gap-4 bg-zinc-900 p-2 rounded-2xl border border-white/5 w-full lg:w-auto justify-between">
-          <button 
-            onClick={() => {
+        
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div className="flex items-center gap-2 bg-zinc-900 p-2 rounded-2xl border border-white/5">
+            <button onClick={() => {
               const d = new Date(date);
               d.setDate(d.getDate() - 1);
               setDate(d.toISOString().split('T')[0]);
-            }}
-            className="p-2 lg:p-3 hover:bg-white/5 rounded-xl transition-colors"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <input 
-            type="date" 
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className="bg-transparent text-white font-bold outline-none px-2 lg:px-4 text-sm"
-          />
-          <button 
-            onClick={() => {
+            }} className="p-2 hover:bg-white/5 rounded-xl transition-colors"><ChevronLeft size={18} /></button>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent text-white font-bold outline-none px-2 text-xs" />
+            <button onClick={() => {
               const d = new Date(date);
               d.setDate(d.getDate() + 1);
               setDate(d.toISOString().split('T')[0]);
-            }}
-            className="p-2 lg:p-3 hover:bg-white/5 rounded-xl transition-colors"
+            }} className="p-2 hover:bg-white/5 rounded-xl transition-colors"><ChevronRight size={18} /></button>
+          </div>
+
+          <select 
+            value={filterGroup}
+            onChange={e => setFilterGroup(e.target.value)}
+            className="bg-zinc-900 border border-white/5 rounded-2xl px-4 py-3 text-xs font-bold outline-none focus:border-red-600 transition-colors"
           >
-            <ChevronRight size={18} />
-          </button>
+            <option value="all">Всі групи</option>
+            {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+
+          <div className="flex gap-2 ml-auto lg:ml-0">
+            {lastAction && (
+              <button 
+                onClick={handleUndo}
+                className="p-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white rounded-2xl transition-all border border-white/5"
+                title="Скасувати останню дію"
+              >
+                <RefreshCw size={18} />
+              </button>
+            )}
+            <button 
+              onClick={() => handleBulkMark('present')}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-green-600/20"
+            >
+              Всі присутні
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
-        {participants.map(p => (
-          <button
-            key={p.id}
-            onClick={() => toggleAttendance(p.id, attendance[p.id] || 'absent')}
-            className={`p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border transition-all duration-500 flex items-center justify-between group ${
-              attendance[p.id] === 'present' 
-                ? 'bg-green-500/10 border-green-500/30 text-green-500' 
-                : 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-white/10'
-            }`}
-          >
-            <div className="text-left">
-              <p className="font-black uppercase tracking-tight text-base lg:text-lg group-hover:translate-x-1 transition-transform">{p.name}</p>
-              <p className="text-[9px] lg:text-[10px] font-bold uppercase tracking-widest opacity-60">{p.group_name || 'Без групи'}</p>
-            </div>
-            <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-              attendance[p.id] === 'present' ? 'bg-green-500 text-white rotate-12' : 'bg-white/5 text-zinc-700'
-            }`}>
-              {attendance[p.id] === 'present' ? <CheckCircle2 size={20} /> : <XCircle size={20} />}
-            </div>
-          </button>
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {filteredParticipants.map(p => {
+          const status = attendance[p.id] || 'absent';
+          const isPresent = status === 'present';
+          const isLate = status === 'late';
+          const isExcused = status === 'excused';
+          
+          let colorClass = 'bg-zinc-900/30 border-white/5 text-zinc-500 hover:border-white/10';
+          let icon = <XCircle size={20} />;
+          let statusLabel = 'Відсутній';
+
+          if (isPresent) {
+            colorClass = 'bg-green-500/10 border-green-500/30 text-green-500';
+            icon = <CheckCircle2 size={20} />;
+            statusLabel = 'Присутній';
+          } else if (isLate) {
+            colorClass = 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500';
+            icon = <Clock size={20} />;
+            statusLabel = 'Запізнився';
+          } else if (isExcused) {
+            colorClass = 'bg-blue-500/10 border-blue-500/30 text-blue-500';
+            icon = <ShieldCheck size={20} />;
+            statusLabel = 'Поважна';
+          }
+
+          return (
+            <button
+              key={p.id}
+              onClick={() => {
+                const statuses = ['absent', 'present', 'late', 'excused'];
+                const currentIndex = statuses.indexOf(status);
+                const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+                updateStatus(p.id, nextStatus);
+              }}
+              className={`p-6 rounded-[2rem] border transition-all duration-300 flex flex-col gap-4 group relative overflow-hidden ${colorClass}`}
+            >
+              <div className="flex justify-between items-start w-full">
+                <div className="text-left">
+                  <p className="font-black uppercase tracking-tight text-sm group-hover:translate-x-1 transition-transform">{p.name}</p>
+                  <p className="text-[8px] font-bold uppercase tracking-widest opacity-60">{statusLabel}</p>
+                </div>
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-500 ${
+                  status !== 'absent' ? 'bg-current text-zinc-950 rotate-12' : 'bg-white/5 text-zinc-700'
+                }`}>
+                  {icon}
+                </div>
+              </div>
+              
+              <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-current opacity-20" style={{ width: isPresent ? '100%' : '0%' }} />
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -3923,7 +4540,7 @@ const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null 
         </div>
       )}
 
-      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-hidden backdrop-blur-xl">
+      <div className="bg-zinc-900/50 border border-white/5 rounded-[3rem] overflow-x-auto backdrop-blur-xl">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-white/5">
@@ -4771,7 +5388,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
               ))}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-8 py-20 text-center text-zinc-500 font-medium italic">
+                  <td colSpan={6} className="px-8 py-20 text-center text-zinc-500 font-medium italic">
                     Оплат за цей період не знайдено
                   </td>
                 </tr>

@@ -177,7 +177,7 @@ export const KidsLanding = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
+      <section className="relative min-h-screen flex items-center pt-20 overflow-hidden max-w-full">
         <div className="absolute inset-0 z-0">
           <img 
             src={content?.kids_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop"} 
@@ -189,33 +189,33 @@ export const KidsLanding = () => {
           <div className="absolute bottom-0 left-0 w-full h-64 bg-gradient-to-t from-black to-transparent" />
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16 relative z-10 w-full">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="max-w-3xl"
+            className="max-w-3xl text-center sm:text-left"
           >
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
               Набір у групу 4–7 років: Залишилось 3 вільних місця
             </div>
             <h1 
-              className="text-5xl sm:text-6xl md:text-[120px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
+              className="text-3xl sm:text-5xl md:text-6xl lg:text-[120px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
               dangerouslySetInnerHTML={{ __html: content?.kids_hero_title || 'Дитяче <br /> <span className="text-red-600">карате</span> <br /> у Києві' }}
             />
             <p 
-              className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-xl font-medium"
+              className="text-lg sm:text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-xl font-medium mx-auto sm:mx-0"
               dangerouslySetInnerHTML={{ __html: content?.kids_hero_subtitle || 'Шукаєте найкращу секцію карате для дітей на Шулявці, Відрадному чи Сирці? Ми формуємо характер та лідерські якості. <span className="text-white">Перше тренування — БЕЗКОШТОВНО.</span>' }}
             />
-            <div className="flex flex-col sm:flex-row gap-6">
+            <div className="flex flex-col sm:flex-row gap-4 md:gap-8">
               <Button 
-                className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
+                className="shadow-[0_20px_50px_rgba(209,0,0,0.3)] w-full sm:w-auto"
                 onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
               >
                 Записатись на безкоштовний тест
               </Button>
-              <Button variant="secondary" onClick={() => document.getElementById('pain-points')?.scrollIntoView({ behavior: 'smooth' })}>
+              <Button variant="secondary" className="w-full sm:w-auto" onClick={() => document.getElementById('pain-points')?.scrollIntoView({ behavior: 'smooth' })}>
                 Чому ми?
               </Button>
             </div>
@@ -232,16 +232,16 @@ export const KidsLanding = () => {
       </section>
 
       {/* Pain Points Section */}
-      <section id="pain-points" className="py-16 md:py-32 bg-zinc-950 border-y border-white/5">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-3xl mb-12 md:mb-20">
+      <section id="pain-points" className="py-8 md:py-16 lg:py-32 bg-zinc-950 border-y border-white/5 overflow-hidden max-w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
+          <div className="max-w-3xl mb-12 md:mb-20 text-center sm:text-left">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Проблеми, які ми вирішуємо</h2>
             <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
               Допоможемо <br /> <span className="text-zinc-700">вашій дитині</span>
             </h3>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8">
             {painPoints.map((point, i) => (
               <motion.div
                 key={i}
@@ -277,14 +277,14 @@ export const KidsLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-16 md:py-32 bg-zinc-950">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 md:py-16 lg:py-32 bg-zinc-950 overflow-hidden max-w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Привілеї клубу</h2>
             <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Більше ніж <span className="text-zinc-700">тренування</span></h3>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 gap-4 md:gap-8">
             {privileges.map((priv, i) => (
               <div key={i} className="p-8 bg-zinc-900 rounded-3xl border border-white/5 flex items-start gap-6">
                 <div className="w-12 h-12 bg-red-600/10 rounded-full flex items-center justify-center shrink-0">
@@ -301,8 +301,8 @@ export const KidsLanding = () => {
       </section>
 
       {/* How it works / Steps */}
-      <section className="py-16 md:py-32 bg-black">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 md:py-16 lg:py-32 bg-black overflow-hidden max-w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Твій шлях до успіху</h2>
             <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter">Як ми <span className="text-zinc-700">працюємо</span></h3>
@@ -325,8 +325,8 @@ export const KidsLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-16 md:py-24 bg-zinc-950">
-        <div className="max-w-7xl mx-auto px-6 text-center">
+      <section className="py-8 md:py-16 lg:py-24 bg-zinc-950 overflow-hidden max-w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16 text-center">
           <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-12 md:mb-16">Що отримає ваша дитина?</h2>
           
           <div className="grid md:grid-cols-3 gap-12">
@@ -346,13 +346,13 @@ export const KidsLanding = () => {
       </section>
 
       {/* Locations Section */}
-      <section className="py-16 md:py-24 bg-black">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 md:py-16 lg:py-24 bg-black overflow-hidden max-w-full">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-16">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-4">Де ми тренуємо</h2>
             <h3 className="text-3xl md:text-5xl font-black uppercase tracking-tighter">Наші зали у <span className="text-zinc-600 text-glow">Києві</span></h3>
           </div>
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-2 gap-4 md:gap-8">
             <div className="p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 hover:border-red-600/20 transition-all group">
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-12 h-12 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-all">

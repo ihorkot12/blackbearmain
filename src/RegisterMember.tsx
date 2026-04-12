@@ -210,21 +210,6 @@ export const RegisterMember = () => {
                 </button>
               </div>
             </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Тимчасовий пароль</p>
-              <div className="flex items-center justify-between bg-black rounded-xl p-4 border border-white/5">
-                <code className="text-red-500 font-bold">{registrationResult.password}</code>
-                <button 
-                  onClick={() => copyToClipboard(registrationResult.password, 'password')}
-                  className="text-zinc-500 hover:text-white transition-colors relative"
-                >
-                  {copiedField === 'password' ? <CheckCircle2 size={16} className="text-green-500" /> : <Info size={16} />}
-                  {copiedField === 'password' && (
-                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[8px] px-2 py-1 rounded uppercase font-black">Скопійовано</span>
-                  )}
-                </button>
-              </div>
-            </div>
           </div>
 
           <div className="pt-8 flex flex-col gap-4">

@@ -20,6 +20,7 @@ const PersonalLanding = lazy(() => import('./PersonalLanding').then(m => ({ defa
 const WomenLanding = lazy(() => import('./WomenLanding').then(m => ({ default: m.WomenLanding })));
 const RegisterMember = lazy(() => import('./RegisterMember').then(m => ({ default: m.RegisterMember })));
 const Encyclopedia = lazy(() => import('./Encyclopedia'));
+const Portal = lazy(() => import('./Portal').then(m => ({ default: m.Portal })));
 
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
@@ -245,7 +246,9 @@ export default function App() {
       <Suspense fallback={<div className="min-h-screen bg-black flex items-center justify-center"><div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div></div>}>
         <Routes>
           <Route path="/" element={<LandingPage initialContent={content} />} />
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login" element={<Portal />} />
+          <Route path="/portal" element={<Portal />} />
+          <Route path="/auth" element={<LoginPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/parent" element={<ParentPanel />} />
           <Route path="/dashboard" element={<AdminPage />} />
@@ -409,7 +412,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           <img 
             src={content?.hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop"} 
             alt="Kyokushin Karate Training Kyiv" 
-            className="w-full h-full object-cover opacity-40 scale-105"
+            className="w-full h-full object-cover opacity-40"
             referrerPolicy="no-referrer"
             fetchPriority="high"
           />
@@ -1342,9 +1345,15 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               <a href={content?.social_facebook || "https://www.facebook.com/karatee.kyiv/"} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white transition-colors"><Facebook size={20} /></a>
             </div>
 
-            <div className="text-zinc-600 text-[10px] max-w-xs text-center md:text-right">
-              Black Bear Dojo — найкраща секція карате Київ для дітей та дорослих. Професійне дитяче карате Київ на Шулявці. Тренування карате Київ за методикою Кіокушинкай.
-              <div className="mt-2">© 2026 Black Bear Dojo. Всі права захищені.</div>
+            <div className="flex flex-col items-center md:items-end gap-2">
+              <div className="flex gap-4 mb-2">
+                <Link to="/login" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors">Портал</Link>
+                <Link to="/register-member" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors">Реєстрація</Link>
+              </div>
+              <div className="text-zinc-600 text-[10px] max-w-xs text-center md:text-right">
+                Black Bear Dojo — найкраща секція карате Київ для дітей та дорослих. Професійне дитяче карате Київ на Шулявці. Тренування карате Київ за методикою Кіокушинкай.
+                <div className="mt-2">© 2026 Black Bear Dojo. Всі права захищені.</div>
+              </div>
             </div>
           </div>
         </footer>
