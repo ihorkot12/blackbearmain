@@ -8,7 +8,7 @@ import {
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
   ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
-  Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone, Wallet, AlertTriangle, FileText
+  Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone, Wallet, AlertTriangle, FileText, Sparkles
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -16,6 +16,7 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
+import { SMMModule } from './components/SMMModule';
 
 // --- Custom Confirmation Modal ---
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, loading }: any) => (
@@ -786,6 +787,7 @@ export const AdminPage = () => {
       items: [
         { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin', 'coach'] },
         { id: 'crm', label: 'CRM & Фінанси', icon: BarChart3, roles: ['admin', 'coach'] },
+        { id: 'smm', label: 'SMM Agency', icon: Sparkles, roles: ['admin'] },
         { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },
         { id: 'coaches', label: 'Тренери', icon: Users, roles: ['admin'] },
         { id: 'locations', label: 'Локації', icon: MapPin, roles: ['admin', 'coach'] },
@@ -988,6 +990,7 @@ export const AdminPage = () => {
               transition={{ duration: 0.3 }}
             >
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
+              {activeTab === 'smm' && <SMMModule />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'leads' && <LeadsViewer />}
               {activeTab === 'crm' && <CRMFinance role={role} coachId={coachId} />}

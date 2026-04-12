@@ -254,6 +254,71 @@ async function initDb() {
         author_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL
       );
 
+      CREATE TABLE IF NOT EXISTS smm_posts (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        audience TEXT,
+        goal TEXT,
+        pain TEXT,
+        format TEXT,
+        source_signal TEXT,
+        score INTEGER,
+        reason TEXT,
+        content JSONB, -- { hook, script, caption, cta, prompt, visual_execution, on_screen_text, cover_idea }
+        scoring JSONB, -- { relevance, viral, difficulty, brand, total }
+        status TEXT DEFAULT 'generated', -- 'generated', 'selected', 'filmed', 'published', 'archived'
+        metrics JSONB DEFAULT '{}', -- { likes, comments, saves, shares, engagement_rate }
+        result_tag TEXT, -- 'worked', 'average', 'failed'
+        notes TEXT,
+        published_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS smm_strategy (
+        id SERIAL PRIMARY KEY,
+        week_start DATE UNIQUE,
+        strategy_text TEXT,
+        patterns JSONB,
+        blind_spots JSONB,
+        swot JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS smm_pains (
+        id SERIAL PRIMARY KEY,
+        audience TEXT NOT NULL,
+        pain_name TEXT NOT NULL,
+        source_type TEXT, -- 'manual', 'ai_analysis'
+        signal_strength INTEGER DEFAULT 50,
+        trend_direction TEXT DEFAULT 'stable', -- 'rising', 'stable', 'falling'
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS smm_account_analysis (
+        id SERIAL PRIMARY KEY,
+        analysis_date DATE DEFAULT CURRENT_DATE,
+        strengths JSONB,
+        weaknesses JSONB,
+        missing_content JSONB,
+        adjacent_opportunities JSONB,
+        recommendations JSONB,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS smm_account_metrics (
+        id SERIAL PRIMARY KEY,
+        followers INTEGER NOT NULL,
+        following INTEGER,
+        posts_count INTEGER,
+        engagement_rate DECIMAL(5, 2),
+        reach INTEGER,
+        impressions INTEGER,
+        date DATE DEFAULT CURRENT_DATE UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
@@ -2402,6 +2467,153 @@ ${childrenList}
     } catch (e) {
       console.error('Dashboard stats error:', e);
       res.status(500).json({ error: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  // ===== SMM AGENCY ROUTES =====
+  app.get("/api/smm/posts", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM smm_posts ORDER BY created_at DESC");
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/smm/posts", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { title, audience, goal, pain, format, source_signal, score, reason, content, scoring, status } = req.body;
+    try {
+      const result = await pool.query(
+        `INSERT INTO smm_posts (title, audience, goal, pain, format, source_signal, score, reason, content, scoring, status) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+        [title, audience, goal, pain, format, source_signal, score, reason, JSON.stringify(content), JSON.stringify(scoring), status || 'generated']
+      );
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.patch("/api/smm/posts/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { id } = req.params;
+    const { status, metrics, result_tag, notes, published_at } = req.body;
+    try {
+      const result = await pool.query(
+        `UPDATE smm_posts SET 
+         status = COALESCE($1, status), 
+         metrics = COALESCE($2, metrics), 
+         result_tag = COALESCE($3, result_tag),
+         notes = COALESCE($4, notes),
+         published_at = COALESCE($5, published_at),
+         updated_at = CURRENT_TIMESTAMP
+         WHERE id = $6 RETURNING *`,
+        [status, metrics ? JSON.stringify(metrics) : null, result_tag, notes, published_at, id]
+      );
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/smm/strategy/latest", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM smm_strategy ORDER BY week_start DESC LIMIT 1");
+      res.json(result.rows[0] || null);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/smm/strategy", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { week_start, strategy_text, patterns, blind_spots, swot } = req.body;
+    try {
+      const result = await pool.query(
+        `INSERT INTO smm_strategy (week_start, strategy_text, patterns, blind_spots, swot) 
+         VALUES ($1, $2, $3, $4, $5) 
+         ON CONFLICT (week_start) DO UPDATE SET 
+         strategy_text = EXCLUDED.strategy_text, 
+         patterns = EXCLUDED.patterns, 
+         blind_spots = EXCLUDED.blind_spots, 
+         swot = EXCLUDED.swot 
+         RETURNING *`,
+        [week_start, strategy_text, JSON.stringify(patterns), JSON.stringify(blind_spots), JSON.stringify(swot)]
+      );
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/smm/pains", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM smm_pains ORDER BY signal_strength DESC");
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/smm/analysis/latest", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM smm_account_analysis ORDER BY analysis_date DESC LIMIT 1");
+      res.json(result.rows[0] || null);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/smm/analysis", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { strengths, weaknesses, missing_content, adjacent_opportunities, recommendations } = req.body;
+    try {
+      const result = await pool.query(
+        `INSERT INTO smm_account_analysis (strengths, weaknesses, missing_content, adjacent_opportunities, recommendations) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [JSON.stringify(strengths), JSON.stringify(weaknesses), JSON.stringify(missing_content), JSON.stringify(adjacent_opportunities), JSON.stringify(recommendations)]
+      );
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.get("/api/smm/metrics", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM smm_account_metrics ORDER BY date DESC LIMIT 30");
+      res.json(result.rows);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/smm/metrics", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { followers, following, posts_count, engagement_rate, reach, impressions, date } = req.body;
+    try {
+      const result = await pool.query(
+        `INSERT INTO smm_account_metrics (followers, following, posts_count, engagement_rate, reach, impressions, date) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7) 
+         ON CONFLICT (date) DO UPDATE SET 
+         followers = EXCLUDED.followers,
+         following = EXCLUDED.following,
+         posts_count = EXCLUDED.posts_count,
+         engagement_rate = EXCLUDED.engagement_rate,
+         reach = EXCLUDED.reach,
+         impressions = EXCLUDED.impressions
+         RETURNING *`,
+        [followers, following, posts_count, engagement_rate, reach, impressions, date || new Date().toISOString().split('T')[0]]
+      );
+      res.json(result.rows[0]);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   });
 
