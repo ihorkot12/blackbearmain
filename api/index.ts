@@ -233,6 +233,16 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+        sender_type TEXT NOT NULL, -- 'parent', 'coach', 'admin'
+        sender_id INTEGER, -- admin_user_id or coach_id (null if parent)
+        content TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS points_log (
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
@@ -2270,6 +2280,9 @@ ${childrenList}
       );
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
+      
+      notifyParent(participant_id, 'achievement', `Нове досягнення: ${type}! +10 балів до рейтингу.`);
+      
       console.log(`Badge added for participant ${participant_id}: 10 points awarded`);
       res.json({ success: true, points_awarded: 10 });
     } catch (e) {
@@ -2346,11 +2359,11 @@ ${childrenList}
       // Points logic
       let points = 5; // Default participation
       
+      const normalizedResult = result?.toLowerCase()?.trim() || "";
       if (type === 'competition') {
-        const normalizedResult = result?.toLowerCase()?.trim() || "";
-        if (normalizedResult.includes('1 місце') || normalizedResult === '1') points = 15;
-        else if (normalizedResult.includes('2 місце') || normalizedResult === '2') points = 10;
-        else if (normalizedResult.includes('3 місце') || normalizedResult === '3') points = 7;
+        if (normalizedResult.includes('1 місце') || normalizedResult === '1' || normalizedResult === '1st') points = 30;
+        else if (normalizedResult.includes('2 місце') || normalizedResult === '2' || normalizedResult === '2nd') points = 20;
+        else if (normalizedResult.includes('3 місце') || normalizedResult === '3' || normalizedResult === '3rd') points = 15;
         else if (normalizedResult === 'participation' || normalizedResult === 'участь') points = 5;
       } else if (type === 'certification') {
         points = 20; // Certification is high value
@@ -2367,6 +2380,9 @@ ${childrenList}
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
+      
+      notifyParent(participant_id, 'event', `Участь у заході: ${name}. Результат: ${result}. +${points} балів.`);
+      
       console.log(`Competition added for participant ${participant_id}: ${points} points awarded`);
       res.json({ success: true, points_awarded: points });
     } catch (e) {
@@ -2974,6 +2990,72 @@ ${childrenList}
       res.json({ success: true, count: participants.length });
     } catch (e) {
       res.status(500).json({ error: "Failed to send mass notification" });
+    }
+  });
+
+  // Messaging API
+  app.get("/api/messages/:participantId", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query(
+        "SELECT * FROM messages WHERE participant_id = $1 ORDER BY created_at ASC",
+        [req.params.participantId]
+      );
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch messages" });
+    }
+  });
+
+  app.post("/api/messages", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "DB error" });
+    const { participant_id, content, sender_type } = req.body;
+    const user = (req as any).user;
+    
+    try {
+      let sender_id = null;
+      if (sender_type === 'coach') sender_id = user.coach_id;
+      else if (sender_type === 'admin') sender_id = user.id;
+
+      const result = await pool.query(
+        "INSERT INTO messages (participant_id, content, sender_type, sender_id) VALUES ($1, $2, $3, $4) RETURNING *",
+        [participant_id, content, sender_type, sender_id]
+      );
+
+      // If parent sends to coach, notify coach via Telegram if possible
+      if (sender_type === 'parent') {
+        const coachRes = await pool.query(`
+          SELECT c.telegram_chat_id, p.name as child_name 
+          FROM participants p 
+          JOIN groups g ON p.group_id = g.id 
+          JOIN coaches c ON g.coach_id = c.id 
+          WHERE p.id = $1
+        `, [participant_id]);
+        
+        if (coachRes.rows[0]?.telegram_chat_id) {
+          const token = process.env.TELEGRAM_BOT_TOKEN;
+          if (token) {
+            const text = `<b>📩 Нове повідомлення від батьків ${coachRes.rows[0].child_name}</b>\n\n${content}`;
+            await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: coachRes.rows[0].telegram_chat_id,
+                text: text,
+                parse_mode: 'HTML'
+              })
+            }).catch(err => console.error('Telegram notify coach error:', err));
+          }
+        }
+      } else {
+        // If coach/admin sends to parent, notify parent via Telegram
+        notifyParent(participant_id, 'message', `Нове повідомлення від тренера: ${content}`);
+      }
+
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error('Failed to send message:', e);
+      res.status(500).json({ error: "Failed to send message" });
     }
   });
 

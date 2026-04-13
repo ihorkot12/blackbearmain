@@ -43,22 +43,63 @@ const ParentPanel = () => {
   const [beltProgress, setBeltProgress] = useState<any[] | null>(null);
   const [attendanceStreak, setAttendanceStreak] = useState<any[]>([]);
   const [coachMessage, setCoachMessage] = useState('');
+  const [messages, setMessages] = useState<any[]>([]);
 
   useEffect(() => {
-    if (children && children.length > 0) {
-      // Fetch belt progress for each child
-      Promise.all(children.map(child => 
-        fetch(`/api/parent/${participant?.id}/belt-progress`)
-          .then(r => r.json())
-      )).then(data => setBeltProgress(data[0]?.children || [])).catch(e => console.log(e));
+    if (participant?.id) {
+      fetchMessages();
+    }
+  }, [participant?.id]);
+
+  const fetchMessages = async () => {
+    try {
+      const res = await fetch(`/api/messages/${participant.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch messages');
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!coachMessage.trim()) return;
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participant_id: participant.id,
+          content: coachMessage,
+          sender_type: 'parent'
+        })
+      });
+      if (res.ok) {
+        toast.success('Повідомлення надіслано!');
+        setCoachMessage('');
+        fetchMessages();
+      }
+    } catch (e) {
+      toast.error('Не вдалося надіслати повідомлення');
+    }
+  };
+
+  useEffect(() => {
+    if (participant?.id) {
+      // Fetch belt progress
+      fetch(`/api/parent/${participant.id}/belt-progress`)
+        .then(r => r.json())
+        .then(data => setBeltProgress(data.children || []))
+        .catch(e => console.log(e));
       
       // Fetch attendance streak
-      fetch(`/api/parent/${participant?.id}/attendance-streak`)
+      fetch(`/api/parent/${participant.id}/attendance-streak`)
         .then(r => r.json())
         .then(data => setAttendanceStreak(data.children || []))
         .catch(e => console.log(e));
     }
-  }, [participant?.id, children]);
+  }, [participant?.id]);
 
   useEffect(() => {
     fetchData();
@@ -798,23 +839,75 @@ const ParentPanel = () => {
           {activeTab === 'messages' && (
             <div className="space-y-8">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Повідомлення від <span className="text-red-600">додзьо</span></h2>
-              <div className="space-y-4">
-                {announcements.map(ann => (
-                  <div key={ann.id} className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 border-l-4 border-l-red-600">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="font-black uppercase tracking-tight text-xl">{ann.title}</div>
-                      <div className="text-xs text-zinc-500">{new Date(ann.created_at).toLocaleString('uk-UA')}</div>
+              
+              <div className="grid lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-6">
+                  <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 h-[500px] flex flex-col">
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-4 custom-scrollbar">
+                      {messages.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-zinc-600 text-sm italic">
+                          Історія повідомлень порожня
+                        </div>
+                      ) : (
+                        messages.map((msg, i) => (
+                          <div key={i} className={`flex ${msg.sender_type === 'parent' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${
+                              msg.sender_type === 'parent' 
+                              ? 'bg-red-600 text-white rounded-tr-none' 
+                              : 'bg-white/5 text-zinc-300 rounded-tl-none border border-white/5'
+                            }`}>
+                              <p>{msg.content}</p>
+                              <div className={`text-[8px] mt-1 font-bold uppercase tracking-widest ${
+                                msg.sender_type === 'parent' ? 'text-white/50' : 'text-zinc-500'
+                              }`}>
+                                {new Date(msg.created_at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
-                    <p className="text-zinc-400 leading-relaxed">
-                      {ann.content}
-                    </p>
+                    
+                    <div className="mt-6 pt-6 border-t border-white/5 flex gap-3">
+                      <input 
+                        type="text"
+                        value={coachMessage}
+                        onChange={(e) => setCoachMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                        placeholder="Напишіть тренеру..."
+                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-red-600/50 transition-all"
+                      />
+                      <button 
+                        onClick={handleSendMessage}
+                        className="bg-red-600 hover:bg-red-700 text-white p-3 rounded-xl transition-all shadow-lg shadow-red-600/20"
+                      >
+                        <MessageSquare size={20} />
+                      </button>
+                    </div>
                   </div>
-                ))}
-                {announcements.length === 0 && (
-                  <div className="p-20 text-center text-zinc-500 font-bold uppercase tracking-widest text-xs">
-                    Повідомлень поки немає
+                </div>
+
+                <div className="lg:col-span-1 space-y-6">
+                  <h3 className="text-xl font-black uppercase tracking-tight">Оголошення</h3>
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                    {announcements.map(ann => (
+                      <div key={ann.id} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 border-l-4 border-l-red-600">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="font-bold text-sm truncate">{ann.title}</div>
+                          <div className="text-[8px] text-zinc-500">{new Date(ann.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 line-clamp-3">
+                          {ann.content}
+                        </p>
+                      </div>
+                    ))}
+                    {announcements.length === 0 && (
+                      <div className="p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-xs">
+                        Оголошень немає
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -869,10 +962,7 @@ const ParentPanel = () => {
               rows={3}
             />
             <button
-              onClick={() => {
-                toast.success('Повідомлення надіслано тренеру!');
-                setCoachMessage('');
-              }}
+              onClick={handleSendMessage}
               className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
             >
               Надіслати повідомлення
