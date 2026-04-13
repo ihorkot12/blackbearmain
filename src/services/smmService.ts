@@ -98,27 +98,36 @@ export const generateContentOptions = async (params: any, history: any[]) => {
   return JSON.parse(cleanText);
 };
 
-export const analyzeAccount = async (posts: any[]) => {
+export const analyzeAccount = async (posts: any[], insights: any[] = []) => {
   const prompt = `
     ${CLUB_CONTEXT}
     
-    Дані про останні пости:
+    Дані про останні публікації (Media):
     ${JSON.stringify(posts.slice(0, 20))}
     
-    Проаналізуй Instagram акаунт клубу. Вияви сильні та слабкі сторони, недорозвинені рубрики та потенціал росту.
+    Дані про охоплення та залученість (Insights):
+    ${JSON.stringify(insights)}
+    
+    Дій як провідний SMM-стратег. Проаналізуй Instagram акаунт клубу на основі цих реальних даних. 
+    Вияви сильні та слабкі сторони, рубрики яких не вистачає, та надай стратегічні рекомендації для росту.
+    
+    Зверни увагу на:
+    1. Якість контенту та залученість (лайки, коментарі).
+    2. Відповідність бренду Black Bear Dojo (дисципліна, експертність).
+    3. Прогалини в контент-плані (наприклад, мало відгуків, мало бекстейджу, мало експертних порад).
     
     Поверни ТІЛЬКИ JSON:
     {
-      "strengths": ["..."],
-      "weaknesses": ["..."],
-      "missing_content": ["Чого бракує"],
-      "adjacent_opportunities": ["Суміжні ніші для натхнення"],
-      "recommendations": ["Конкретні кроки для покращення"]
+      "strengths": ["3-5 сильних сторін"],
+      "weaknesses": ["3-5 слабких сторін"],
+      "missing_content": ["3-5 типів контенту, яких бракує"],
+      "adjacent_opportunities": ["Суміжні ніші або тренди для впровадження"],
+      "recommendations": ["5 конкретних кроків для покращення показників"]
     }
   `;
 
   const response = await ai.models.generateContent({
-    model: "gemini-3-flash-preview",
+    model: "gemini-1.5-flash",
     contents: prompt
   });
 

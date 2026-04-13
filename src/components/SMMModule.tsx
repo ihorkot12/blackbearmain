@@ -106,10 +106,24 @@ export const SMMModule = () => {
   });
   const [options, setOptions] = useState<any[]>([]);
   const [selectedOption, setSelectedOption] = useState<any | null>(null);
+  const [igMedia, setIgMedia] = useState<any[]>([]);
+  const [igInsights, setIgInsights] = useState<any[]>([]);
 
   useEffect(() => {
     fetchData();
     checkInstagramStatus();
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'instagram_connected') {
+        setIsAccountConnected(true);
+        setGenerating(false);
+        toast.success('Instagram акаунт успішно підключено!');
+        fetchData();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   const checkInstagramStatus = async () => {
@@ -205,7 +219,10 @@ export const SMMModule = () => {
   const runAccountAnalysis = async () => {
     setGenerating(true);
     try {
-      const data = await analyzeAccount(posts);
+      // Use real Instagram media if available, otherwise fallback to internal history
+      const analysisData = igMedia.length > 0 ? igMedia : posts;
+      const data = await analyzeAccount(analysisData, igInsights);
+      
       const token = localStorage.getItem('admin_token');
       await fetch('/api/smm/analysis', {
         method: 'POST',
@@ -309,6 +326,10 @@ export const SMMModule = () => {
       const data = await res.json();
       
       if (data.success) {
+        // Store real media and insights for AI analysis
+        setIgMedia(data.media || []);
+        setIgInsights(data.account_insights || []);
+
         // In a real app, we'd process the insights and media data
         // For now, let's update the local state with some of the data
         const accountInsights = data.account_insights || [];
@@ -376,17 +397,6 @@ export const SMMModule = () => {
       toast.error('Помилка отримання посилання для авторизації');
       setGenerating(false);
     }
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data === 'instagram_connected') {
-        setIsAccountConnected(true);
-        setGenerating(false);
-        toast.success('Акаунт @karate_kyiv успішно підключено!');
-        window.removeEventListener('message', handleMessage);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
   };
 
   return (
@@ -964,6 +974,22 @@ export const SMMModule = () => {
                     {analysis.missing_content.map((s, i) => (
                       <div key={i} className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
                         <div className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center font-black text-xs">
+                          {i + 1}
+                        </div>
+                        <p className="text-sm text-zinc-300 font-medium">{s}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-zinc-900/30 p-10 rounded-[3rem] border border-white/5">
+                  <h3 className="text-xl font-black uppercase tracking-tight mb-8 flex items-center gap-3">
+                    <BrainCircuit size={20} className="text-orange-500" /> Можливості та тренди
+                  </h3>
+                  <div className="space-y-4">
+                    {analysis.adjacent_opportunities.map((s, i) => (
+                      <div key={i} className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                        <div className="w-8 h-8 bg-orange-500/10 text-orange-500 rounded-lg flex items-center justify-center font-black text-xs">
                           {i + 1}
                         </div>
                         <p className="text-sm text-zinc-300 font-medium">{s}</p>
