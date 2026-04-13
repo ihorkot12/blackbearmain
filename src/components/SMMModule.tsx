@@ -285,11 +285,62 @@ export const SMMModule = () => {
 
   const connectAccount = () => {
     setGenerating(true);
-    setTimeout(() => {
-      setIsAccountConnected(true);
-      setGenerating(false);
-      toast.success('Акаунт @karate_kyiv успішно підключено!');
-    }, 2000);
+    // Simulate Instagram OAuth Popup
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    const popup = window.open(
+      'about:blank',
+      'InstagramLogin',
+      `width=${width},height=${height},left=${left},top=${top}`
+    );
+
+    if (popup) {
+      popup.document.write(`
+        <html>
+          <head>
+            <title>Instagram Login</title>
+            <style>
+              body { background: #000; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; items-center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+              .logo { width: 80px; height: 80px; background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%); border-radius: 20px; margin-bottom: 20px; }
+              .btn { background: #0095f6; color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 20px; }
+              .loader { border: 4px solid #333; border-top: 4px solid #fff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; display: none; margin: 20px auto; }
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+          </head>
+          <body>
+            <div class="logo"></div>
+            <h2>Black Bear Dojo Content OS</h2>
+            <p style="color: #888; font-size: 14px; max-width: 80%;">Надайте дозвіл на доступ до метрик акаунту @karate_kyiv</p>
+            <div id="loader" class="loader"></div>
+            <button id="btn" class="btn" onclick="connect()">Дозволити доступ</button>
+            <script>
+              function connect() {
+                document.getElementById('btn').style.display = 'none';
+                document.getElementById('loader').style.display = 'block';
+                setTimeout(() => {
+                  window.opener.postMessage('instagram_connected', '*');
+                  window.close();
+                }, 1500);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'instagram_connected') {
+        setIsAccountConnected(true);
+        setGenerating(false);
+        toast.success('Акаунт @karate_kyiv успішно підключено!');
+        window.removeEventListener('message', handleMessage);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
   };
 
   return (

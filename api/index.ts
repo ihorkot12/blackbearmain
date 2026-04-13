@@ -1471,8 +1471,8 @@ async function startServer() {
       }
 
       // Нормалізуємо телефон (видаляємо всі non-digits) для пошуку
-      const normalizedPhone = login.replace(/\D/g, '');
-      console.log('Normalized phone:', normalizedPhone);
+      const normalizedPhone = normalizePhone(login);
+      console.log('Normalized phone for login:', normalizedPhone);
 
       if (!pool) return res.status(500).json({ error: 'Database not configured' });
 
@@ -1522,7 +1522,7 @@ async function startServer() {
         // Спроба 1: bcrypt.compare (якщо пароль хешований)
         if (user.parent_password) {
           try {
-            if (user.parent_password.startsWith('$2a$')) {
+            if (user.parent_password.startsWith('$2a$') || user.parent_password.startsWith('$2b$')) {
               passwordMatch = await bcrypt.compare(password, user.parent_password);
               console.log('Bcrypt compare result:', passwordMatch);
             } else {
@@ -1530,7 +1530,6 @@ async function startServer() {
             }
           } catch (e: any) {
             console.log('Bcrypt compare failed, trying plain text:', e.message);
-            // Спроба 2: простой текст (для старих записів)
             passwordMatch = (password === user.parent_password);
           }
         }
@@ -1554,8 +1553,8 @@ async function startServer() {
           res.json({ 
             success: true, 
             role: 'parent', 
-            name: user.name, 
-            id: user.id,
+            name: user.name,
+            participantId: user.id,
             redirect: '/parent'
           });
         });
@@ -1753,7 +1752,7 @@ async function startServer() {
       const message = `
 <b>🆕 Нова реєстрація (${children.length} уч.)</b>
 <b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
-<b>Телефон:</b> ${phone}
+<b>Телефон:</b> ${contactPhone}
 <b>Діти:</b>
 ${childrenList}
 <b>Логін:</b> ${parent_login}
