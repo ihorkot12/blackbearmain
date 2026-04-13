@@ -12,6 +12,7 @@ import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import * as xlsx from 'xlsx';
 import cron from 'node-cron';
+import fetch from 'node-fetch';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -214,6 +215,15 @@ async function initDb() {
       CREATE TABLE IF NOT EXISTS settings (
         key TEXT PRIMARY KEY,
         value TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS instagram_accounts (
+        id SERIAL PRIMARY KEY,
+        username TEXT,
+        access_token TEXT NOT NULL,
+        instagram_business_account_id TEXT,
+        facebook_page_id TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       CREATE TABLE IF NOT EXISTS images (
@@ -574,6 +584,158 @@ async function startServer() {
       maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
     }
   }));
+
+  // Instagram OAuth Routes
+  app.get('/api/auth/instagram/url', (req, res) => {
+    const clientId = process.env.INSTAGRAM_CLIENT_ID;
+    if (!clientId) return res.status(500).json({ error: "Instagram Client ID not configured" });
+
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
+    
+    // Scopes needed for Business Account insights
+    // Note: Instagram Graph API uses Facebook Login for Business
+    const scopes = [
+      'instagram_basic',
+      'instagram_manage_insights',
+      'pages_read_engagement',
+      'pages_show_list',
+      'business_management'
+    ].join(',');
+
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+    
+    res.json({ url: authUrl });
+  });
+
+  app.get('/api/auth/instagram/callback', async (req, res) => {
+    const { code } = req.query;
+    if (!code) return res.status(400).send("No code provided");
+
+    const clientId = process.env.INSTAGRAM_CLIENT_ID;
+    const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
+    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
+
+    try {
+      // 1. Exchange code for access token
+      const tokenRes = await fetch(`https://graph.facebook.com/v19.0/oauth/access_token?client_id=${clientId}&client_secret=${clientSecret}&redirect_uri=${encodeURIComponent(redirectUri)}&code=${code}`);
+      const tokenData: any = await tokenRes.json();
+
+      if (tokenData.error) throw new Error(tokenData.error.message);
+
+      const accessToken = tokenData.access_token;
+
+      // 2. Get User's Pages to find linked Instagram Business Account
+      const pagesRes = await fetch(`https://graph.facebook.com/v19.0/me/accounts?access_token=${accessToken}`);
+      const pagesData: any = await pagesRes.json();
+
+      let instagramBusinessAccountId = null;
+      let facebookPageId = null;
+      let username = 'Connected Account';
+
+      if (pagesData.data && pagesData.data.length > 0) {
+        // Find the first page that has a linked Instagram account
+        for (const page of pagesData.data) {
+          const igRes = await fetch(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`);
+          const igData: any = await igRes.json();
+          
+          if (igData.instagram_business_account) {
+            instagramBusinessAccountId = igData.instagram_business_account.id;
+            facebookPageId = page.id;
+            
+            // Get IG username
+            const userRes = await fetch(`https://graph.facebook.com/v19.0/${instagramBusinessAccountId}?fields=username&access_token=${accessToken}`);
+            const userData: any = await userRes.json();
+            username = userData.username || username;
+            break;
+          }
+        }
+      }
+
+      if (!instagramBusinessAccountId) {
+        return res.send(`
+          <html>
+            <body>
+              <script>
+                alert("No Instagram Business Account linked to your Facebook Pages found.");
+                window.close();
+              </script>
+            </body>
+          </html>
+        `);
+      }
+
+      // 3. Store in DB
+      await pool.query(
+        "INSERT INTO instagram_accounts (username, access_token, instagram_business_account_id, facebook_page_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+        [username, accessToken, instagramBusinessAccountId, facebookPageId]
+      );
+
+      // 4. Success message and close popup
+      res.send(`
+        <html>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage('instagram_connected', '*');
+                window.close();
+              } else {
+                window.location.href = '/admin';
+              }
+            </script>
+            <p>Instagram connected successfully! You can close this window.</p>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error("Instagram OAuth Error:", error);
+      res.status(500).send(`Error: ${error.message}`);
+    }
+  });
+
+  app.get('/api/instagram/status', async (req, res) => {
+    try {
+      const result = await pool.query("SELECT username, updated_at FROM instagram_accounts ORDER BY updated_at DESC LIMIT 1");
+      if (result.rows.length > 0) {
+        res.json({ connected: true, account: result.rows[0] });
+      } else {
+        res.json({ connected: false });
+      }
+    } catch (e) {
+      res.status(500).json({ error: "Failed to check status" });
+    }
+  });
+
+  app.post('/api/instagram/sync', async (req, res) => {
+    try {
+      const accountRes = await pool.query("SELECT * FROM instagram_accounts ORDER BY updated_at DESC LIMIT 1");
+      if (accountRes.rows.length === 0) return res.status(404).json({ error: "No account connected" });
+
+      const account = accountRes.rows[0];
+      const igId = account.instagram_business_account_id;
+      const token = account.access_token;
+
+      // 1. Fetch Account Insights (Followers, Reach, Impressions)
+      // Metrics: follower_count, reach, impressions
+      const insightsRes = await fetch(`https://graph.facebook.com/v19.0/${igId}/insights?metric=follower_count,reach,impressions&period=day&access_token=${token}`);
+      const insightsData: any = await insightsRes.json();
+
+      // 2. Fetch Media to get individual post metrics
+      const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${igId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&access_token=${token}`);
+      const mediaData: any = await mediaRes.json();
+
+      // Process and save metrics
+      // For simplicity, we'll just return them for now, but in a real app you'd save them to smm_posts or a metrics table
+      
+      res.json({
+        success: true,
+        account_insights: insightsData.data,
+        media: mediaData.data
+      });
+    } catch (error: any) {
+      console.error("Instagram Sync Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
 
