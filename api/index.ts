@@ -219,12 +219,15 @@ async function initDb() {
 
       CREATE TABLE IF NOT EXISTS instagram_accounts (
         id SERIAL PRIMARY KEY,
+        admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE,
         username TEXT,
         access_token TEXT NOT NULL,
         instagram_business_account_id TEXT,
         facebook_page_id TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE;
 
       CREATE TABLE IF NOT EXISTS images (
         id SERIAL PRIMARY KEY,
@@ -595,15 +598,61 @@ async function startServer() {
     }
   }));
 
+  const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
+
+  const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader === `Bearer ${ADMIN_TOKEN}`) {
+      (req as any).user = { role: 'admin', login: 'system' };
+      return next();
+    }
+
+    // Check for custom tokens (simple implementation for now)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const [id, role] = token.split('-');
+      try {
+        if (role === 'parent') {
+          const result = await pool.query("SELECT id, name, 'parent' as role FROM participants WHERE id::text = $1", [id]);
+          if (result.rows.length > 0) {
+            (req as any).user = result.rows[0];
+            return next();
+          }
+        } else {
+          const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [id]);
+          if (result.rows.length > 0) {
+            (req as any).user = result.rows[0];
+            return next();
+          }
+        }
+      } catch (e) {
+        console.error('Auth error:', e);
+      }
+    }
+
+    console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}...`);
+    res.status(401).json({ error: 'Unauthorized' });
+  };
+
+  const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    requireAuth(req, res, () => {
+      if ((req as any).user?.role === 'admin') {
+        next();
+      } else {
+        res.status(403).json({ error: 'Forbidden: Admin access required' });
+      }
+    });
+  };
+
   // Instagram OAuth Routes
   app.get('/api/auth/instagram/url', (req, res) => {
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
     if (!clientId) return res.status(500).json({ error: "Instagram Client ID not configured" });
 
+    const { action } = req.query; // 'login' or 'connect'
     const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
     
     // Scopes needed for Business Account insights
-    // Note: Instagram Graph API uses Facebook Login for Business
     const scopes = [
       'instagram_basic',
       'instagram_manage_insights',
@@ -612,13 +661,14 @@ async function startServer() {
       'business_management'
     ].join(',');
 
-    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+    const state = action === 'login' ? 'login' : 'connect';
+    const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
     
     res.json({ url: authUrl });
   });
 
   app.get('/api/auth/instagram/callback', async (req, res) => {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) return res.status(400).send("No code provided");
 
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
@@ -643,7 +693,6 @@ async function startServer() {
       let username = 'Connected Account';
 
       if (pagesData.data && pagesData.data.length > 0) {
-        // Find the first page that has a linked Instagram account
         for (const page of pagesData.data) {
           const igRes = await fetch(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`);
           const igData: any = await igRes.json();
@@ -652,7 +701,6 @@ async function startServer() {
             instagramBusinessAccountId = igData.instagram_business_account.id;
             facebookPageId = page.id;
             
-            // Get IG username
             const userRes = await fetch(`https://graph.facebook.com/v19.0/${instagramBusinessAccountId}?fields=username&access_token=${accessToken}`);
             const userData: any = await userRes.json();
             username = userData.username || username;
@@ -674,37 +722,90 @@ async function startServer() {
         `);
       }
 
-      // 3. Store in DB
-      await pool.query(
-        "INSERT INTO instagram_accounts (username, access_token, instagram_business_account_id, facebook_page_id) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-        [username, accessToken, instagramBusinessAccountId, facebookPageId]
-      );
+      // 3. Handle Login vs Connect
+      if (state === 'login') {
+        const result = await pool.query(
+          "SELECT admin_users.* FROM admin_users JOIN instagram_accounts ON admin_users.id = instagram_accounts.admin_user_id WHERE instagram_accounts.instagram_business_account_id = $1",
+          [instagramBusinessAccountId]
+        );
 
-      // 4. Success message and close popup
-      res.send(`
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage('instagram_connected', '*');
-                window.close();
-              } else {
-                window.location.href = '/admin';
-              }
-            </script>
-            <p>Instagram connected successfully! You can close this window.</p>
-          </body>
-        </html>
-      `);
+        if (result.rows.length === 0) {
+          return res.send(`
+            <html>
+              <body>
+                <script>
+                  alert("Цей Instagram акаунт не прив'язаний до жодного адміна.");
+                  window.close();
+                </script>
+              </body>
+            </html>
+          `);
+        }
+
+        const user = result.rows[0];
+        (req.session as any).userId = user.id;
+        (req.session as any).role = user.role || 'admin';
+        (req.session as any).userName = user.name;
+
+        await new Promise((resolve, reject) => {
+          req.session.save((err) => err ? reject(err) : resolve(null));
+        });
+
+        return res.send(`
+          <html>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage({ type: 'instagram_login_success', user: ${JSON.stringify({
+                    role: user.role,
+                    name: user.name,
+                    token: `${user.id}-${user.role}`
+                  })} }, '*');
+                  window.close();
+                } else {
+                  window.location.href = '/admin';
+                }
+              </script>
+            </body>
+          </html>
+        `);
+      } else {
+        // Connect mode - requires being logged in
+        const currentUserId = (req.session as any).userId;
+        if (!currentUserId) {
+          return res.status(401).send("Please login first to connect Instagram");
+        }
+
+        await pool.query(
+          "INSERT INTO instagram_accounts (admin_user_id, username, access_token, instagram_business_account_id, facebook_page_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (instagram_business_account_id) DO UPDATE SET access_token = $3, username = $2, admin_user_id = $1",
+          [currentUserId, username, accessToken, instagramBusinessAccountId, facebookPageId]
+        );
+
+        return res.send(`
+          <html>
+            <body>
+              <script>
+                if (window.opener) {
+                  window.opener.postMessage('instagram_connected', '*');
+                  window.close();
+                } else {
+                  window.location.href = '/admin';
+                }
+              </script>
+            </body>
+          </html>
+        `);
+      }
     } catch (error: any) {
       console.error("Instagram OAuth Error:", error);
       res.status(500).send(`Error: ${error.message}`);
     }
   });
 
-  app.get('/api/instagram/status', async (req, res) => {
+  app.get('/api/instagram/status', requireAuth, async (req, res) => {
+    const currentUserId = (req as any).user.id;
     try {
-      const result = await pool.query("SELECT username, updated_at FROM instagram_accounts ORDER BY updated_at DESC LIMIT 1");
+      const result = await pool.query("SELECT username, updated_at FROM instagram_accounts WHERE admin_user_id = $1 ORDER BY updated_at DESC LIMIT 1", [currentUserId]);
       if (result.rows.length > 0) {
         res.json({ connected: true, account: result.rows[0] });
       } else {
@@ -715,27 +816,24 @@ async function startServer() {
     }
   });
 
-  app.post('/api/instagram/sync', async (req, res) => {
+  app.post('/api/instagram/sync', requireAuth, async (req, res) => {
+    const currentUserId = (req as any).user.id;
     try {
-      const accountRes = await pool.query("SELECT * FROM instagram_accounts ORDER BY updated_at DESC LIMIT 1");
+      const accountRes = await pool.query("SELECT * FROM instagram_accounts WHERE admin_user_id = $1 ORDER BY updated_at DESC LIMIT 1", [currentUserId]);
       if (accountRes.rows.length === 0) return res.status(404).json({ error: "No account connected" });
 
       const account = accountRes.rows[0];
       const igId = account.instagram_business_account_id;
       const token = account.access_token;
 
-      // 1. Fetch Account Insights (Followers, Reach, Impressions)
-      // Metrics: follower_count, reach, impressions
-      const insightsRes = await fetch(`https://graph.facebook.com/v19.0/${igId}/insights?metric=follower_count,reach,impressions&period=day&access_token=${token}`);
+      // Fetch insights
+      const insightsRes = await fetch(`https://graph.facebook.com/v19.0/${igId}/insights?metric=impressions,reach,follower_count&period=day&access_token=${token}`);
       const insightsData: any = await insightsRes.json();
 
-      // 2. Fetch Media to get individual post metrics
+      // Fetch media
       const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${igId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&access_token=${token}`);
       const mediaData: any = await mediaRes.json();
 
-      // Process and save metrics
-      // For simplicity, we'll just return them for now, but in a real app you'd save them to smm_posts or a metrics table
-      
       res.json({
         success: true,
         account_insights: insightsData.data,
@@ -746,43 +844,6 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
-
-  const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
-
-  const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader === `Bearer ${ADMIN_TOKEN}`) {
-      (req as any).user = { role: 'admin', login: 'system' };
-      return next();
-    }
-
-    // Check for custom tokens (simple implementation for now)
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      try {
-        const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [token.split('-')[0]]);
-        if (result.rows.length > 0) {
-          (req as any).user = result.rows[0];
-          return next();
-        }
-      } catch (e) {
-        console.error('Auth error:', e);
-      }
-    }
-
-    console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}...`);
-    res.status(401).json({ error: 'Unauthorized' });
-  };
-
-  const requireAdmin = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-    requireAuth(req, res, () => {
-      if ((req as any).user?.role === 'admin') {
-        next();
-      } else {
-        res.status(403).json({ error: 'Forbidden: Admin access required' });
-      }
-    });
-  };
 
   async function notifyParent(participantId: number, type: string, message: string) {
     if (!pool) return;

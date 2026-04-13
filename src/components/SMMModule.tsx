@@ -374,7 +374,7 @@ export const SMMModule = () => {
   const connectAccount = async () => {
     setGenerating(true);
     try {
-      const res = await fetch('/api/auth/instagram/url');
+      const res = await fetch('/api/auth/instagram/url?action=connect');
       const { url } = await res.json();
       
       const width = 600;
@@ -412,8 +412,19 @@ export const SMMModule = () => {
           </div>
           <p className="text-zinc-500 font-medium">Black Bear Dojo AI SMM Agency</p>
         </div>
-        
-        <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
+
+        <div className="flex items-center gap-4">
+          {!isAccountConnected && (
+            <button 
+              onClick={connectAccount}
+              className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-black uppercase tracking-widest text-[10px] hover:opacity-90 transition-all shadow-lg flex items-center gap-2"
+            >
+              <Share2 size={14} />
+              Підключити Instagram
+            </button>
+          )}
+          
+          <div className="flex bg-zinc-900/50 p-1 rounded-2xl border border-white/5 overflow-x-auto no-scrollbar">
           {[
             { id: 'dashboard', label: 'Дашборд', icon: Layout },
             { id: 'generator', label: 'Генератор', icon: Sparkles },
@@ -437,6 +448,7 @@ export const SMMModule = () => {
           ))}
         </div>
       </div>
+    </div>
 
       <AnimatePresence mode="wait">
         {activeTab === 'dashboard' && (

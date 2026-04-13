@@ -77,6 +77,45 @@ export const LoginPage = () => {
   const queryParams = new URLSearchParams(location.search);
   const targetRole = queryParams.get('role') || 'admin';
 
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'instagram_login_success') {
+        const { user } = event.data;
+        localStorage.setItem('admin_token', user.token);
+        localStorage.setItem('admin_role', user.role);
+        localStorage.setItem('admin_name', user.name);
+        navigate('/admin');
+        toast.success(`Вітаємо, ${user.name}!`);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigate]);
+
+  const handleInstagramLogin = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/auth/instagram/url?action=login');
+      const { url } = await res.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      window.open(
+        url,
+        'InstagramLogin',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+    } catch (err) {
+      setError('Помилка отримання посилання');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -179,6 +218,18 @@ export const LoginPage = () => {
             >
               {isLoading ? 'Вхід...' : 'Увійти'}
             </button>
+
+            {!isParent && (
+              <button 
+                type="button"
+                onClick={handleInstagramLogin}
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black uppercase tracking-widest text-[10px] py-5 rounded-2xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
+              >
+                <ImageIcon size={18} />
+                Увійти через Instagram
+              </button>
+            )}
             
             {isParent && (
               <button 
