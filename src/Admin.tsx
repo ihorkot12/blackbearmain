@@ -265,6 +265,7 @@ export const LoginPage = () => {
 const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: string, action?: string) => void, role: string, coachId: number | null }) => {
   const [stats, setStats] = useState<any>(null);
   const [chartData, setChartData] = useState<any>(null);
+  const [recentMessages, setRecentMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [birthdays, setBirthdays] = useState<any[]>([]);
 
@@ -272,9 +273,10 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
     const fetchData = async () => {
       const token = localStorage.getItem('admin_token');
       try {
-        const [statsRes, birthdaysRes] = await Promise.all([
+        const [statsRes, birthdaysRes, messagesRes] = await Promise.all([
           fetch('/api/dashboard/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-          fetch('/api/birthdays', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+          fetch('/api/birthdays', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+          fetch('/api/admin/recent-messages', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
         ]);
         
         if (statsRes.error) throw new Error(statsRes.error);
@@ -288,6 +290,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           churnRisk: statsRes.churnRisk || []
         });
         setBirthdays(Array.isArray(birthdaysRes) ? birthdaysRes : []);
+        setRecentMessages(Array.isArray(messagesRes) ? messagesRes : []);
         
         if (Array.isArray(birthdaysRes) && birthdaysRes.length > 0) {
           toast.info(`Сьогодні день народження у ${birthdaysRes.length} учнів!`, {
@@ -664,6 +667,48 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             ))}
             {(!chartData?.churnRisk || chartData.churnRisk.length === 0) && (
               <div className="text-center py-10 text-zinc-500 font-bold italic">Всі активно тренуються 💪</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
+          <div className="flex items-center justify-between mb-6 lg:mb-10">
+            <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center gap-3">
+              <MessageSquare size={20} className="text-blue-500" />
+              Повідомлення від батьків
+            </h3>
+            <button 
+              onClick={() => onQuickAction('messages')}
+              className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
+            >
+              Всі чати →
+            </button>
+          </div>
+          <div className="space-y-4">
+            {recentMessages.map((msg, i) => (
+              <div 
+                key={i} 
+                onClick={() => onQuickAction('messages')}
+                className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group cursor-pointer"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-500/10 text-blue-500 rounded-xl flex items-center justify-center font-black text-lg">
+                    {msg.participant_name[0]}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black uppercase tracking-tight truncate">{msg.participant_name}</p>
+                    <p className="text-[10px] text-zinc-400 line-clamp-1">{msg.content}</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-[8px] text-zinc-600 font-bold uppercase">
+                    {new Date(msg.created_at).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            ))}
+            {recentMessages.length === 0 && (
+              <div className="text-center py-10 text-zinc-500 font-bold italic">Повідомлень немає</div>
             )}
           </div>
         </div>
@@ -2645,7 +2690,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   }, []);
 
   useEffect(() => {
-    if (initialAction === 'add' && groups.length > 0) {
+    if (initialAction === 'add') {
       setEditingParticipant({ 
         name: '', 
         age: '', 
@@ -4686,10 +4731,10 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   }, []);
 
   useEffect(() => {
-    if (initialAction === 'add' && locations.length > 0 && coaches.length > 0) {
+    if (initialAction === 'add') {
       setEditingEntry({ 
-        location_id: locations[0].id, 
-        coach_id: coaches[0].id, 
+        location_id: locations[0]?.id || '', 
+        coach_id: coaches[0]?.id || '', 
         day_of_week: 'Пн', 
         start_time: '16:00', 
         end_time: '17:30', 
@@ -4699,7 +4744,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
       });
       onActionComplete?.();
     }
-  }, [initialAction, locations, coaches]);
+  }, [initialAction]);
 
   const handleSaveEntry = async (entry: any) => {
     try {

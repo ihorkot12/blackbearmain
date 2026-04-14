@@ -630,6 +630,16 @@ async function startServer() {
       }
     }
 
+    // Also check session for parent
+    if ((req.session as any).participantId) {
+      (req as any).user = { 
+        id: (req.session as any).participantId, 
+        role: 'parent', 
+        name: (req.session as any).userName 
+      };
+      return next();
+    }
+
     console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}...`);
     res.status(401).json({ error: 'Unauthorized' });
   };
@@ -1621,6 +1631,24 @@ async function startServer() {
         return res.json([]);
       }
       res.status(500).json({ error: "Failed to fetch schedule" });
+    }
+  });
+
+  app.get("/api/admin/recent-messages", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const result = await pool.query(`
+        SELECT m.*, p.name as participant_name, g.name as group_name
+        FROM messages m
+        JOIN participants p ON m.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE m.sender_type = 'parent'
+        ORDER BY m.created_at DESC
+        LIMIT 10
+      `);
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Server error" });
     }
   });
 
@@ -3526,6 +3554,22 @@ ${content}
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  app.get("/api/parent/notifications", async (req, res) => {
+    if (!pool) return res.json([]);
+    const participantId = (req.session as any).participantId;
+    if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+    
+    try {
+      const result = await pool.query(
+        "SELECT * FROM notifications WHERE participant_id = $1 ORDER BY created_at DESC LIMIT 20",
+        [participantId]
+      );
+      res.json(result.rows);
+    } catch (e) {
+      res.status(500).json({ error: "Server error" });
     }
   });
 

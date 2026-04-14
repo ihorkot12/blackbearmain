@@ -33,6 +33,7 @@ const ParentPanel = () => {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [isChildMode, setIsChildMode] = useState(false);
@@ -48,6 +49,8 @@ const ParentPanel = () => {
   useEffect(() => {
     if (participant?.id) {
       fetchMessages();
+      const interval = setInterval(fetchMessages, 5000);
+      return () => clearInterval(interval);
     }
   }, [participant?.id]);
 
@@ -103,19 +106,22 @@ const ParentPanel = () => {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 30000); // Fetch every 30s
+    return () => clearInterval(interval);
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [pRes, aRes, bRes, sRes, cRes, payRes, annRes] = await Promise.all([
+      const [pRes, aRes, bRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
         fetch('/api/parent/me'),
         fetch('/api/parent/attendance'),
         fetch('/api/parent/badges'),
         fetch('/api/parent/schedule'),
         fetch('/api/parent/children'),
         fetch('/api/parent/payments'),
-        fetch('/api/announcements')
+        fetch('/api/announcements'),
+        fetch('/api/parent/notifications')
       ]);
 
       if (pRes.status === 401) {
@@ -130,6 +136,7 @@ const ParentPanel = () => {
       const cData = cRes.ok ? await cRes.json() : [];
       const payData = payRes.ok ? await payRes.json() : [];
       const annData = annRes.ok ? await annRes.json() : [];
+      const notifData = notifRes.ok ? await notifRes.json() : [];
 
       if (pData) setParticipant(pData);
       setAttendance(aData);
@@ -138,6 +145,7 @@ const ParentPanel = () => {
       setChildren(cData);
       setPayments(payData);
       setAnnouncements(annData);
+      setNotifications(notifData);
     } catch (e) {
       toast.error('Помилка завантаження даних');
     }
@@ -343,6 +351,7 @@ const ParentPanel = () => {
                 { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
                 { id: 'progress', label: 'Прогрес', icon: Trophy },
                 { id: 'payments', label: 'Оплата', icon: CreditCard },
+                { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
                 { id: 'messages', label: 'Повідомлення', icon: MessageSquare },
               ].map(item => (
                 <button
@@ -435,6 +444,7 @@ const ParentPanel = () => {
             { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
             { id: 'progress', label: 'Прогрес', icon: Trophy },
             { id: 'payments', label: 'Оплата', icon: CreditCard },
+            { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
             { id: 'messages', label: 'Повідомлення', icon: MessageSquare },
           ].map(item => (
             <button
@@ -627,6 +637,46 @@ const ParentPanel = () => {
                   </div>
                 </section>
               </div>
+
+              <section>
+                <div className="flex items-center justify-between mb-8">
+                  <h2 className="text-2xl font-black uppercase tracking-tight">Останні сповіщення</h2>
+                  <button 
+                    onClick={() => setActiveTab('notifications')}
+                    className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+                  >
+                    Всі сповіщення →
+                  </button>
+                </div>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {notifications.slice(0, 4).map((n, i) => (
+                    <div key={i} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                        n.type === 'attendance' ? 'bg-orange-500/10 text-orange-500' :
+                        n.type === 'payment' ? 'bg-green-500/10 text-green-500' :
+                        n.type === 'achievement' ? 'bg-yellow-500/10 text-yellow-500' :
+                        'bg-red-600/10 text-red-600'
+                      }`}>
+                        {n.type === 'attendance' ? <Calendar size={18} /> :
+                         n.type === 'payment' ? <CreditCard size={18} /> :
+                         n.type === 'achievement' ? <Trophy size={18} /> :
+                         <AlertCircle size={18} />}
+                      </div>
+                      <div>
+                        <p className="text-xs text-zinc-300 line-clamp-2 mb-2">{n.message}</p>
+                        <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">
+                          {new Date(n.created_at).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                  {notifications.length === 0 && (
+                    <div className="col-span-2 p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-xs">
+                      Сповіщень немає
+                    </div>
+                  )}
+                </div>
+              </section>
             </div>
           )}
 
@@ -737,8 +787,11 @@ const ParentPanel = () => {
                     <div className="mt-10">
                       <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-6 px-2">Чек-лист навичок</div>
                       <div className="grid sm:grid-cols-2 gap-3">
-                        {(participant?.skill_checklist || '').split(',').map((skill: string, i: number) => (
-                          skill.trim() && (
+                        {(Array.isArray(participant?.skill_checklist) 
+                          ? participant.skill_checklist 
+                          : (participant?.skill_checklist || '').split(',')
+                        ).map((skill: string, i: number) => (
+                          skill && typeof skill === 'string' && skill.trim() && (
                             <div key={i} className="flex items-center gap-4 bg-white/[0.03] p-4 rounded-2xl border border-white/5">
                               <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
                                 <ShieldCheck size={14} className="text-green-500" />
@@ -747,7 +800,7 @@ const ParentPanel = () => {
                             </div>
                           )
                         ))}
-                        {(!participant?.skill_checklist || participant?.skill_checklist.trim() === '') && (
+                        {(!participant?.skill_checklist || (typeof participant.skill_checklist === 'string' && participant.skill_checklist.trim() === '') || (Array.isArray(participant.skill_checklist) && participant.skill_checklist.length === 0)) && (
                           <div className="col-span-2 text-center p-8 text-zinc-500 italic text-sm">Чек-лист поки порожній</div>
                         )}
                       </div>
@@ -832,6 +885,59 @@ const ParentPanel = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'notifications' && (
+            <div className="space-y-8">
+              <h2 className="text-4xl font-black uppercase tracking-tighter">Ваші <span className="text-red-600">сповіщення</span></h2>
+              <div className="space-y-4">
+                {notifications.length > 0 ? notifications.map((n, i) => (
+                  <motion.div 
+                    key={i}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.05 }}
+                    className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-6 group hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
+                      n.type === 'attendance' ? 'bg-orange-500/10 text-orange-500' :
+                      n.type === 'payment' ? 'bg-green-500/10 text-green-500' :
+                      n.type === 'achievement' ? 'bg-yellow-500/10 text-yellow-500' :
+                      'bg-red-600/10 text-red-600'
+                    }`}>
+                      {n.type === 'attendance' ? <Calendar size={24} /> :
+                       n.type === 'payment' ? <CreditCard size={24} /> :
+                       n.type === 'achievement' ? <Trophy size={24} /> :
+                       <AlertCircle size={24} />}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${
+                          n.type === 'attendance' ? 'text-orange-500' :
+                          n.type === 'payment' ? 'text-green-500' :
+                          n.type === 'achievement' ? 'text-yellow-500' :
+                          'text-red-500'
+                        }`}>
+                          {n.type === 'attendance' ? 'Відвідуваність' :
+                           n.type === 'payment' ? 'Оплата' :
+                           n.type === 'achievement' ? 'Досягнення' :
+                           'Повідомлення'}
+                        </span>
+                        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                          {new Date(n.created_at).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-zinc-300 text-sm leading-relaxed">{n.message}</p>
+                    </div>
+                  </motion.div>
+                )) : (
+                  <div className="p-20 text-center bg-zinc-900/20 rounded-[3rem] border border-dashed border-white/5">
+                    <AlertCircle size={48} className="mx-auto text-zinc-700 mb-4 opacity-20" />
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Сповіщень поки немає</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
