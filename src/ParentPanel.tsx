@@ -620,24 +620,62 @@ const ParentPanel = () => {
                   </div>
                 </section>
 
-                <section>
-                  <h2 className="text-2xl font-black uppercase tracking-tight mb-8">Останні досягнення</h2>
-                  <div className="space-y-4">
-                    {badges.length > 0 ? badges.slice(0, 3).map((badge, i) => (
-                      <div key={i} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-center gap-6">
-                        <div className="w-14 h-14 bg-red-600/10 text-red-600 rounded-full flex items-center justify-center shadow-inner">
-                          <Trophy size={28} />
+                <section className="space-y-8">
+                  {/* BELT PROGRESS SECTION */}
+                  <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-yellow-500">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Trophy className="text-yellow-500" size={24} />
+                      <h3 className="text-xl font-black uppercase tracking-tight">Прогрес поясів</h3>
+                    </div>
+                    <div className="space-y-4">
+                      {beltProgress?.map((child) => (
+                        <div key={child.id} className="border-l-4 border-orange-500/50 pl-4">
+                          <p className="font-bold text-white">{child.first_name}</p>
+                          <p className="text-sm text-zinc-400">Поточний пояс: <span className="font-black text-orange-500 uppercase tracking-widest text-xs">{child.belt_level || 'Не вказано'}</span></p>
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Оновлено: {child.belt_updated_at ? new Date(child.belt_updated_at).toLocaleDateString('uk-UA') : 'Ніколи'}</p>
                         </div>
-                        <div>
-                          <div className="font-bold text-lg">{badge.type}</div>
-                          <div className="text-xs text-zinc-500">{new Date(badge.date).toLocaleDateString('uk-UA')}</div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ATTENDANCE STREAK SECTION */}
+                  <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-green-500">
+                    <div className="flex items-center gap-3 mb-6">
+                      <Activity className="text-green-500" size={24} />
+                      <h3 className="text-xl font-black uppercase tracking-tight">Відвідуваність за 30 днів</h3>
+                    </div>
+                    <div className="space-y-4">
+                      {attendanceStreak?.map((child) => (
+                        <div key={child.id} className="border-l-4 border-green-500/50 pl-4">
+                          <p className="font-bold text-white">{child.first_name}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <p className="text-sm text-zinc-400">Заняття: <span className="font-black text-green-500 text-xs">{child.total_attendance || 0}</span> разів</p>
+                            <span className="text-[9px] font-black uppercase tracking-widest bg-green-500/10 text-green-500 px-2 py-1 rounded-lg">✓ Активно</span>
+                          </div>
                         </div>
-                      </div>
-                    )) : (
-                      <div className="p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500">
-                        Досягнень поки немає
-                      </div>
-                    )}
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* QUICK MESSAGE TO COACH */}
+                  <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-blue-500">
+                    <div className="flex items-center gap-3 mb-6">
+                      <MessageSquare className="text-blue-500" size={24} />
+                      <h3 className="text-xl font-black uppercase tracking-tight">Зв'язок з тренером</h3>
+                    </div>
+                    <textarea
+                      value={coachMessage}
+                      onChange={(e) => setCoachMessage(e.target.value)}
+                      placeholder="Напишіть повідомлення тренеру (питання, причина відсутності тощо)..."
+                      className="w-full bg-black/40 p-4 border border-white/5 rounded-2xl text-sm mb-4 focus:outline-none focus:border-blue-500/50 text-white placeholder:text-zinc-600 transition-colors"
+                      rows={3}
+                    />
+                    <button
+                      onClick={handleSendMessage}
+                      className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
+                    >
+                      Надіслати повідомлення
+                    </button>
                   </div>
                 </section>
               </div>
@@ -1022,62 +1060,7 @@ const ParentPanel = () => {
             </div>
           )}
 
-          {/* BELT PROGRESS SECTION */}
-          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-yellow-500">
-            <div className="flex items-center gap-3 mb-6">
-              <Trophy className="text-yellow-500" size={24} />
-              <h3 className="text-xl font-black uppercase tracking-tight">Прогрес поясів</h3>
-            </div>
-            <div className="space-y-4">
-              {beltProgress?.map((child) => (
-                <div key={child.id} className="border-l-4 border-orange-500/50 pl-4">
-                  <p className="font-bold text-white">{child.first_name}</p>
-                  <p className="text-sm text-zinc-400">Поточний пояс: <span className="font-black text-orange-500 uppercase tracking-widest text-xs">{child.belt_level || 'Не вказано'}</span></p>
-                  <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Оновлено: {child.belt_updated_at ? new Date(child.belt_updated_at).toLocaleDateString('uk-UA') : 'Ніколи'}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ATTENDANCE STREAK SECTION */}
-          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-green-500">
-            <div className="flex items-center gap-3 mb-6">
-              <Activity className="text-green-500" size={24} />
-              <h3 className="text-xl font-black uppercase tracking-tight">Відвідуваність за 30 днів</h3>
-            </div>
-            <div className="space-y-4">
-              {attendanceStreak?.map((child) => (
-                <div key={child.id} className="border-l-4 border-green-500/50 pl-4">
-                  <p className="font-bold text-white">{child.first_name}</p>
-                  <div className="flex items-center gap-3 mt-1">
-                    <p className="text-sm text-zinc-400">Заняття: <span className="font-black text-green-500 text-xs">{child.total_attendance || 0}</span> разів</p>
-                    <span className="text-[9px] font-black uppercase tracking-widest bg-green-500/10 text-green-500 px-2 py-1 rounded-lg">✓ Активно</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* QUICK MESSAGE TO COACH */}
-          <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-blue-500">
-            <div className="flex items-center gap-3 mb-6">
-              <MessageSquare className="text-blue-500" size={24} />
-              <h3 className="text-xl font-black uppercase tracking-tight">Зв'язок з тренером</h3>
-            </div>
-            <textarea
-              value={coachMessage}
-              onChange={(e) => setCoachMessage(e.target.value)}
-              placeholder="Напишіть повідомлення тренеру (питання, причина відсутності тощо)..."
-              className="w-full bg-black/40 p-4 border border-white/5 rounded-2xl text-sm mb-4 focus:outline-none focus:border-blue-500/50 text-white placeholder:text-zinc-600 transition-colors"
-              rows={3}
-            />
-            <button
-              onClick={handleSendMessage}
-              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20 active:scale-[0.98]"
-            >
-              Надіслати повідомлення
-            </button>
-          </div>
+          {/* BELT PROGRESS SECTION REMOVED FROM HERE */}
         </div>
       </main>
     </div>

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Calendar, Search, ChevronRight, ChevronLeft, 
   Filter, CheckCircle2, XCircle, MoreVertical, Edit2, 
   TrendingUp, Activity, UserPlus, Award, BarChart3, PieChart as PieChartIcon,
-  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck,
+  ArrowUpRight, ArrowDownRight, Bell, SearchIcon, Menu, X, AlertCircle, Eye, EyeOff, Shield, ShieldCheck, Key,
   Smile, Trophy, Zap, Target, Heart, Book, FileUp, Link, CreditCard, Download, Phone, Wallet, AlertTriangle, FileText, Sparkles
 } from 'lucide-react';
 import { 
@@ -76,45 +76,6 @@ export const LoginPage = () => {
   
   const queryParams = new URLSearchParams(location.search);
   const targetRole = queryParams.get('role') || 'admin';
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'instagram_login_success') {
-        const { user } = event.data;
-        localStorage.setItem('admin_token', user.token);
-        localStorage.setItem('admin_role', user.role);
-        localStorage.setItem('admin_name', user.name);
-        navigate('/admin');
-        toast.success(`Вітаємо, ${user.name}!`);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [navigate]);
-
-  const handleInstagramLogin = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/auth/instagram/url?action=login');
-      const { url } = await res.json();
-      
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      window.open(
-        url,
-        'InstagramLogin',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-    } catch (err) {
-      setError('Помилка отримання посилання');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -219,18 +180,6 @@ export const LoginPage = () => {
               {isLoading ? 'Вхід...' : 'Увійти'}
             </button>
 
-            {!isParent && (
-              <button 
-                type="button"
-                onClick={handleInstagramLogin}
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black uppercase tracking-widest text-[10px] py-5 rounded-2xl hover:opacity-90 transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                <ImageIcon size={18} />
-                Увійти через Instagram
-              </button>
-            )}
-            
             {isParent && (
               <button 
                 type="button"
@@ -2717,6 +2666,28 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
     }
   }, [initialAction, groups, participants]);
 
+  const handleSendCredentials = async (participantId: number) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/parent/send-credentials', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ participantId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success('Дані надіслано в Telegram');
+      } else {
+        toast.error(data.error || 'Помилка надсилання');
+      }
+    } catch (e) {
+      toast.error('Помилка мережі');
+    }
+  };
+
   const handleSave = async (data: any) => {
     const token = localStorage.getItem('admin_token');
     try {
@@ -2956,7 +2927,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                           </div>
                           <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
                             <span className="text-zinc-600 font-black">P:</span>
-                            <span className="text-zinc-300 font-mono text-[9px]">{showPasswords[p.id] ? p.parent_password : '••••••'}</span>
+                            <span className="text-zinc-300 font-mono text-[9px]">
+                              {showPasswords[p.id] 
+                                ? (p.parent_password?.startsWith('$2a$') ? '(зашифровано)' : p.parent_password) 
+                                : '••••••'}
+                            </span>
                             <button 
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -3018,6 +2993,13 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </td>
                   <td className="p-4 lg:p-6 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={() => handleSendCredentials(p.id)}
+                        className="p-2 hover:bg-blue-600/10 text-zinc-500 hover:text-blue-500 rounded-xl transition-colors"
+                        title="Надіслати логін/пароль"
+                      >
+                        <Key size={14} />
+                      </button>
                       <button 
                         onClick={() => {
                           setNotifyTarget({ id: p.id, name: p.name });
@@ -3359,6 +3341,15 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm h-20 resize-none"
                 />
               </div>
+              <div>
+                <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Успіхи та досягнення (текст для батьків)</label>
+                <textarea 
+                  value={editingParticipant.achievements_text || ''}
+                  onChange={e => setEditingParticipant({...editingParticipant, achievements_text: e.target.value})}
+                  placeholder="Дитина робить великі успіхи..."
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm h-20 resize-none"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
                   <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 flex justify-between items-center">
@@ -3386,9 +3377,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   <div className="relative">
                     <input 
                       type={showPasswords['editing'] ? 'text' : 'password'} 
-                      value={editingParticipant.parent_password || ''}
+                      value={editingParticipant.parent_password?.startsWith('$2a$') ? '********' : (editingParticipant.parent_password || '')}
                       onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                      placeholder="Введіть пароль..."
+                      placeholder={editingParticipant.parent_password?.startsWith('$2a$') ? 'Пароль зашифровано. Введіть новий для зміни.' : 'Введіть пароль...'}
                       className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-24 text-sm"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -5258,6 +5249,8 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
     notes: ''
   });
 
+  const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<{id: number} | null>(null);
+
   const fetchData = async () => {
     setLoading(true);
     const token = localStorage.getItem('admin_token');
@@ -5335,16 +5328,17 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
     }
   };
 
-  const handleDeleteAnnouncement = async (id: number) => {
-    if (!confirm('Видалити це оголошення?')) return;
+  const handleDeleteAnnouncement = async () => {
+    if (!confirmDeleteAnnouncement) return;
     const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch(`/api/announcements/${id}`, {
+      const res = await fetch(`/api/announcements/${confirmDeleteAnnouncement.id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         toast.success('Оголошення видалено');
+        setConfirmDeleteAnnouncement(null);
         fetchData();
       }
     } catch (e) {
@@ -5585,7 +5579,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
             {announcements.map(ann => (
               <div key={ann.id} className="bg-white/5 p-6 rounded-3xl border border-white/5 group relative">
                 <button 
-                  onClick={() => handleDeleteAnnouncement(ann.id)}
+                  onClick={() => setConfirmDeleteAnnouncement({ id: ann.id })}
                   className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 p-2 text-zinc-500 hover:text-red-500 transition-all"
                 >
                   <Trash2 size={16} />
@@ -5605,6 +5599,14 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           </div>
         </div>
       </div>
+
+      <ConfirmModal 
+        isOpen={!!confirmDeleteAnnouncement}
+        onClose={() => setConfirmDeleteAnnouncement(null)}
+        onConfirm={handleDeleteAnnouncement}
+        title="Видалити оголошення?"
+        message="Ви впевнені, що хочете видалити це оголошення? Воно зникне з кабінетів батьків."
+      />
 
       {/* Payments List */}
       <div className="bg-zinc-900/50 rounded-[2.5rem] border border-white/5 overflow-hidden">

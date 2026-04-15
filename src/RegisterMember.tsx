@@ -18,6 +18,7 @@ import {
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
 import { Button } from './components/Button';
+import { toast } from 'sonner';
 import SEO from './components/SEO';
 
 export const RegisterMember = () => {
@@ -111,7 +112,7 @@ export const RegisterMember = () => {
     e.preventDefault();
     
     if (parentInfo.password !== parentInfo.confirmPassword) {
-      alert('Паролі не співпадають');
+      toast.error('Паролі не співпадають');
       return;
     }
 

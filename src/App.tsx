@@ -1133,7 +1133,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
                           <div className="flex items-center gap-3">
                             {item.price && (
-                              <div className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-zinc-400 text-[10px] font-black uppercase tracking-wider">
+                              <div className="px-3 py-1 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-wider">
                                 {item.price} грн
                               </div>
                             )}
@@ -1347,7 +1347,6 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
             <div className="flex flex-col items-center md:items-end gap-2">
               <div className="flex gap-4 mb-2">
-                <Link to="/login" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors">Портал</Link>
                 <Link to="/register-member" className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-red-500 transition-colors">Реєстрація</Link>
               </div>
               <div className="text-zinc-600 text-[10px] max-w-xs text-center md:text-right">

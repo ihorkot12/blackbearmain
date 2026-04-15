@@ -112,6 +112,13 @@ async function initDb() {
       await client.query("ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key");
       // Normalize existing parent_login values (remove spaces, dashes, etc.)
       await client.query("UPDATE participants SET parent_login = REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') WHERE parent_login IS NOT NULL AND parent_login ~ '[^\\d+]'");
+      
+      // Ensure parent_login is set for all participants who have a phone
+      await client.query(`
+        UPDATE participants 
+        SET parent_login = REGEXP_REPLACE(COALESCE(parent_phone, phone), '[^\\d]', '', 'g') 
+        WHERE (parent_login IS NULL OR parent_login = '') AND (parent_phone IS NOT NULL OR phone IS NOT NULL)
+      `);
     } catch (e) {
       console.log("Note: Could not update participants table constraints or data.", e);
     }
@@ -137,14 +144,24 @@ async function initDb() {
         exam_readiness TEXT DEFAULT 'not_started',
         skill_checklist JSONB DEFAULT '[]',
         streak INTEGER DEFAULT 0,
-        last_attendance_date DATE
+        last_attendance_date DATE,
+        achievements_text TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
-      -- Ensure parent_phone exists if table was created before
+      -- Ensure achievements_text exists
       DO $$ 
       BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='parent_phone') THEN
-          ALTER TABLE participants ADD COLUMN parent_phone TEXT;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='achievements_text') THEN
+          ALTER TABLE participants ADD COLUMN achievements_text TEXT;
+        END IF;
+      END $$;
+
+      -- Ensure updated_at exists
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='updated_at') THEN
+          ALTER TABLE participants ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
         END IF;
       END $$;
 
@@ -888,21 +905,17 @@ async function startServer() {
     }
   }
 
-  async function sendTelegramMessage(text: string) {
+  async function sendTelegramMessage(text: string, customChatId?: string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chatId = process.env.TELEGRAM_CHAT_ID;
-    
-    console.log('Attempting to send Telegram notification...');
-    console.log(`Telegram Token exists: ${!!token}`);
-    console.log(`Telegram Chat ID exists: ${!!chatId}`);
+    const defaultChatId = process.env.TELEGRAM_CHAT_ID;
+    const chatId = customChatId || defaultChatId;
     
     if (!token || !chatId) {
-      console.warn('Telegram notification skipped: TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID is missing.');
+      console.warn('Telegram notification skipped: TELEGRAM_BOT_TOKEN or chatId is missing.');
       return;
     }
 
     try {
-      console.log('Sending request to Telegram API...');
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -916,8 +929,6 @@ async function startServer() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Telegram API error:', response.status, errorData);
-      } else {
-        console.log('Telegram message sent successfully');
       }
     } catch (e) {
       console.error('Failed to send Telegram message:', e);
@@ -2058,6 +2069,47 @@ ${childrenList}
     }
   });
 
+  app.post("/api/parent/send-credentials", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { participantId } = req.body;
+    
+    try {
+      const result = await pool.query(
+        "SELECT name, parent_login, parent_password, telegram_chat_id, parent_name FROM participants WHERE id = $1",
+        [participantId]
+      );
+      
+      if (result.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
+      
+      const p = result.rows[0];
+      const isHashed = p.parent_password?.startsWith('$2a$') || p.parent_password?.startsWith('$2b$');
+      const passwordDisplay = isHashed ? "******** (зашифровано)" : p.parent_password;
+
+      const message = `
+<b>👋 Вітаємо у нашому Додзьо!</b>
+
+Ось ваші дані для входу в особистий кабінет батьків:
+<b>Учень:</b> ${p.name}
+<b>Логін:</b> <code>${p.parent_login}</code>
+<b>Пароль:</b> <code>${passwordDisplay}</code>
+${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано. Якщо ви його забули, зверніться до адміністратора для скидання.</i>\n' : ''}
+<b>Посилання:</b> ${process.env.APP_URL || 'https://ais-dev-52dzs75wldpn6rggyas75b-286910022589.europe-west2.run.app'}/portal
+
+<i>Зберігайте ці дані в надійному місці.</i>
+      `;
+      
+      if (p.telegram_chat_id) {
+        await sendTelegramMessage(message, p.telegram_chat_id);
+        res.json({ success: true, message: "Credentials sent via Telegram" });
+      } else {
+        res.status(400).json({ error: "Telegram Chat ID not set for this participant" });
+      }
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to send credentials" });
+    }
+  });
+
   // Participants
   const upload = multer({ storage: multer.memoryStorage() });
 
@@ -2189,7 +2241,7 @@ ${childrenList}
 
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text } = req.body;
     
     // Auto-generate credentials if missing
     const finalLogin = parent_login || phone || `parent_${Math.random().toString(36).substring(2, 8)}`;
@@ -2201,8 +2253,8 @@ ${childrenList}
         hashedPassword = await bcrypt.hash(rawPassword, 10);
       }
       await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий']
+        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', achievements_text || '']
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -2218,7 +2270,8 @@ ${childrenList}
       const allowedKeys = [
         'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password', 
         'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone', 
-        'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date'
+        'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
+        'achievements_text'
       ];
       
       const updateData: any = {};
@@ -3622,25 +3675,40 @@ ${content}
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
-        const meRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [participantId]);
+        const meRes = await pool.query("SELECT parent_login, parent_phone, phone FROM participants WHERE id = $1", [participantId]);
         if (meRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
         
-        const parentLogin = meRes.rows[0].parent_login;
-        if (!parentLogin) return res.json([]);
+        const { parent_login, parent_phone, phone } = meRes.rows[0];
+        const normalizedPhone = normalizePhone(parent_phone || phone || "");
 
-        const childrenRes = await pool.query(`
+        let query = `
           SELECT 
             p.id, p.name, p.age, p.belt, p.rank_points, p.payment_status, p.streak, p.exam_readiness,
             g.name as group_name,
-            (SELECT status FROM attendance WHERE participant_id = p.id AND date = CURRENT_DATE) as today_status,
+            (SELECT status FROM attendance WHERE participant_id = p.id AND date = CURRENT_DATE LIMIT 1) as today_status,
             (SELECT COUNT(*) FROM attendance WHERE participant_id = p.id AND status = 'present') as total_attendance
           FROM participants p 
           LEFT JOIN groups g ON p.group_id = g.id 
-          WHERE p.parent_login = $1
-        `, [parentLogin]);
+          WHERE 1=0
+        `;
+        const params = [];
+
+        if (parent_login) {
+          params.push(parent_login);
+          query += ` OR p.parent_login = $${params.length}`;
+        }
         
+        if (normalizedPhone) {
+          params.push(normalizedPhone);
+          query += ` OR REGEXP_REPLACE(p.parent_phone, '[^\\d]', '', 'g') = $${params.length}`;
+          query += ` OR REGEXP_REPLACE(p.phone, '[^\\d]', '', 'g') = $${params.length}`;
+          query += ` OR p.parent_login = $${params.length}`;
+        }
+
+        const childrenRes = await pool.query(query, params);
         res.json(childrenRes.rows);
       } catch (e) {
+        console.error('Fetch children error:', e);
         res.status(500).json({ error: "Failed to fetch children" });
       }
     });
@@ -3761,9 +3829,11 @@ ${content}
       try {
         const { parentId } = req.params;
         const result = await pool.query(
-          `SELECT id, name as first_name, '' as last_name, belt as belt_level, updated_at as belt_updated_at 
-           FROM participants WHERE parent_login = (SELECT parent_login FROM participants WHERE id = $1 LIMIT 1) 
-           OR id = $1 ORDER BY created_at DESC LIMIT 5`,
+          `SELECT id, name as first_name, belt as belt_level, updated_at as belt_updated_at 
+           FROM participants 
+           WHERE parent_login = (SELECT parent_login FROM participants WHERE id = $1)
+           OR id = $1 
+           ORDER BY name ASC`,
           [parentId]
         );
         res.json({ children: result.rows });
@@ -3779,8 +3849,8 @@ ${content}
           `SELECT p.id, p.name as first_name, COUNT(a.id) as total_attendance 
            FROM participants p 
            LEFT JOIN attendance a ON p.id = a.participant_id AND a.date >= NOW() - INTERVAL '30 days'
-           WHERE p.parent_login = (SELECT parent_login FROM participants WHERE id = $1 LIMIT 1) OR p.id = $1
-           GROUP BY p.id ORDER BY p.created_at DESC`,
+           WHERE p.parent_login = (SELECT parent_login FROM participants WHERE id = $1) OR p.id = $1
+           GROUP BY p.id, p.name ORDER BY p.name ASC`,
           [parentId]
         );
         res.json({ children: result.rows });

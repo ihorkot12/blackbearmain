@@ -35,8 +35,6 @@ export const Navbar = () => {
     { name: 'Тренери', href: '#coach' },
     { name: 'Розклад', href: '#schedule' },
     { name: 'Контакти', href: '#contact' },
-    { name: 'Енциклопедія', href: '/encyclopedia' },
-    { name: 'Портал', href: '/login' },
   ];
 
   const handleAnchorClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
