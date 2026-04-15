@@ -724,24 +724,28 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             {role === 'admin' ? (
               <>
                 <button 
+                  id="quick-add-participant"
                   onClick={() => onQuickAction('participants', 'add')}
                   className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
                 >
                   Додати учня
                 </button>
                 <button 
+                  id="quick-schedule"
                   onClick={() => onQuickAction('schedule', 'add')}
                   className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
                   Розклад
                 </button>
                 <button 
+                  id="quick-content"
                   onClick={() => onQuickAction('content', 'video')}
                   className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
                   Контент
                 </button>
                 <button 
+                  id="quick-leads"
                   onClick={() => onQuickAction('leads')}
                   className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
                 >
@@ -965,6 +969,7 @@ export const AdminPage = () => {
                   {group.items.map((item) => (
                     <button 
                       key={item.id}
+                      id={`nav-${item.id}`}
                       onClick={() => {
                         setActiveTab(item.id);
                         setIsMobileMenuOpen(false);
@@ -987,6 +992,7 @@ export const AdminPage = () => {
 
           <div className="pt-8 border-t border-white/5 mt-auto">
             <button 
+              id="logout-button"
               onClick={() => {
                 localStorage.removeItem('admin_token');
                 navigate('/');
@@ -4744,7 +4750,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
       });
       onActionComplete?.();
     }
-  }, [initialAction]);
+  }, [initialAction, locations, coaches]);
 
   const handleSaveEntry = async (entry: any) => {
     try {

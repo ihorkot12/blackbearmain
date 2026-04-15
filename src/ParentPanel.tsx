@@ -105,13 +105,13 @@ const ParentPanel = () => {
   }, [participant?.id]);
 
   useEffect(() => {
-    fetchData();
+    fetchData(true);
     const interval = setInterval(fetchData, 30000); // Fetch every 30s
     return () => clearInterval(interval);
   }, []);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (isInitial = false) => {
+    if (isInitial) setLoading(true);
     try {
       const [pRes, aRes, bRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
         fetch('/api/parent/me'),
@@ -148,8 +148,9 @@ const ParentPanel = () => {
       setNotifications(notifData);
     } catch (e) {
       toast.error('Помилка завантаження даних');
+    } finally {
+      if (isInitial) setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSwitchChild = async (childId: number) => {
@@ -449,6 +450,7 @@ const ParentPanel = () => {
           ].map(item => (
             <button
               key={item.id}
+              id={`parent-nav-${item.id}`}
               onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
                 activeTab === item.id 
@@ -464,6 +466,7 @@ const ParentPanel = () => {
 
         <div className="mt-auto pt-8 border-t border-white/5 space-y-4">
           <button 
+            id="child-mode-button"
             onClick={() => setIsChildMode(true)}
             className="w-full flex items-center gap-4 px-6 py-4 bg-red-600/10 text-red-500 rounded-2xl font-bold hover:bg-red-600/20 transition-all border border-red-600/20"
           >
@@ -471,6 +474,7 @@ const ParentPanel = () => {
             Дитячий режим
           </button>
           <button 
+            id="parent-logout-button"
             onClick={handleLogout}
             className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold"
           >

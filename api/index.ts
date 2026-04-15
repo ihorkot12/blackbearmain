@@ -1181,6 +1181,16 @@ async function startServer() {
 
   // --- End Scheduled Tasks ---
 
+  app.delete("/api/leads/delete-all", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      await pool.query("DELETE FROM leads");
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete all leads" });
+    }
+  });
+
   app.delete("/api/leads/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
@@ -3301,17 +3311,27 @@ ${childrenList}
         if (p.last_attendance_date) {
           const lastDate = new Date(p.last_attendance_date);
           const currentDate = new Date(date);
+          // Use UTC for comparison to avoid timezone issues
           const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
           
-          if (diffDays <= 4) { // Allow up to 4 days gap (e.g. Fri to Mon)
+          if (diffDays <= 4 && diffDays > 0) { // Allow up to 4 days gap, but only if it's a forward date
             newStreak = (p.streak || 0) + 1;
+          } else if (diffDays <= 0) {
+            // If marking past date, keep current streak
+            newStreak = p.streak || 1;
           }
         }
         
-        await pool.query(
-          "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3",
-          [newStreak, date, participant_id]
-        );
+        // Only update last_attendance_date if the new date is more recent
+        const updateQuery = p.last_attendance_date && new Date(date) <= new Date(p.last_attendance_date)
+          ? "UPDATE participants SET rank_points = rank_points + 1, streak = $1 WHERE id = $2"
+          : "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3";
+        
+        const updateParams = p.last_attendance_date && new Date(date) <= new Date(p.last_attendance_date)
+          ? [newStreak, participant_id]
+          : [newStreak, date, participant_id];
+
+        await pool.query(updateQuery, updateParams);
       } else if (status === 'absent' && existing.rows[0] && existing.rows[0].status === 'present') {
         // Removal
         await pool.query(
