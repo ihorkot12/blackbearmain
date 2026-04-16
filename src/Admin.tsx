@@ -745,6 +745,82 @@ export const AdminPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
+  const [coachData, setCoachData] = useState<any>(null);
+  const [isInstagramConnected, setIsInstagramConnected] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/telegram/bot-info')
+      .then(r => r.json())
+      .then(data => setBotUsername(data.botUsername))
+      .catch(e => console.log(e));
+    
+    checkInstagramStatus();
+  }, []);
+
+  const checkInstagramStatus = async () => {
+    try {
+      const res = await fetch('/api/instagram/status');
+      const data = await res.json();
+      if (data.connected) {
+        setIsInstagramConnected(true);
+      }
+    } catch (e) {
+      console.error('Failed to check IG status', e);
+    }
+  };
+
+  const connectInstagram = async () => {
+    try {
+      const res = await fetch('/api/auth/instagram/url?action=connect');
+      const { url } = await res.json();
+      
+      const width = 600;
+      const height = 700;
+      const left = window.screen.width / 2 - width / 2;
+      const top = window.screen.height / 2 - height / 2;
+      
+      const popup = window.open(
+        url,
+        'InstagramLogin',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!popup) {
+        toast.error('Будь ласка, дозвольте спливаючі вікна');
+        return;
+      }
+
+      const checkPopup = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkPopup);
+          checkInstagramStatus();
+        }
+      }, 1000);
+    } catch (e) {
+      toast.error('Помилка отримання посилання для авторизації');
+    }
+  };
+
+  useEffect(() => {
+    if (coachId) {
+      const token = localStorage.getItem('admin_token');
+      fetch(`/api/coaches/${coachId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+        .then(r => r.json())
+        .then(data => setCoachData(data))
+        .catch(e => console.log(e));
+    }
+  }, [coachId]);
+
+  const handleConnectTelegram = () => {
+    if (!coachId) return;
+    const token = `c_${coachId}`;
+    window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
+  };
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -803,14 +879,13 @@ export const AdminPage = () => {
   }, [navigate]);
 
   const handleQuickAction = (tab: string, action?: string) => {
+    setInitialAction(null);
     setActiveTab(tab);
     // Use a small timeout to ensure the component has mounted before setting initialAction
     if (action) {
       setTimeout(() => {
         setInitialAction(action);
       }, 50);
-    } else {
-      setInitialAction(null);
     }
   };
 
@@ -1015,7 +1090,45 @@ export const AdminPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-6">
-            <button className="relative p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors">
+            <div className="hidden md:flex items-center gap-3">
+              {isInstagramConnected ? (
+                <div className="flex items-center gap-2 text-pink-500 text-[10px] font-black uppercase tracking-widest bg-pink-500/10 px-4 py-2 rounded-xl border border-pink-500/20">
+                  <ImageIcon size={14} />
+                  <span>Instagram OK</span>
+                </div>
+              ) : (
+                <button 
+                  onClick={connectInstagram}
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-lg shadow-pink-600/20"
+                >
+                  <ImageIcon size={14} />
+                  <span>Підключити Instagram</span>
+                </button>
+              )}
+            </div>
+
+            {role === 'coach' && coachId && (
+              <div className="hidden md:flex items-center gap-3">
+                {coachData?.telegram_chat_id ? (
+                  <div className="flex items-center gap-2 text-green-500 text-[10px] font-black uppercase tracking-widest bg-green-500/10 px-4 py-2 rounded-xl border border-green-500/20">
+                    <CheckCircle2 size={14} />
+                    <span>Telegram OK</span>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={handleConnectTelegram}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                  >
+                    <MessageSquare size={14} />
+                    <span>Підключити Telegram</span>
+                  </button>
+                )}
+              </div>
+            )}
+            <button 
+              onClick={() => setActiveTab('notifications')}
+              className="relative p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors"
+            >
               <Bell size={20} />
               <span className="absolute top-2 right-2 w-2 h-2 bg-red-600 rounded-full border-2 border-black" />
             </button>
@@ -1881,6 +1994,8 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
 const NotificationsViewer = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const fetchNotifications = async () => {
     const token = localStorage.getItem('admin_token');
@@ -1894,6 +2009,40 @@ const NotificationsViewer = () => {
       toast.error('Помилка завантаження сповіщень');
     }
     setLoading(false);
+  };
+
+  const handleClearAll = async () => {
+    setIsClearing(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        toast.success('Всі сповіщення видалено');
+        fetchNotifications();
+      }
+    } catch (e) {
+      toast.error('Помилка при видаленні');
+    }
+    setIsClearing(false);
+    setShowClearConfirm(false);
+  };
+
+  const handleDeleteOne = async (id: number) => {
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchNotifications();
+      }
+    } catch (e) {
+      toast.error('Помилка при видаленні');
+    }
   };
 
   useEffect(() => {
@@ -1913,7 +2062,25 @@ const NotificationsViewer = () => {
           <h2 className="text-3xl lg:text-4xl font-black uppercase tracking-tighter mb-2">Сповіщення</h2>
           <p className="text-zinc-500 font-medium text-sm lg:text-base">Історія надісланих сповіщень батькам</p>
         </div>
+        {notifications.length > 0 && (
+          <button 
+            onClick={() => setShowClearConfirm(true)}
+            disabled={isClearing}
+            className="px-6 py-3 bg-red-600/10 text-red-600 rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-red-600 hover:text-white transition-all border border-red-600/20 disabled:opacity-50"
+          >
+            {isClearing ? 'Очищення...' : 'Очистити все'}
+          </button>
+        )}
       </div>
+
+      <ConfirmModal 
+        isOpen={showClearConfirm}
+        onClose={() => setShowClearConfirm(false)}
+        onConfirm={handleClearAll}
+        title="Очистити всі сповіщення?"
+        message="Ця дія видалить всю історію сповіщень без можливості відновлення."
+        loading={isClearing}
+      />
 
       <div className="bg-zinc-900/30 rounded-[2rem] lg:rounded-[3rem] border border-white/5 overflow-hidden">
         <div className="overflow-x-auto">
@@ -1924,6 +2091,7 @@ const NotificationsViewer = () => {
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Повідомлення</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Тип</th>
                 <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Дата</th>
+                <th className="p-6 lg:p-8 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 text-right">Дії</th>
               </tr>
             </thead>
             <tbody>
@@ -1948,6 +2116,14 @@ const NotificationsViewer = () => {
                     <div className="text-zinc-500 font-bold text-[10px] uppercase tracking-widest">
                       {new Date(n.created_at).toLocaleString('uk-UA')}
                     </div>
+                  </td>
+                  <td className="p-6 lg:p-8 text-right">
+                    <button 
+                      onClick={() => handleDeleteOne(n.id)}
+                      className="p-2 text-zinc-600 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}

@@ -72,8 +72,11 @@ async function initDb() {
         bio TEXT,
         photo TEXT,
         achievements TEXT, -- JSON string
+        telegram_chat_id TEXT,
         order_index INTEGER DEFAULT 0
       );
+
+      ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 
       CREATE TABLE IF NOT EXISTS locations (
         id SERIAL PRIMARY KEY,
@@ -611,7 +614,7 @@ async function startServer() {
       secure: true, 
       httpOnly: true, 
       sameSite: 'none',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+      maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
   }));
 
@@ -844,6 +847,7 @@ async function startServer() {
   });
 
   app.post('/api/instagram/sync', requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
     const currentUserId = (req as any).user.id;
     try {
       const accountRes = await pool.query("SELECT * FROM instagram_accounts WHERE admin_user_id = $1 ORDER BY updated_at DESC LIMIT 1", [currentUserId]);
@@ -871,6 +875,8 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Instagram Sync REMOVED
 
   async function notifyParent(participantId: number, type: string, message: string) {
     if (!pool) return;
@@ -904,6 +910,45 @@ async function startServer() {
       console.error('Failed to notify parent:', e);
     }
   }
+
+  // Telegram Webhook
+  app.post("/api/telegram/webhook", async (req, res) => {
+    const { message } = req.body;
+    if (!message || !message.text) return res.sendStatus(200);
+
+    const text = message.text;
+    const chatId = message.chat.id;
+
+    if (text.startsWith("/start")) {
+      const parts = text.split(" ");
+      if (parts.length > 1) {
+        const token = parts[1];
+        const [type, id] = token.split("_");
+        
+        try {
+          if (type === "p") {
+            await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+            await sendTelegramMessage("✅ Ваш акаунт батьків успішно підключено!", String(chatId));
+          } else if (type === "c") {
+            await pool.query("UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+            await sendTelegramMessage("✅ Ваш акаунт тренера успішно підключено!", String(chatId));
+          }
+        } catch (e) {
+          console.error("Telegram connection error:", e);
+        }
+      } else {
+        await sendTelegramMessage("👋 Вітаємо у Black Bear Dojo! Щоб підключити акаунт, скористайтеся кнопкою в особистому кабінеті.", String(chatId));
+      }
+    }
+    
+    res.sendStatus(200);
+  });
+
+  app.get("/api/telegram/bot-info", (req, res) => {
+    res.json({
+      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'BlackBearDojoBot'
+    });
+  });
 
   async function sendTelegramMessage(text: string, customChatId?: string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -1507,6 +1552,17 @@ async function startServer() {
       }
       console.error('Error fetching coaches:', e);
       res.status(500).json({ error: "Failed to fetch coaches" });
+    }
+  });
+
+  app.get("/api/coaches/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("SELECT * FROM coaches WHERE id = $1", [req.params.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Coach not found" });
+      res.json(result.rows[0]);
+    } catch (e) {
+      res.status(500).json({ error: "Failed to fetch coach" });
     }
   });
 
@@ -3046,6 +3102,38 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  app.delete("/api/notifications", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    try {
+      if (user.role === 'admin') {
+        await pool.query("DELETE FROM notifications");
+      } else if (user.role === 'coach' && user.coach_id) {
+        await pool.query(`
+          DELETE FROM notifications 
+          WHERE participant_id IN (
+            SELECT p.id FROM participants p 
+            JOIN groups g ON p.group_id = g.id 
+            WHERE g.coach_id = $1
+          )
+        `, [user.coach_id]);
+      }
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to clear notifications" });
+    }
+  });
+
+  app.delete("/api/notifications/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      await pool.query("DELETE FROM notifications WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to delete notification" });
     }
   });
 

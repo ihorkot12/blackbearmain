@@ -20,7 +20,8 @@ import {
   Zap,
   CheckCircle2,
   AlertCircle,
-  Users
+  Users,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
@@ -45,6 +46,14 @@ const ParentPanel = () => {
   const [attendanceStreak, setAttendanceStreak] = useState<any[]>([]);
   const [coachMessage, setCoachMessage] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
+  const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
+
+  useEffect(() => {
+    fetch('/api/telegram/bot-info')
+      .then(r => r.json())
+      .then(data => setBotUsername(data.botUsername))
+      .catch(e => console.log(e));
+  }, []);
 
   useEffect(() => {
     if (participant?.id) {
@@ -172,6 +181,12 @@ const ParentPanel = () => {
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';
+  };
+
+  const handleConnectTelegram = () => {
+    if (!participant) return;
+    const token = `p_${participant.id}`;
+    window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
   };
 
   if (loading) {
@@ -486,7 +501,41 @@ const ParentPanel = () => {
 
       {/* Main Content */}
       <main className="lg:pl-80 min-h-screen pt-20 lg:pt-0">
-        <div className="p-8 lg:p-12 max-w-6xl mx-auto">
+        {/* Desktop Header */}
+        <div className="hidden lg:flex fixed top-0 left-80 right-0 h-20 bg-black/50 backdrop-blur-md border-b border-white/5 z-40 items-center justify-between px-12">
+          <div className="flex items-center gap-4">
+            <div className="text-sm font-bold text-zinc-400">
+              {activeTab === 'overview' ? 'Дашборд' : 
+               activeTab === 'family' ? 'Сім\'я' :
+               activeTab === 'schedule' ? 'Розклад' :
+               activeTab === 'attendance' ? 'Відвідуваність' :
+               activeTab === 'progress' ? 'Прогрес' :
+               activeTab === 'payments' ? 'Оплата' :
+               activeTab === 'notifications' ? 'Сповіщення' : 'Повідомлення'}
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setActiveTab('notifications')}
+              className="relative p-3 bg-white/5 rounded-xl text-zinc-400 hover:text-white transition-colors group"
+            >
+              <Bell size={20} />
+              {notifications.some(n => !n.is_read) && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-600 rounded-full border-2 border-black" />
+              )}
+            </button>
+            <div className="h-8 w-px bg-white/10" />
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-3 px-4 py-2 bg-white/5 rounded-xl text-zinc-400 hover:text-red-500 transition-all group"
+            >
+              <LogOut size={18} className="group-hover:translate-x-0.5 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-widest">Вийти</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-8 lg:p-12 lg:pt-32 max-w-6xl mx-auto">
           {activeTab === 'family' && (
             <div className="space-y-12">
               <header>
@@ -578,6 +627,25 @@ const ParentPanel = () => {
                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Досягнення</div>
                   <div className="text-4xl font-black mb-2">{badges.length}</div>
                   <div className="text-xs text-zinc-400">отримано відзнак</div>
+                </div>
+                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
+                    <MessageSquare size={80} />
+                  </div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Telegram Сповіщення</div>
+                  {participant?.telegram_chat_id ? (
+                    <div className="flex items-center gap-2 text-green-500 font-bold mt-4">
+                      <CheckCircle2 size={20} />
+                      <span>Підключено</span>
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={handleConnectTelegram}
+                      className="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20"
+                    >
+                      Підключити
+                    </button>
+                  )}
                 </div>
                 <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
