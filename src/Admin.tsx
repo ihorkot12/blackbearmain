@@ -2821,6 +2821,8 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   }, []);
 
   useEffect(() => {
+    if (loading) return;
+    
     if (initialAction === 'add') {
       setEditingParticipant({ 
         name: '', 
@@ -2840,7 +2842,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         onActionComplete?.();
       }
     }
-  }, [initialAction, groups, participants]);
+  }, [initialAction, groups, participants, loading]);
 
   const handleSendCredentials = async (participantId: number) => {
     const token = localStorage.getItem('admin_token');
@@ -4871,6 +4873,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, group_name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
     try {
@@ -4897,6 +4900,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
       setLocations([]);
       setCoaches([]);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -4904,6 +4908,8 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   }, []);
 
   useEffect(() => {
+    if (loading) return;
+
     if (initialAction === 'add') {
       setEditingEntry({ 
         location_id: locations[0]?.id || '', 
@@ -4917,7 +4923,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
       });
       onActionComplete?.();
     }
-  }, [initialAction, locations, coaches]);
+  }, [initialAction, locations, coaches, loading]);
 
   const handleSaveEntry = async (entry: any) => {
     try {

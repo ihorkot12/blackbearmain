@@ -680,7 +680,9 @@ async function startServer() {
     if (!clientId) return res.status(500).json({ error: "Instagram Client ID not configured" });
 
     const { action } = req.query; // 'login' or 'connect'
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
+    const host = process.env.APP_URL ? new URL(process.env.APP_URL).host : req.get('host');
+    const protocol = process.env.APP_URL ? new URL(process.env.APP_URL).protocol.replace(':', '') : req.protocol;
+    const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
     
     // Scopes needed for Business Account insights
     const scopes = [
@@ -703,7 +705,9 @@ async function startServer() {
 
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
     const clientSecret = process.env.INSTAGRAM_CLIENT_SECRET;
-    const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
+    const host = process.env.APP_URL ? new URL(process.env.APP_URL).host : req.get('host');
+    const protocol = process.env.APP_URL ? new URL(process.env.APP_URL).protocol.replace(':', '') : req.protocol;
+    const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
 
     try {
       // 1. Exchange code for access token
@@ -875,8 +879,6 @@ async function startServer() {
       res.status(500).json({ error: error.message });
     }
   });
-
-  // Instagram Sync REMOVED
 
   async function notifyParent(participantId: number, type: string, message: string) {
     if (!pool) return;
