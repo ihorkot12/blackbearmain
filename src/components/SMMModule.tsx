@@ -127,8 +127,11 @@ export const SMMModule = () => {
   }, []);
 
   const checkInstagramStatus = async () => {
+    const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/instagram/status');
+      const res = await fetch('/api/instagram/status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       if (data.connected) {
         setIsAccountConnected(true);
@@ -320,9 +323,13 @@ export const SMMModule = () => {
     }
     
     setGenerating(true);
-    toast.loading('Синхронізація з Instagram Graph API...');
+    const loadingToast = toast.loading('Синхронізація з Instagram Graph API...');
+    const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/instagram/sync', { method: 'POST' });
+      const res = await fetch('/api/instagram/sync', { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       
       if (data.success) {
@@ -347,7 +354,6 @@ export const SMMModule = () => {
         setNewMetric(updatedMetrics);
         
         // Save to our internal metrics table
-        const token = localStorage.getItem('admin_token');
         await fetch('/api/smm/metrics', {
           method: 'POST',
           headers: { 
@@ -357,14 +363,14 @@ export const SMMModule = () => {
           body: JSON.stringify(updatedMetrics)
         });
 
-        toast.dismiss();
+        toast.dismiss(loadingToast);
         toast.success('Метрики успішно імпортовано!');
         fetchData();
       } else {
         throw new Error(data.error || 'Failed to sync');
       }
     } catch (e: any) {
-      toast.dismiss();
+      toast.dismiss(loadingToast);
       toast.error(`Помилка імпорту: ${e.message}`);
     } finally {
       setGenerating(false);
@@ -373,8 +379,11 @@ export const SMMModule = () => {
 
   const connectAccount = async () => {
     setGenerating(true);
+    const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/auth/instagram/url?action=connect');
+      const res = await fetch('/api/auth/instagram/url?action=connect', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const { url } = await res.json();
       
       const width = 600;

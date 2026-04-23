@@ -242,12 +242,19 @@ async function initDb() {
         admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE,
         username TEXT,
         access_token TEXT NOT NULL,
-        instagram_business_account_id TEXT,
+        instagram_business_account_id TEXT UNIQUE,
         facebook_page_id TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
       ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE;
+      
+      DO $$ 
+      BEGIN 
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'instagram_accounts_instagram_business_account_id_key') THEN
+          ALTER TABLE instagram_accounts ADD CONSTRAINT instagram_accounts_instagram_business_account_id_key UNIQUE (instagram_business_account_id);
+        END IF;
+      END $$;
 
       CREATE TABLE IF NOT EXISTS images (
         id SERIAL PRIMARY KEY,
@@ -660,6 +667,19 @@ async function startServer() {
       return next();
     }
 
+    // Also check session for admin
+    if ((req.session as any).userId) {
+      try {
+        const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [(req.session as any).userId]);
+        if (result.rows.length > 0) {
+          (req as any).user = result.rows[0];
+          return next();
+        }
+      } catch (e) {
+        console.error('Session auth error:', e);
+      }
+    }
+
     console.log(`Auth failed. Received: ${authHeader?.substring(0, 15)}...`);
     res.status(401).json({ error: 'Unauthorized' });
   };
@@ -880,36 +900,56 @@ async function startServer() {
     }
   });
 
-  async function notifyParent(participantId: number, type: string, message: string) {
+  async function notifyParent(participantId: number, type: string, message: string, coachName?: string, skipAdminLog: boolean = false) {
     if (!pool) return;
     try {
-      // 1. Save to DB
+      // 1. Fetch participant info
+      const pRes = await pool.query("SELECT telegram_chat_id, name FROM participants WHERE id = $1", [participantId]);
+      const participant = pRes.rows[0];
+      if (!participant) return;
+
+      // 2. Save to DB
       await pool.query(
         "INSERT INTO notifications (participant_id, type, message) VALUES ($1, $2, $3)",
         [participantId, type, message]
       );
 
-      // 2. Send to Telegram if chat_id exists
-      const res = await pool.query("SELECT telegram_chat_id, name FROM participants WHERE id = $1", [participantId]);
-      const participant = res.rows[0];
-      
-      if (participant && participant.telegram_chat_id) {
-        const token = process.env.TELEGRAM_BOT_TOKEN;
-        if (token) {
-          const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
-          await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: participant.telegram_chat_id,
-              text: text,
-              parse_mode: 'HTML'
-            })
-          });
-        }
+      // 3. Send to Parent Telegram if connected
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (token && participant.telegram_chat_id) {
+        const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: participant.telegram_chat_id,
+            text: text,
+            parse_mode: 'HTML'
+          })
+        });
       }
+
+      // 4. LOG to Admin Channel (TELEGRAM_CHAT_ID)
+      if (!skipAdminLog) {
+        const coachInfo = coachName ? `\n👤 Виконав: ${coachName}` : '';
+        const adminText = `📢 <b>СИСТЕМА СПОВІЩЕНЬ</b>\n\n👤 Учень: <b>${participant.name}</b>\n📝 Тип: ${type}\n💬 Повідомлення: ${message}${coachInfo}`;
+        await sendTelegramMessage(adminText);
+      }
+
     } catch (e) {
       console.error('Failed to notify parent:', e);
+    }
+  }
+
+  async function logAuditAction(userId: number, role: string, action: string, type: string, entityId?: number, details?: any) {
+    if (!pool) return;
+    try {
+      await pool.query(
+        "INSERT INTO audit_logs (user_id, user_role, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5, $6)",
+        [userId, role, action, type, entityId || null, details ? JSON.stringify(details) : null]
+      );
+    } catch (e) {
+      console.error('Failed to log audit action:', e);
     }
   }
 
@@ -976,9 +1016,12 @@ async function startServer() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Telegram API error:', response.status, errorData);
+        return false;
       }
+      return true;
     } catch (e) {
       console.error('Failed to send Telegram message:', e);
+      return false;
     }
   }
 
@@ -1069,6 +1112,121 @@ async function startServer() {
     validate: false,
   });
 
+  // Helper to normalize date to YYYY-MM-DD
+  function normalizeDate(dateStr: any) {
+    if (!dateStr) return new Date().toISOString().split('T')[0];
+    const s = dateStr.toString().trim();
+    if (!s) return new Date().toISOString().split('T')[0];
+    
+    // Check for DD.MM.YYYY
+    if (s.includes('.') && s.split('.').length === 3) {
+      const parts = s.split('.');
+      if (parts[2].length === 4) {
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+    }
+    
+    // Check for YYYY-MM-DD
+    if (s.includes('-') && s.split('-').length === 3) {
+      return s;
+    }
+
+    try {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return d.toISOString().split('T')[0];
+      }
+    } catch (e) {}
+
+    return new Date().toISOString().split('T')[0];
+  }
+
+  app.post("/api/attendance/bulk", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const { participants, date, status } = req.body;
+    
+    if (!Array.isArray(participants) || !date || !status) {
+      return res.status(400).json({ error: "Invalid bulk data" });
+    }
+
+    const normalizedDate = normalizeDate(date);
+    const coachName = (req as any).user?.name || 'Тренер';
+    const coachId = (req as any).user?.id || null;
+    const userRole = (req as any).user?.role || 'coach';
+
+    try {
+      await pool.query("BEGIN");
+      
+      const results = [];
+      for (const pId of participants) {
+        // Find current streak to update
+        const pInfo = await pool.query("SELECT streak, last_attendance_date FROM participants WHERE id = $1", [pId]);
+        const p = pInfo.rows[0];
+        
+        let newStreak = (p?.streak || 0);
+        if (status === 'present') {
+          const yesterday = new Date(normalizedDate);
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+          
+          if (p?.last_attendance_date && p.last_attendance_date.toISOString().split('T')[0] === yesterdayStr) {
+            newStreak += 1;
+          } else if (!p?.last_attendance_date || p.last_attendance_date.toISOString().split('T')[0] < yesterdayStr) {
+            newStreak = 1;
+          }
+        } else if (status === 'absent') {
+          newStreak = 0;
+        }
+
+        await pool.query(
+          `INSERT INTO attendance (participant_id, date, status, coach_id) 
+           VALUES ($1, $2, $3, $4) 
+           ON CONFLICT (participant_id, date) DO UPDATE SET status = EXCLUDED.status, coach_id = EXCLUDED.coach_id`,
+          [pId, normalizedDate, status, coachId]
+        );
+
+        if (status === 'present') {
+           // Increment rank points and streak
+           await pool.query(
+            "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+            [pId, 1, 'attendance', normalizedDate]
+          );
+          
+          await pool.query(
+            "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3",
+            [newStreak, normalizedDate, pId]
+          );
+        } else if (status === 'absent') {
+          await pool.query("UPDATE participants SET streak = 0 WHERE id = $1", [pId]);
+        }
+
+        // Individual parent notification (still needed per child)
+        if (status === 'present') {
+          notifyParent(pId, 'attendance', `Дитина на тренуванні! Відмічено присутність (${normalizedDate}).`, coachName, true);
+        } else if (status === 'absent' || status === 'late') {
+          const statusText = status === 'absent' ? 'відсутній(я)' : 'запізнився(лася)';
+          notifyParent(pId, 'attendance', `Ваша дитина ${statusText} на занятті сьогодні (${normalizedDate}).`, coachName, true);
+        }
+        
+        results.push(pId);
+      }
+
+      await pool.query("COMMIT");
+
+      // Send ONE aggregated message to Admin Channel
+      const adminText = `📢 <b>МАСОВА ВІДМІТКА</b>\n\n📝 Тип: attendance\n📉 Статус: <b>${status}</b>\n📅 Дата: ${normalizedDate}\n👥 Кількість учнів: ${participants.length}\n👤 Тренер: ${coachName}`;
+      await sendTelegramMessage(adminText);
+      
+      logAuditAction(coachId, userRole, `Масова відмітка: ${status} (${participants.length} учнів)`, 'attendance', null, { date: normalizedDate, count: participants.length });
+
+      res.json({ success: true, count: results.length });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      console.error("Bulk attendance failed:", e);
+      res.status(500).json({ error: "Failed to update bulk attendance" });
+    }
+  });
+
   app.post("/api/leads", leadLimiter, async (req, res) => {
     const { name, phone, age_group, location, event_id, source } = req.body;
     console.log(`New lead submission: ${name}, ${phone}, source: ${source}`);
@@ -1101,13 +1259,20 @@ async function startServer() {
 <b>Локація:</b> ${location || 'Не вказано'}
       `;
       
-      // Send notifications in background
-      Promise.all([
-        sendTelegramMessage(message),
-        sendMetaEvent('Lead', { name, phone, event_id, source }, req)
-      ]).catch(err => console.error('Background notification error:', err));
+      // Send notifications (Synchronous for stability)
+      try {
+        const tgStatus = await sendTelegramMessage(message);
+        console.log(`Telegram notification status: ${tgStatus ? 'Success' : 'Failed'}`);
+        
+        // 2. Send to Meta Pixel (Background is fine for this)
+        sendMetaEvent('Lead', { name, phone, event_id, source }, req).catch(err => console.error('Meta CAPI error:', err));
 
-      res.json({ success: true });
+        res.json({ success: true, telegramSent: !!tgStatus });
+      } catch (notifyErr) {
+        console.error('Notification logic error:', notifyErr);
+        // Still return success if DB save worked but notification failed
+        res.json({ success: true, telegramSent: false, warning: 'Notification failed' });
+      }
     } catch (e) {
       console.error("Failed to save lead:", e);
       res.status(500).json({ error: "Failed to save lead" });
@@ -2439,6 +2604,16 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         "UPDATE participants SET belt = $1, rank_points = $2 WHERE id = $3",
         [belt, rank_points, req.params.id]
       );
+
+      // Notify parents about rank/belt update
+      const coachName = (req as any).user?.name || 'Тренер';
+      const coachId = (req as any).user?.id || null;
+      const userRole = (req as any).user?.role || 'coach';
+
+      notifyParent(parseInt(req.params.id), 'rank', `Оновлено статус: Пояс - ${belt}, Бали - ${rank_points}.`, coachName);
+      
+      logAuditAction(coachId, userRole, `Зміна рангу: ${belt}, Бали: ${rank_points}`, 'participant', parseInt(req.params.id));
+
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to update rank" });
@@ -2474,25 +2649,31 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/badges", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participant_id, type, date } = req.body;
-    const badgeDate = date || new Date();
+    const normalizedDate = normalizeDate(date);
     try {
       await pool.query("BEGIN");
       const result = await pool.query(
         "INSERT INTO badges (participant_id, type, date) VALUES ($1, $2, $3) RETURNING id",
-        [participant_id, type, badgeDate]
+        [participant_id, type, normalizedDate]
       );
       const badgeId = result.rows[0].id;
 
       // Increment rank points by 10 for a badge
       await pool.query(
         "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, $3, $4, $5)",
-        [participant_id, 10, 'badge', badgeDate, `badge_${badgeId}`]
+        [participant_id, 10, 'badge', normalizedDate, `badge_${badgeId}`]
       );
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
       
-      notifyParent(participant_id, 'achievement', `Нове досягнення: ${type}! +10 балів до рейтингу.`);
+      const coachName = (req as any).user?.name || 'Тренер';
+      const coachId = (req as any).user?.id || null;
+      const userRole = (req as any).user?.role || 'coach';
+
+      notifyParent(participant_id, 'achievement', `Нове досягнення: ${type}! +10 балів до рейтингу.`, coachName);
       
+      logAuditAction(coachId, userRole, `Присвоєно досягнення: ${type}`, 'badge', participant_id);
+
       console.log(`Badge added for participant ${participant_id}: 10 points awarded`);
       res.json({ success: true, points_awarded: 10 });
     } catch (e) {
@@ -2558,11 +2739,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!participant_id || !name) {
       return res.status(400).json({ error: "Participant ID and name are required" });
     }
+    const normalizedDate = normalizeDate(date);
     try {
       await pool.query("BEGIN");
       const insertRes = await pool.query(
         "INSERT INTO competitions (participant_id, name, type, result, date) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [participant_id, name, type, result, date]
+        [participant_id, name, type, result, normalizedDate]
       );
       const compId = insertRes.rows[0].id;
       
@@ -2580,19 +2762,25 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       } else if (type === 'seminar') {
         points = 10;
       } else if (type === 'club_event') {
-        points = 5;
+        points = 10;
       }
 
       await pool.query(
         "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, $3, $4, $5)",
-        [participant_id, points, `${type}_${result || name}`, date, `comp_${compId}`]
+        [participant_id, points, `${type}_${result || name}`, normalizedDate, `comp_${compId}`]
       );
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
       
-      notifyParent(participant_id, 'event', `Участь у заході: ${name}. Результат: ${result}. +${points} балів.`);
+      const coachName = (req as any).user?.name || 'Тренер';
+      const coachId = (req as any).user?.id || null;
+      const userRole = (req as any).user?.role || 'coach';
+
+      notifyParent(participant_id, 'event', `Участь у заході: ${name}. Результат: ${result}. +${points} балів.`, coachName);
       
+      logAuditAction(coachId, userRole, `Участь у заході/змаганнях: ${name} (${result})`, 'competition', participant_id, { points });
+
       console.log(`Competition added for participant ${participant_id}: ${points} points awarded`);
       res.json({ success: true, points_awarded: points });
     } catch (e) {
@@ -3052,10 +3240,23 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/payments", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participant_id, amount, date, month, year, type, method, notes } = req.body;
+    
+    if (!participant_id || !amount) {
+      return res.status(400).json({ error: "Participant ID and amount are required" });
+    }
+
+    const normalizedDate = normalizeDate(date);
+    const numAmount = parseFloat(amount.toString().replace(',', '.').replace(/\s/g, ''));
+    if (isNaN(numAmount)) {
+      return res.status(400).json({ error: "Invalid amount format" });
+    }
+    const numMonth = parseInt(month?.toString() || (new Date().getMonth() + 1).toString());
+    const numYear = parseInt(year?.toString() || new Date().getFullYear().toString());
+
     try {
       const result = await pool.query(
         "INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        [participant_id, amount, date || new Date(), month, year, type || 'subscription', method || 'cash', notes]
+        [participant_id, numAmount, normalizedDate, numMonth, numYear, type || 'subscription', method || 'cash', notes]
       );
       
       // Update participant payment status if it's a subscription for current month
@@ -3065,7 +3266,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       // Notify parents
-      notifyParent(participant_id, 'payment', `Отримано оплату: ${amount} ₴ за ${month}/${year}. Дякуємо!`);
+      const coachName = (req as any).user?.name || 'Адмін';
+      const coachId = (req as any).user?.id || null;
+      const userRole = (req as any).user?.role || 'admin';
+
+      notifyParent(participant_id, 'payment', `Отримано оплату: ${amount} ₴ за ${month}/${year}. Дякуємо!`, coachName);
+
+      logAuditAction(coachId, userRole, `Проведено оплату: ${amount} ₴ (${type})`, 'payment', participant_id, { month, year, method });
 
       res.json({ success: true, id: result.rows[0].id });
     } catch (e) {
@@ -3205,7 +3412,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "DB error" });
     const { participantId, message } = req.body;
     try {
-      await notifyParent(participantId, 'manual', message);
+      const coachName = (req as any).user?.name || 'Адмін';
+      await notifyParent(participantId, 'manual', message, coachName);
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to send notification" });
@@ -3215,6 +3423,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/admin/notify/mass", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "DB error" });
     const { message, group_id } = req.body;
+    const coachName = (req as any).user?.name || 'Адмін';
     try {
       let query = "SELECT id FROM participants WHERE status = 'active'";
       let params = [];
@@ -3223,15 +3432,15 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         params.push(group_id);
       }
       const result = await pool.query(query, params);
-      const participants = result.rows;
       
-      // Send notifications in background
-      Promise.all(participants.map(p => notifyParent(p.id, 'manual', message)))
-        .catch(err => console.error('Mass notify background error:', err));
-        
-      res.json({ success: true, count: participants.length });
+      // Async notify all
+      result.rows.forEach(p => {
+        notifyParent(p.id, 'announcement', message, coachName);
+      });
+
+      res.json({ success: true, count: result.rows.length });
     } catch (e) {
-      res.status(500).json({ error: "Failed to send mass notification" });
+      res.status(500).json({ error: "Failed mass notify" });
     }
   });
 
@@ -3291,7 +3500,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         }
       } else {
         // If coach/admin sends to parent, notify parent via Telegram
-        notifyParent(participant_id, 'message', `Нове повідомлення від тренера: ${content}`);
+        const coachName = (req as any).user?.name || 'Тренер';
+        notifyParent(participant_id, 'message', `Нове повідомлення від тренера: ${content}`, coachName);
       }
 
       res.json(result.rows[0]);
@@ -3490,15 +3700,43 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       runWorkflows().catch(console.error);
 
       // Notify parents asynchronously
-      if (status === 'absent' || status === 'late') {
+      const coachName = (req as any).user?.name || 'Тренер';
+      const coachId = (req as any).user?.id || null;
+      const userRole = (req as any).user?.role || 'coach';
+
+      if (status === 'present') {
+        notifyParent(participant_id, 'attendance', `Дитина на тренуванні! Відмічено присутність (${date}).`, coachName);
+      } else if (status === 'absent' || status === 'late') {
         const statusText = status === 'absent' ? 'відсутній(я)' : 'запізнився(лася)';
-        notifyParent(participant_id, 'attendance', `Ваша дитина ${statusText} на занятті сьогодні (${date}).`);
+        notifyParent(participant_id, 'attendance', `Ваша дитина ${statusText} на занятті сьогодні (${date}).`, coachName);
       }
+
+      logAuditAction(coachId, userRole, `Відмічено відвідування: ${status}`, 'attendance', participant_id, { date });
 
       res.json({ success: true });
     } catch (e) {
       await pool.query("ROLLBACK");
       res.status(500).json({ error: "Failed to update attendance" });
+    }
+  });
+
+  app.get("/api/audit-logs", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    try {
+      const { limit = 100 } = req.query;
+      const result = await pool.query(`
+        SELECT al.*, 
+               COALESCE(au.name, c.name, 'Система') as user_name
+        FROM audit_logs al
+        LEFT JOIN admin_users au ON al.user_id = au.id AND al.user_role != 'parent'
+        LEFT JOIN coaches c ON au.coach_id = c.id
+        ORDER BY al.created_at DESC
+        LIMIT $1
+      `, [parseInt(limit as string)]);
+      res.json(result.rows);
+    } catch (e) {
+      console.error('Failed to fetch audit logs:', e);
+      res.status(500).json({ error: "Failed to fetch logs" });
     }
   });
 

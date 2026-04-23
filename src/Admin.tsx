@@ -406,19 +406,30 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </h3>
           <div className="space-y-4">
             {(chartData?.churnRisk || []).map((p: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                <div>
-                  <p className="text-sm font-bold">{p.name}</p>
+              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all group">
+                <div onClick={() => onQuickAction('participants')} className="cursor-pointer">
+                  <p className="text-sm font-bold text-white group-hover:text-orange-500 transition-colors">{p.name}</p>
                   <p className="text-[10px] text-zinc-500 uppercase font-black">{p.group_name}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-black text-orange-500">{p.days_since_last || '∞'} днів</p>
-                  <p className="text-[8px] text-zinc-600 uppercase font-black">без тренувань</p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right mr-2">
+                    <p className="text-xs font-black text-orange-500">{p.days_since_last || '∞'} днів</p>
+                    <p className="text-[8px] text-zinc-600 uppercase font-black">без занять</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      onQuickAction('parent_messages', `remind_churn:${p.id}:${p.name}`);
+                    }}
+                    className="p-2 bg-orange-600/10 text-orange-500 rounded-xl hover:bg-orange-600 text-white transition-all shadow-lg shadow-orange-600/20"
+                    title="Нагадати про себе"
+                  >
+                    <Bell size={14} />
+                  </button>
                 </div>
               </div>
             ))}
             {(!chartData?.churnRisk || chartData.churnRisk.length === 0) && (
-              <div className="text-center py-8 text-zinc-600 font-bold text-sm">Ризиків не виявлено</div>
+              <div className="text-center py-8 text-zinc-600 font-bold text-sm italic">Ризиків не виявлено</div>
             )}
           </div>
         </div>
@@ -430,24 +441,35 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </h3>
           <div className="space-y-4">
             {(chartData?.debtors || []).map((p: any, i: number) => (
-              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                <div>
-                  <p className="text-sm font-bold">{p.name}</p>
+              <div key={i} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-all group">
+                <div onClick={() => onQuickAction('crm')} className="cursor-pointer">
+                  <p className="text-sm font-bold text-white group-hover:text-red-500 transition-colors">{p.name}</p>
                   <p className="text-[10px] text-zinc-500 uppercase font-black">{p.parent_name || 'Не вказано'}</p>
                 </div>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(`tel:${p.phone}`);
-                  }}
-                  className="p-2 bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600/20 transition-all"
-                >
-                  <Phone size={16} />
-                </button>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => {
+                      onQuickAction('parent_messages', `remind_debt:${p.id}:${p.name}`);
+                    }}
+                    className="p-2 bg-red-600/10 text-red-500 rounded-xl hover:bg-red-600 text-white transition-all shadow-lg shadow-red-600/20"
+                    title="Нагадати про борг"
+                  >
+                    <Bell size={14} />
+                  </button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(`tel:${p.phone}`);
+                    }}
+                    className="p-2 bg-zinc-800 text-zinc-400 rounded-xl hover:bg-zinc-700 hover:text-white transition-all"
+                  >
+                    <Phone size={14} />
+                  </button>
+                </div>
               </div>
             ))}
             {(!chartData?.debtors || chartData.debtors.length === 0) && (
-              <div className="text-center py-8 text-zinc-600 font-bold text-sm">Боржників немає</div>
+              <div className="text-center py-8 text-zinc-600 font-bold text-sm italic">Боржників немає</div>
             )}
           </div>
         </div>
@@ -627,7 +649,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
               Повідомлення від батьків
             </h3>
             <button 
-              onClick={() => onQuickAction('messages')}
+              onClick={() => onQuickAction('parent_messages')}
               className="text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-blue-400 transition-colors"
             >
               Всі чати →
@@ -637,7 +659,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             {recentMessages.map((msg, i) => (
               <div 
                 key={i} 
-                onClick={() => onQuickAction('messages')}
+                onClick={() => onQuickAction('parent_messages')}
                 className="flex items-center justify-between p-5 bg-white/[0.03] hover:bg-white/[0.06] rounded-2xl border border-white/5 transition-all group cursor-pointer"
               >
                 <div className="flex items-center gap-4">
@@ -670,65 +692,30 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter mb-3 lg:mb-4">Швидкі дії</h3>
           <p className="text-zinc-500 text-[10px] lg:text-sm font-medium mb-6 lg:mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
           <div className="grid grid-cols-2 gap-2 lg:gap-4 w-full">
-            {role === 'admin' ? (
-              <>
-                <button 
-                  id="quick-add-participant"
-                  onClick={() => onQuickAction('participants', 'add')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
-                >
-                  Додати учня
-                </button>
-                <button 
-                  id="quick-schedule"
-                  onClick={() => onQuickAction('schedule', 'add')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Розклад
-                </button>
-                <button 
-                  id="quick-content"
-                  onClick={() => onQuickAction('content', 'video')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Контент
-                </button>
-                <button 
-                  id="quick-leads"
-                  onClick={() => onQuickAction('leads')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Звіти
-                </button>
-              </>
-            ) : (
-              <>
-                <button 
-                  onClick={() => onQuickAction('attendance', 'mark')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
-                >
-                  Відвідуваність
-                </button>
-                <button 
-                  onClick={() => onQuickAction('rank_management', 'add_points')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Бали
-                </button>
-                <button 
-                  onClick={() => onQuickAction('participants', 'add')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Учень
-                </button>
-                <button 
-                  onClick={() => onQuickAction('schedule')}
-                  className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
-                >
-                  Розклад
-                </button>
-              </>
-            )}
+            <button 
+              onClick={() => onQuickAction('participants', 'add')}
+              className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
+            >
+              Новий учень
+            </button>
+            <button 
+              onClick={() => onQuickAction('attendance', 'mark_attendance')}
+              className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
+            >
+              Відмітити
+            </button>
+            <button 
+              onClick={() => onQuickAction('crm', 'add_payment')}
+              className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
+            >
+              Оплата
+            </button>
+            <button 
+              onClick={() => onQuickAction('rank_management', 'add_activity')}
+              className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
+            >
+              Захід
+            </button>
           </div>
         </div>
       </div>
@@ -760,8 +747,11 @@ export const AdminPage = () => {
   }, []);
 
   const checkInstagramStatus = async () => {
+    const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/instagram/status');
+      const res = await fetch('/api/instagram/status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const data = await res.json();
       if (data.connected) {
         setIsInstagramConnected(true);
@@ -772,8 +762,11 @@ export const AdminPage = () => {
   };
 
   const connectInstagram = async () => {
+    const token = localStorage.getItem('admin_token');
     try {
-      const res = await fetch('/api/auth/instagram/url?action=connect');
+      const res = await fetch('/api/auth/instagram/url?action=connect', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       const { url } = await res.json();
       
       const width = 600;
@@ -802,6 +795,17 @@ export const AdminPage = () => {
       toast.error('Помилка отримання посилання для авторизації');
     }
   };
+
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data === 'instagram_connected') {
+        setIsInstagramConnected(true);
+        toast.success('Instagram акаунт успішно підключено!');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     if (coachId) {
@@ -879,13 +883,13 @@ export const AdminPage = () => {
   }, [navigate]);
 
   const handleQuickAction = (tab: string, action?: string) => {
-    setInitialAction(null);
     setActiveTab(tab);
+    setIsMobileMenuOpen(false);
     // Use a small timeout to ensure the component has mounted before setting initialAction
     if (action) {
       setTimeout(() => {
         setInitialAction(action);
-      }, 50);
+      }, 300);
     }
   };
 
@@ -904,6 +908,7 @@ export const AdminPage = () => {
         { id: 'registrations', label: 'Реєстрації', icon: UserPlus, roles: ['admin', 'coach'] },
         { id: 'groups', label: 'Групи', icon: Users, roles: ['admin', 'coach'] },
         { id: 'parent_messages', label: 'Повідомлення батьків', icon: MessageSquare, roles: ['admin', 'coach'] },
+        { id: 'audit_logs', label: 'Журнал подій', icon: FileText, roles: ['admin'] },
         { id: 'schedule', label: 'Розклад', icon: Clock, roles: ['admin', 'coach'] },
       ]
     },
@@ -1157,12 +1162,13 @@ export const AdminPage = () => {
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
               {activeTab === 'smm' && <SMMModule />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
-              {activeTab === 'leads' && <LeadsViewer />}
+              {activeTab === 'audit_logs' && <AuditLogsViewer />}
+      {activeTab === 'leads' && <LeadsViewer />}
               {activeTab === 'crm' && <CRMFinance role={role} coachId={coachId} />}
               {activeTab === 'coaches' && <CoachesEditor />}
               {activeTab === 'locations' && <LocationsEditor />}
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
-              {activeTab === 'parent_messages' && <ParentMessages role={role} coachId={coachId} />}
+              {activeTab === 'parent_messages' && <ParentMessages role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'registrations' && <RegistrationManager onEdit={(id) => handleQuickAction('participants', `edit:${id}`)} />}
@@ -1219,12 +1225,18 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newPayment)
+        body: JSON.stringify({
+          ...newPayment,
+          date: new Date().toISOString().split('T')[0]
+        })
       });
       if (res.ok) {
-        toast.success('Оплату додано');
+        toast.success('Оплату успішно додано');
         setIsAddingPayment(false);
         fetchParticipants();
+      } else {
+        const err = await res.json();
+        toast.error(`Проблема: ${err.error}`);
       }
     } catch (e) {
       toast.error('Помилка додавання оплати');
@@ -1261,13 +1273,21 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
     }
   };
 
+  const [isCompLoading, setIsCompLoading] = useState(false);
+  const [initialActionHandled, setInitialActionHandled] = useState(false);
+
   useEffect(() => {
     fetchParticipants();
   }, []);
 
   useEffect(() => {
-    if (initialAction === 'add_points') {
-      toast.info('Оберіть учня для нарахування балів або додавання досягнень');
+    if (initialAction && !initialActionHandled) {
+      if (initialAction === 'add_points') {
+        toast.info('Оберіть учня для нарахування балів або додавання досягнень');
+      } else if (initialAction === 'add_activity') {
+        toast.info('Оберіть учня для додавання участі у заході');
+      }
+      setInitialActionHandled(true);
       onActionComplete?.();
     }
   }, [initialAction]);
@@ -3666,11 +3686,37 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
 
   const handleBulkMark = async (status: string) => {
     const filtered = participants.filter(p => filterGroup === 'all' || p.group_id?.toString() === filterGroup);
+    
+    if (filtered.length === 0) {
+      toast.error('Немає учнів у цій групі');
+      return;
+    }
+
+    const token = localStorage.getItem('admin_token');
+    
     toast.promise(
-      Promise.all(filtered.map(p => updateStatus(p.id, status, true))),
+      fetch('/api/attendance/bulk', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          participants: filtered.map(p => p.id), 
+          date, 
+          status 
+        })
+      }).then(r => {
+        if (!r.ok) throw new Error('Bulk update failed');
+        return r.json();
+      }).then(() => {
+        const attMap = { ...attendance };
+        filtered.forEach(p => attMap[p.id] = status);
+        setAttendance(attMap);
+      }),
       {
-        loading: 'Оновлення групи...',
-        success: 'Всіх відмічено!',
+        loading: 'Масове оновлення...',
+        success: 'Групу відмічено!',
         error: 'Помилка масового оновлення'
       }
     );
@@ -5222,7 +5268,7 @@ const ScheduleEditor = ({ initialAction, onActionComplete, role, coachId }: { in
   );
 };
 
-const ParentMessages = ({ role, coachId }: { role: string, coachId: number | null }) => {
+const ParentMessages = ({ role, coachId, initialAction, onActionComplete }: { role: string, coachId: number | null, initialAction?: string | null, onActionComplete?: () => void }) => {
   const [participants, setParticipants] = useState<any[]>([]);
   const [selectedParticipant, setSelectedParticipant] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -5232,6 +5278,25 @@ const ParentMessages = ({ role, coachId }: { role: string, coachId: number | nul
   useEffect(() => {
     fetchParticipants();
   }, []);
+
+  useEffect(() => {
+    if (!loading && initialAction && participants.length > 0) {
+      if (initialAction.startsWith('remind_debt:') || initialAction.startsWith('remind_churn:')) {
+        const parts = initialAction.split(':');
+        const pId = parseInt(parts[1]);
+        const type = parts[0].replace('remind_', '');
+        const p = participants.find(part => part.id === pId);
+        if (p) {
+          setSelectedParticipant(p);
+          const msg = type === 'debt' 
+            ? `Доброго дня! Нагадуємо про оплату за навчання для ${p.name}. Дякуємо!` 
+            : `Доброго дня! Давно не бачили ${p.name} на тренуваннях. Все гаразд?`;
+          setNewMessage(msg);
+        }
+        onActionComplete?.();
+      }
+    }
+  }, [loading, initialAction, participants]);
 
   useEffect(() => {
     if (selectedParticipant) {
@@ -5414,6 +5479,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
   const [report, setReport] = useState<any>(null);
   const [leads, setLeads] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
+  const [localFilteredParticipants, setLocalFilteredParticipants] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isAddingAnnouncement, setIsAddingAnnouncement] = useState(false);
@@ -5461,7 +5527,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
 
   const handleAddPayment = async () => {
     if (!newPayment.participant_id || !newPayment.amount) {
-      toast.error('Заповніть обов\'язкові поля');
+      toast.error('Заповніть обов\'язкові поля: учня та суму');
       return;
     }
     const token = localStorage.getItem('admin_token');
@@ -5472,15 +5538,30 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(newPayment)
+        body: JSON.stringify({
+          ...newPayment,
+          date: new Date().toISOString().split('T')[0] // Ensure date is sent
+        })
       });
       if (res.ok) {
-        toast.success('Оплату додано');
+        toast.success('Оплату успішно додано');
         setIsAddingPayment(false);
+        setNewPayment({
+          participant_id: '',
+          amount: '',
+          type: 'subscription',
+          method: 'cash',
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear(),
+          notes: ''
+        });
         fetchData();
+      } else {
+        const err = await res.json();
+        toast.error(`Проблема з оплатою: ${err.error || 'Спробуйте пізніше'}`);
       }
     } catch (e) {
-      toast.error('Помилка додавання оплати');
+      toast.error('Помилка мережі при спробі додати оплату');
     }
   };
 
@@ -6167,6 +6248,121 @@ const RegistrationManager = ({ onEdit }: { onEdit?: (id: number) => void }) => {
             <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Нових реєстрацій немає</p>
           </div>
         )}
+      </div>
+    </div>
+  );
+};
+
+const AuditLogsViewer = () => {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  const fetchLogs = async () => {
+    setIsLoading(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/audit-logs?limit=200', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setLogs(data);
+    } catch (e) {
+      toast.error('Помилка завантаження журналу');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getActionColor = (action: string) => {
+    if (action.includes('оплату')) return 'text-green-500 bg-green-500/10';
+    if (action.includes('відвідування')) return 'text-blue-500 bg-blue-500/10';
+    if (action.includes('рангу')) return 'text-purple-500 bg-purple-500/10';
+    if (action.includes('досягнення')) return 'text-amber-500 bg-amber-500/10';
+    return 'text-zinc-400 bg-white/5';
+  };
+
+  return (
+    <div className="p-4 lg:p-12 space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-4xl lg:text-7xl font-black uppercase tracking-tighter leading-none mb-4">
+            Журнал <span className="text-red-600">подій</span>
+          </h1>
+          <p className="text-zinc-500 font-medium text-lg">Історія всіх ключових дій адміністрації та тренерів</p>
+        </div>
+        <button 
+          onClick={fetchLogs}
+          className="h-14 px-8 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs"
+        >
+          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+          Оновити
+        </button>
+      </div>
+
+      <div className="bg-zinc-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="border-b border-white/5 bg-white/[0.02]">
+                <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Час</th>
+                <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Користувач</th>
+                <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Дія</th>
+                <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Тип</th>
+                <th className="px-8 py-6 text-left text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Деталі</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center">
+                    <div className="inline-block w-8 h-8 border-2 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center text-zinc-500 font-medium">Подій ще не зафіксовано</td>
+                </tr>
+              ) : (
+                logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-white/[0.02] transition-colors group">
+                    <td className="px-8 py-6 whitespace-nowrap">
+                      <div className="text-zinc-400 font-medium text-sm">
+                        {new Date(log.created_at).toLocaleString('uk-UA', { 
+                          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 whitespace-nowrap">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-red-600/10 flex items-center justify-center text-red-600 font-bold text-xs uppercase">
+                          {log.user_name?.charAt(0)}
+                        </div>
+                        <span className="font-bold text-white uppercase tracking-wider text-xs">{log.user_name}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <span className={`inline-flex px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${getActionColor(log.action)}`}>
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-8 py-6 whitespace-nowrap">
+                      <div className="text-zinc-500 font-black uppercase tracking-widest text-[10px]">{log.entity_type}</div>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="text-zinc-400 text-xs font-medium max-w-xs truncate">
+                        {log.details ? JSON.stringify(log.details) : '-'}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
