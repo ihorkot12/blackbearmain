@@ -5716,7 +5716,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
         <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
           <h3 className="text-xl font-black uppercase tracking-tight mb-8">Динаміка доходів ({year})</h3>
           <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <AreaChart data={monthlyData}>
                 <defs>
                   <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
@@ -5740,7 +5740,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
         <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
           <h3 className="text-xl font-black uppercase tracking-tight mb-8">Розподіл за типом</h3>
           <div className="h-80 flex items-center">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={typeData}

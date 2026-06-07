@@ -1,6 +1,12 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+const getAi = () => {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Gemini API key is not configured");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 const CLUB_CONTEXT = `
 Black Bear Dojo — клуб кіокушинкай карате в Києві.
@@ -36,7 +42,7 @@ export const generateSMMStrategy = async (history: any[]) => {
     }
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt
   });
@@ -88,7 +94,7 @@ export const generateContentOptions = async (params: any, history: any[]) => {
     ]
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: "gemini-3-flash-preview",
     contents: prompt
   });
@@ -126,7 +132,7 @@ export const analyzeAccount = async (posts: any[], insights: any[] = []) => {
     }
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: "gemini-1.5-flash",
     contents: prompt
   });
