@@ -726,6 +726,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
 export const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [initialAction, setInitialAction] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState<string>('admin');
   const [userName, setUserName] = useState<string>('Адміністратор');
   const [coachId, setCoachId] = useState<number | null>(null);
@@ -738,13 +739,15 @@ export const AdminPage = () => {
   const [isClearing, setIsClearing] = useState(false);
 
   useEffect(() => {
+    if (!authChecked) return;
+
     fetch('/api/telegram/bot-info')
       .then(r => r.json())
       .then(data => setBotUsername(data.botUsername))
       .catch(e => console.log(e));
     
     checkInstagramStatus();
-  }, []);
+  }, [authChecked]);
 
   const checkInstagramStatus = async () => {
     const token = localStorage.getItem('admin_token');
@@ -869,6 +872,7 @@ export const AdminPage = () => {
         setRole(data.role || 'admin');
         setUserName(data.name || 'Адміністратор');
         setCoachId(data.coach_id || null);
+        setAuthChecked(true);
         
         // If coach and activeTab is restricted, switch to first allowed tab
         if (data.role === 'coach' && ['leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
@@ -931,6 +935,12 @@ export const AdminPage = () => {
     ...group,
     items: group.items.filter(item => item.roles.includes(role))
   })).filter(group => group.items.length > 0);
+
+  if (!authChecked) return (
+    <div className="min-h-screen bg-[#050505] text-zinc-100 flex items-center justify-center">
+      <RefreshCw className="animate-spin text-red-600" size={48} />
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
