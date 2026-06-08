@@ -2337,19 +2337,17 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       if (req.file) {
-        // Handle file upload
         const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        data = xlsx.utils.sheet_to_json(worksheet);
+        data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
       } else if (sheetUrl) {
-        // Handle Google Sheets URL
         let fetchUrl = sheetUrl;
         if (sheetUrl.includes('docs.google.com/spreadsheets')) {
-          // Try to convert to CSV export URL if it's a standard sharing link
           const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
           if (match) {
-            fetchUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv`;
+            const gid = sheetUrl.match(/[?&]gid=([^&]+)/)?.[1];
+            fetchUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gid ? `&gid=${gid}` : ''}`;
           }
         }
         
@@ -2359,7 +2357,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         const workbook = xlsx.read(new Uint8Array(buffer), { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        data = xlsx.utils.sheet_to_json(worksheet);
+        data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
       } else {
         return res.status(400).json({ error: "No file or URL provided" });
       }
@@ -2368,43 +2366,268 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         return res.status(400).json({ error: "No data found in file or URL" });
       }
 
-      // Map data to database fields
-      // Expected columns: "Name" or "Ім'я", "Age" or "Вік", "Login" or "Логін", "Password" or "Пароль", "Birthday" or "Дата народження"
-      const participantsToInsert = data.map(row => ({
-        name: row["Name"] || row["Ім'я"] || row["ПІБ"] || row["ПІБ дитини"] || row["name"] || row["ім'я"] || "",
-        age: parseInt(row["Age"] || row["Вік"] || row["age"] || row["вік"] || "0"),
-        birthday: row["Birthday"] || row["Дата народження"] || row["birthday"] || row["дата народження"] || null,
-        parent_login: row["Login"] || row["Логін"] || row["Логін (англійською)"] || row["login"] || row["логін"] || `user_${Math.random().toString(36).substring(2, 7)}`,
-        parent_password: row["Password"] || row["Пароль"] || row["Пароль (англійською)"] || row["password"] || row["пароль"] || Math.random().toString(36).substring(2, 10),
-        group_id: group_id || null,
-        payment_status: row["Payment"] || row["Оплата"] || 'unpaid',
-        status: row["Status"] || row["Статус"] || 'active'
-      })).filter(p => p.name);
+      const normalizeImportKey = (value: any) =>
+        String(value ?? '')
+          .trim()
+          .toLowerCase()
+          .replace(/[^a-zа-яіїєґё0-9]+/gi, '');
+
+      const isBlank = (value: any) => value === undefined || value === null || String(value).trim() === '';
+
+      const cleanText = (value: any) => {
+        if (isBlank(value)) return undefined;
+        return String(value).trim();
+      };
+
+      const getRowValue = (row: Record<string, any>, aliases: string[]) => {
+        const normalizedRow = new Map<string, any>();
+        Object.entries(row).forEach(([key, value]) => {
+          normalizedRow.set(normalizeImportKey(key), value);
+        });
+
+        for (const alias of aliases) {
+          const value = normalizedRow.get(normalizeImportKey(alias));
+          if (!isBlank(value)) return value;
+        }
+        return undefined;
+      };
+
+      const parseNumber = (value: any) => {
+        if (isBlank(value)) return undefined;
+        const parsed = parseInt(String(value).replace(/[^\d-]/g, ''), 10);
+        return Number.isFinite(parsed) ? parsed : undefined;
+      };
+
+      const parseDateValue = (value: any) => {
+        if (isBlank(value)) return undefined;
+
+        if (typeof value === 'number') {
+          const parsed = xlsx.SSF.parse_date_code(value);
+          if (parsed) {
+            return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
+          }
+        }
+
+        const raw = String(value).trim();
+        const dotMatch = raw.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+        if (dotMatch) {
+          return `${dotMatch[3]}-${dotMatch[2].padStart(2, '0')}-${dotMatch[1].padStart(2, '0')}`;
+        }
+
+        const dashMatch = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (dashMatch) {
+          return `${dashMatch[1]}-${dashMatch[2].padStart(2, '0')}-${dashMatch[3].padStart(2, '0')}`;
+        }
+
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) {
+          return parsed.toISOString().split('T')[0];
+        }
+
+        return undefined;
+      };
+
+      const calculateAge = (birthday?: string) => {
+        if (!birthday) return undefined;
+        const birthDate = new Date(birthday);
+        if (isNaN(birthDate.getTime())) return undefined;
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+        return age >= 0 ? age : undefined;
+      };
+
+      const normalizePaymentStatus = (value: any) => {
+        if (isBlank(value)) return undefined;
+        const normalized = normalizeImportKey(value);
+        if (['paid', 'yes', 'true', '1', 'так', 'оплачено', 'сплачено'].includes(normalized)) return 'paid';
+        if (['unpaid', 'no', 'false', '0', 'ні', 'борг', 'неоплачено', 'несплачено'].includes(normalized)) return 'unpaid';
+        return cleanText(value);
+      };
+
+      const normalizeStatus = (value: any) => {
+        if (isBlank(value)) return undefined;
+        const normalized = normalizeImportKey(value);
+        if (['active', 'активний', 'активна', 'активен'].includes(normalized)) return 'active';
+        if (['new', 'новий', 'нова', 'новачок'].includes(normalized)) return 'new';
+        if (['archived', 'archive', 'inactive', 'архів', 'архив', 'неактивний'].includes(normalized)) return 'archived';
+        return cleanText(value);
+      };
+
+      const parseChecklist = (value: any) => {
+        if (isBlank(value)) return undefined;
+        if (Array.isArray(value)) return JSON.stringify(value);
+        const raw = String(value).trim();
+        try {
+          const parsed = JSON.parse(raw);
+          return JSON.stringify(parsed);
+        } catch {
+          return JSON.stringify(raw.split(',').map(item => item.trim()).filter(Boolean));
+        }
+      };
+
+      const groupResult = await pool.query("SELECT id, name FROM groups");
+      const groupLookup = new Map<string, number>();
+      groupResult.rows.forEach((group: any) => {
+        groupLookup.set(String(group.id), group.id);
+        groupLookup.set(normalizeImportKey(group.name), group.id);
+      });
+
+      const selectedGroupId = parseNumber(group_id);
+      const resolveGroupId = (value: any) => {
+        if (selectedGroupId) return selectedGroupId;
+        if (isBlank(value)) return undefined;
+        const directId = parseNumber(value);
+        if (directId) return directId;
+        return groupLookup.get(normalizeImportKey(value));
+      };
+
+      const participantsToImport = data.map((row, index) => {
+        const birthday = parseDateValue(getRowValue(row, [
+          'birthday', 'birth date', 'date of birth', 'dob',
+          'дата народження', 'день народження', 'дн', 'дата рождения'
+        ]));
+        const parentPhone = cleanText(getRowValue(row, [
+          'parent_phone', 'parent phone', 'contact phone', 'contact',
+          'телефон', 'номер телефону', 'телефон батьків', 'телефон батька', 'телефон мами',
+          'контакт', 'контактний телефон', 'phone'
+        ]));
+        const childPhone = cleanText(getRowValue(row, [
+          'child phone', 'participant phone', 'student phone',
+          'телефон дитини', 'телефон учня'
+        ]));
+        const explicitParentLogin = cleanText(getRowValue(row, [
+          'parent_login', 'login', 'логін', 'логин', 'логін батьків', 'логін parent'
+        ]));
+        const parentLogin = explicitParentLogin || `parent_${crypto.createHash('sha1').update(`${parentPhone || ''}|${childPhone || ''}|${birthday || ''}|${index}`).digest('hex').slice(0, 10)}`;
+        const explicitParentPassword = cleanText(getRowValue(row, [
+          'parent_password', 'password', 'пароль', 'пароль батьків'
+        ]));
+
+        return {
+          rowNumber: index + 2,
+          name: cleanText(getRowValue(row, [
+            'name', 'full name', 'participant name', 'student name', 'child name',
+            "ім'я", 'імя', 'піб', 'піб дитини', 'дитина', 'учень', 'учасник', 'фио', 'имя'
+          ])),
+          age: parseNumber(getRowValue(row, ['age', 'вік', 'возраст'])) || calculateAge(birthday),
+          birthday,
+          group_id: resolveGroupId(getRowValue(row, ['group_id', 'group', 'group name', 'група', 'назва групи'])),
+          parent_name: cleanText(getRowValue(row, [
+            'parent_name', 'parent name', 'father mother', 'guardian',
+            'батьки', 'батько', 'мама', 'тато', "ім'я батьків", 'імя батьків', 'піб батьків', 'родитель'
+          ])),
+          phone: normalizePhone(childPhone || parentPhone || ''),
+          parent_phone: normalizePhone(parentPhone || childPhone || ''),
+          parent_login: parentLogin,
+          has_explicit_login: !!explicitParentLogin,
+          parent_password: explicitParentPassword || crypto.randomBytes(4).toString('hex'),
+          has_explicit_password: !!explicitParentPassword,
+          belt: cleanText(getRowValue(row, ['belt', 'пояс'])) || 'Білий',
+          payment_status: normalizePaymentStatus(getRowValue(row, ['payment_status', 'payment', 'оплата', 'статус оплати'])),
+          status: normalizeStatus(getRowValue(row, ['status', 'статус'])),
+          telegram_chat_id: cleanText(getRowValue(row, ['telegram_chat_id', 'telegram chat id', 'chat_id', 'telegram id', 'тг id'])),
+          exam_readiness: cleanText(getRowValue(row, ['exam_readiness', 'exam readiness', 'готовність', 'готовність до іспиту'])),
+          skill_checklist: parseChecklist(getRowValue(row, ['skill_checklist', 'skills', 'навички', 'чеклист'])),
+          rank_points: parseNumber(getRowValue(row, ['rank_points', 'points', 'бали', 'рейтинг'])),
+          achievements_text: cleanText(getRowValue(row, ['achievements_text', 'achievements', 'досягнення', 'нотатки']))
+        };
+      });
+
+      const validParticipants = participantsToImport.filter(p => p.name);
 
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
-        for (const p of participantsToInsert) {
-          // Handle birthday format if it's a string from Excel/CSV
-          let formattedBirthday = null;
-          if (p.birthday) {
-            try {
-              const d = new Date(p.birthday);
-              if (!isNaN(d.getTime())) {
-                formattedBirthday = d.toISOString().split('T')[0];
-              }
-            } catch (e) {
-              console.warn(`Invalid birthday format for ${p.name}: ${p.birthday}`);
-            }
+        let created = 0;
+        let updated = 0;
+        const skipped = participantsToImport.length - validParticipants.length;
+
+        for (const p of validParticipants) {
+          let existing = null;
+
+          if (p.parent_login) {
+            existing = await client.query(
+              p.has_explicit_login
+                ? "SELECT id FROM participants WHERE parent_login = $1 LIMIT 1"
+                : "SELECT id FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND parent_login = $2 LIMIT 1",
+              p.has_explicit_login ? [p.parent_login] : [p.name, p.parent_login]
+            );
+          }
+          if ((!existing || existing.rows.length === 0) && p.phone) {
+            existing = await client.query(
+              "SELECT id FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND (phone = $2 OR parent_phone = $2) LIMIT 1",
+              [p.name, p.phone]
+            );
           }
 
-          await client.query(
-            "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (parent_login) DO NOTHING",
-            [p.name, p.age, formattedBirthday, p.group_id, p.parent_login, p.parent_password, p.payment_status, p.status]
-          );
+          if ((!existing || existing.rows.length === 0) && p.birthday) {
+            existing = await client.query(
+              "SELECT id FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND birthday = $2::date LIMIT 1",
+              [p.name, p.birthday]
+            );
+          }
+
+          const passwordValue = p.parent_password.startsWith('$2a$') || p.parent_password.startsWith('$2b$')
+            ? p.parent_password
+            : await bcrypt.hash(p.parent_password, 10);
+
+          const insertData: Record<string, any> = {
+            name: p.name,
+            age: p.age ?? null,
+            birthday: p.birthday ?? null,
+            group_id: p.group_id ?? null,
+            parent_name: p.parent_name ?? null,
+            phone: p.phone || null,
+            parent_phone: p.parent_phone || null,
+            parent_login: p.parent_login,
+            parent_password: passwordValue,
+            belt: p.belt,
+            payment_status: p.payment_status || 'unpaid',
+            status: p.status || 'active',
+            telegram_chat_id: p.telegram_chat_id || null,
+            exam_readiness: p.exam_readiness || 'not_started',
+            skill_checklist: p.skill_checklist || '[]',
+            rank_points: p.rank_points ?? 0,
+            achievements_text: p.achievements_text || ''
+          };
+
+          if (existing && existing.rows.length > 0) {
+            const existingId = existing.rows[0].id;
+            const updateData: Record<string, any> = {};
+            Object.entries(insertData).forEach(([key, value]) => {
+              if (key !== 'parent_password' && value !== undefined && value !== null && value !== '') {
+                updateData[key] = value;
+              }
+            });
+
+            if (p.has_explicit_password) {
+              updateData.parent_password = passwordValue;
+            }
+
+            const keys = Object.keys(updateData);
+            if (keys.length > 0) {
+              const setClause = keys.map((key, idx) => `${key} = $${idx + 1}`).join(', ');
+              const values = keys.map(key => updateData[key]);
+              values.push(existingId);
+              await client.query(`UPDATE participants SET ${setClause} WHERE id = $${values.length}`, values);
+            }
+            updated += 1;
+          } else {
+            const keys = Object.keys(insertData);
+            const columns = keys.join(', ');
+            const placeholders = keys.map((_, idx) => `$${idx + 1}`).join(', ');
+            await client.query(
+              `INSERT INTO participants (${columns}) VALUES (${placeholders})`,
+              keys.map(key => insertData[key])
+            );
+            created += 1;
+          }
         }
+
         await client.query('COMMIT');
-        res.json({ success: true, count: participantsToInsert.length });
+        res.json({ success: true, count: created + updated, created, updated, skipped });
       } catch (err) {
         await client.query('ROLLBACK');
         throw err;
@@ -2416,7 +2639,6 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.status(500).json({ error: `Failed to import participants: ${e.message}` });
     }
   });
-
   app.get("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
     const user = (req as any).user;

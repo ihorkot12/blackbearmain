@@ -2996,7 +2996,10 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`Імпортовано ${data.count} учасників`);
+        const created = data.created ?? data.count ?? 0;
+        const updated = data.updated ?? 0;
+        const skipped = data.skipped ?? 0;
+        toast.success(`Синхронізовано: нових ${created}, оновлено ${updated}, пропущено ${skipped}`);
         setShowImportModal(false);
         setImportFile(null);
         setImportUrl('');
@@ -3410,11 +3413,13 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   <AlertCircle size={12} />
                   Вимоги
                 </p>
-                <p className="text-[10px] lg:text-[11px] text-zinc-400 leading-relaxed font-medium">
-                  Колонки: <span className="text-white font-bold">Ім'я</span>, 
-                  <span className="text-white font-bold"> Вік</span>, 
-                  <span className="text-white font-bold"> Логін</span>, 
-                  <span className="text-white font-bold"> Пароль</span>.
+                <p className="text-[10px] lg:text-[11px] text-zinc-400 leading-relaxed font-medium space-y-2">
+                  <span className="block">
+                    Основна колонка: <span className="text-white font-bold">ПІБ / Ім'я</span>. Додатково можна додати: вік, дату народження, телефон, батьків, групу, логін, пароль, пояс, оплату, статус, Telegram ID, бали та досягнення.
+                  </span>
+                  <span className="block">
+                    Повторний імпорт оновлює існуючих учнів за ім'ям + логіном, телефоном або датою народження.
+                  </span>
                 </p>
               </div>
 
