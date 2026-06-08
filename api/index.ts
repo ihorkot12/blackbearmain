@@ -371,6 +371,15 @@ async function initDb() {
 
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'subscription';
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'cash';
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS notes TEXT;
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+      ALTER TABLE competitions ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'competition';
+      ALTER TABLE competitions ADD COLUMN IF NOT EXISTS result TEXT;
+      ALTER TABLE competitions ADD COLUMN IF NOT EXISTS date DATE;
+
       ALTER TABLE schedule ADD COLUMN IF NOT EXISTS price TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS belt TEXT DEFAULT 'Білий';
       ALTER TABLE admin_users ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
