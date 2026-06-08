@@ -1159,7 +1159,6 @@ async function startServer() {
     }
 
     const normalizedDate = normalizeDate(date);
-    const coachName = (req as any).user?.name || 'Тренер';
     const coachId = (req as any).user?.id || null;
     const userRole = (req as any).user?.role || 'coach';
 
@@ -1209,23 +1208,11 @@ async function startServer() {
           await pool.query("UPDATE participants SET streak = 0 WHERE id = $1", [pId]);
         }
 
-        // Individual parent notification (still needed per child)
-        if (status === 'present') {
-          notifyParent(pId, 'attendance', `Дитина на тренуванні! Відмічено присутність (${normalizedDate}).`, coachName, true);
-        } else if (status === 'absent' || status === 'late') {
-          const statusText = status === 'absent' ? 'відсутній(я)' : 'запізнився(лася)';
-          notifyParent(pId, 'attendance', `Ваша дитина ${statusText} на занятті сьогодні (${normalizedDate}).`, coachName, true);
-        }
-        
         results.push(pId);
       }
 
       await pool.query("COMMIT");
 
-      // Send ONE aggregated message to Admin Channel
-      const adminText = `📢 <b>МАСОВА ВІДМІТКА</b>\n\n📝 Тип: attendance\n📉 Статус: <b>${status}</b>\n📅 Дата: ${normalizedDate}\n👥 Кількість учнів: ${participants.length}\n👤 Тренер: ${coachName}`;
-      await sendTelegramMessage(adminText);
-      
       logAuditAction(coachId, userRole, `Масова відмітка: ${status} (${participants.length} учнів)`, 'attendance', null, { date: normalizedDate, count: participants.length });
 
       res.json({ success: true, count: results.length });
@@ -1336,8 +1323,7 @@ async function startServer() {
         report += `<i>Всі відвідували заняття!</i>\n`;
       }
 
-      await sendTelegramMessage(report);
-      console.log('Weekly attendance report sent.');
+      console.log('Weekly attendance report prepared; Telegram delivery disabled to keep the bot quiet.');
     } catch (err) {
       console.error('Failed to send weekly report:', err);
     }
@@ -1366,8 +1352,7 @@ async function startServer() {
 
       message += `\nБудь ласка, здійсніть оплату вчасно. Дякуємо!`;
 
-      await sendTelegramMessage(message);
-      console.log('Monthly payment reminder sent.');
+      console.log('Monthly payment reminder prepared; Telegram delivery disabled to keep the bot quiet.');
     } catch (err) {
       console.error('Failed to send payment reminder:', err);
     }
@@ -1396,8 +1381,7 @@ async function startServer() {
         message += `🎉 Вітаємо <b>${p.name}</b> з групи "${p.group_name || 'Без групи'}"! 🥳\n`;
       });
 
-      await sendTelegramMessage(message);
-      console.log('Birthday notifications sent.');
+      console.log('Birthday notifications prepared; Telegram delivery disabled to keep the bot quiet.');
     } catch (err) {
       console.error('Failed to send birthday notifications:', err);
     }
@@ -2614,13 +2598,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         [belt, rank_points, req.params.id]
       );
 
-      // Notify parents about rank/belt update
-      const coachName = (req as any).user?.name || 'Тренер';
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
-      notifyParent(parseInt(req.params.id), 'rank', `Оновлено статус: Пояс - ${belt}, Бали - ${rank_points}.`, coachName);
-      
       logAuditAction(coachId, userRole, `Зміна рангу: ${belt}, Бали: ${rank_points}`, 'participant', parseInt(req.params.id));
 
       res.json({ success: true });
@@ -2675,12 +2655,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
       
-      const coachName = (req as any).user?.name || 'Тренер';
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
-      notifyParent(participant_id, 'achievement', `Нове досягнення: ${type}! +10 балів до рейтингу.`, coachName);
-      
       logAuditAction(coachId, userRole, `Присвоєно досягнення: ${type}`, 'badge', participant_id);
 
       console.log(`Badge added for participant ${participant_id}: 10 points awarded`);
@@ -2782,12 +2759,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
       
-      const coachName = (req as any).user?.name || 'Тренер';
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
-      notifyParent(participant_id, 'event', `Участь у заході: ${name}. Результат: ${result}. +${points} балів.`, coachName);
-      
       logAuditAction(coachId, userRole, `Участь у заході/змаганнях: ${name} (${result})`, 'competition', participant_id, { points });
 
       console.log(`Competition added for participant ${participant_id}: ${points} points awarded`);
@@ -3274,12 +3248,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participant_id]);
       }
 
-      // Notify parents
-      const coachName = (req as any).user?.name || 'Адмін';
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'admin';
-
-      notifyParent(participant_id, 'payment', `Отримано оплату: ${amount} ₴ за ${month}/${year}. Дякуємо!`, coachName);
 
       logAuditAction(coachId, userRole, `Проведено оплату: ${amount} ₴ (${type})`, 'payment', participant_id, { month, year, method });
 
@@ -3709,16 +3679,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       runWorkflows().catch(console.error);
 
       // Notify parents asynchronously
-      const coachName = (req as any).user?.name || 'Тренер';
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
-
-      if (status === 'present') {
-        notifyParent(participant_id, 'attendance', `Дитина на тренуванні! Відмічено присутність (${date}).`, coachName);
-      } else if (status === 'absent' || status === 'late') {
-        const statusText = status === 'absent' ? 'відсутній(я)' : 'запізнився(лася)';
-        notifyParent(participant_id, 'attendance', `Ваша дитина ${statusText} на занятті сьогодні (${date}).`, coachName);
-      }
 
       logAuditAction(coachId, userRole, `Відмічено відвідування: ${status}`, 'attendance', participant_id, { date });
 
