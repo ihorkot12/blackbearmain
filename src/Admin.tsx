@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   User,
@@ -28,6 +28,36 @@ const shiftDateInputValue = (value: string, days: number) => {
   const date = new Date(year, month - 1, day);
   date.setDate(date.getDate() + days);
   return toDateInputValue(date);
+};
+
+const ChartFrame = ({ className, children }: { className: string; children: React.ReactNode }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+
+    const update = () => {
+      const rect = element.getBoundingClientRect();
+      setIsReady(rect.width > 0 && rect.height > 0);
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className={`${className} min-w-0 min-h-0`}>
+      {isReady && (
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+          {children}
+        </ResponsiveContainer>
+      )}
+    </div>
+  );
 };
 
 // --- Custom Confirmation Modal ---
@@ -346,31 +376,29 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             </div>
             <ArrowUpRight size={18} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
-          <div className="h-60 lg:h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={chartData?.leadsOverTime || []}>
-                <defs>
-                  <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis 
-                  dataKey="date" 
-                  stroke="#ffffff20" 
-                  fontSize={10} 
-                  tickFormatter={(val) => val ? new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) : ''}
-                />
-                <YAxis stroke="#ffffff20" fontSize={10} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
-                  itemStyle={{ color: '#fff', fontWeight: 'bold' }}
-                />
-                <Area type="monotone" dataKey="count" stroke="#dc2626" strokeWidth={4} fillOpacity={1} fill="url(#colorLeads)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-60 lg:h-80 w-full">
+            <AreaChart data={chartData?.leadsOverTime || []}>
+              <defs>
+                <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#dc2626" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#dc2626" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+              <XAxis 
+                dataKey="date" 
+                stroke="#ffffff20" 
+                fontSize={10} 
+                tickFormatter={(val) => val ? new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) : ''}
+              />
+              <YAxis stroke="#ffffff20" fontSize={10} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
+                itemStyle={{ color: '#fff', fontWeight: 'bold' }}
+              />
+              <Area type="monotone" dataKey="count" stroke="#dc2626" strokeWidth={4} fillOpacity={1} fill="url(#colorLeads)" />
+            </AreaChart>
+          </ChartFrame>
         </div>
 
         <div 
@@ -384,29 +412,27 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             </div>
             <ArrowUpRight size={18} className="text-zinc-700 group-hover:text-red-600 transition-colors" />
           </h3>
-          <div className="h-60 lg:h-80 w-full">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <PieChart>
-                <Pie
-                  data={chartData?.groupDistribution || []}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={8}
-                  dataKey="count"
-                  nameKey="group_name"
-                >
-                  {(chartData?.groupDistribution || []).map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fee2e2'][index % 5]} stroke="none" />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-60 lg:h-80 w-full">
+            <PieChart>
+              <Pie
+                data={chartData?.groupDistribution || []}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={100}
+                paddingAngle={8}
+                dataKey="count"
+                nameKey="group_name"
+              >
+                {(chartData?.groupDistribution || []).map((entry: any, index: number) => (
+                  <Cell key={`cell-${index}`} fill={['#dc2626', '#ef4444', '#f87171', '#fca5a5', '#fee2e2'][index % 5]} stroke="none" />
+                ))}
+              </Pie>
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#18181b', border: '1px solid #ffffff10', borderRadius: '16px', fontSize: '12px' }}
+              />
+            </PieChart>
+          </ChartFrame>
         </div>
       </div>
 
@@ -5723,32 +5749,30 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
           <h3 className="text-xl font-black uppercase tracking-tight mb-8">Динаміка доходів ({year})</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                <XAxis dataKey="name" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v/1000}k`} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
-                  itemStyle={{ color: '#fff' }}
-                />
-                <Area type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+          <ChartFrame className="h-80">
+            <AreaChart data={monthlyData}>
+              <defs>
+                <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
+              <XAxis dataKey="name" stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} />
+              <YAxis stroke="#52525b" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(v) => `${v/1000}k`} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
+                itemStyle={{ color: '#fff' }}
+              />
+              <Area type="monotone" dataKey="total" stroke="#ef4444" strokeWidth={4} fillOpacity={1} fill="url(#colorTotal)" />
+            </AreaChart>
+          </ChartFrame>
         </div>
 
         <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
           <h3 className="text-xl font-black uppercase tracking-tight mb-8">Розподіл за типом</h3>
           <div className="h-80 flex items-center">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+            <ChartFrame className="h-full flex-1">
               <PieChart>
                 <Pie
                   data={typeData}
@@ -5767,7 +5791,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
                   contentStyle={{ backgroundColor: '#18181b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem' }}
                 />
               </PieChart>
-            </ResponsiveContainer>
+            </ChartFrame>
             <div className="w-48 space-y-4">
               {typeData.map((t: any) => (
                 <div key={t.name} className="flex items-center gap-3">
