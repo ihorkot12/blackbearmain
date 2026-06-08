@@ -52,7 +52,7 @@ const ChartFrame = ({ className, children }: { className: string; children: Reac
   return (
     <div ref={ref} className={`${className} min-w-0 min-h-0`}>
       {isReady && (
-        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1} initialDimension={{ width: 1, height: 1 }}>
           {children}
         </ResponsiveContainer>
       )}
