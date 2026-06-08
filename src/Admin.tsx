@@ -18,6 +18,18 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 import { SMMModule } from './components/SMMModule';
 
+const toDateInputValue = (date = new Date()) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().split('T')[0];
+};
+
+const shiftDateInputValue = (value: string, days: number) => {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return toDateInputValue(date);
+};
+
 // --- Custom Confirmation Modal ---
 const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, loading }: any) => (
   <AnimatePresence>
@@ -1204,11 +1216,11 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   const [showCompModal, setShowCompModal] = useState<any>(null);
   const [showDetails, setShowDetails] = useState<any>(null);
   const [badgeType, setBadgeType] = useState('');
-  const [badgeDate, setBadgeDate] = useState(new Date().toISOString().split('T')[0]);
+  const [badgeDate, setBadgeDate] = useState(toDateInputValue());
   const [compName, setCompName] = useState('');
   const [compResult, setCompResult] = useState('participation');
   const [compType, setCompType] = useState('competition');
-  const [compDate, setCompDate] = useState(new Date().toISOString().split('T')[0]);
+  const [compDate, setCompDate] = useState(toDateInputValue());
   const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
   const [search, setSearch] = useState('');
   const [isAddingPayment, setIsAddingPayment] = useState(false);
@@ -1237,7 +1249,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         },
         body: JSON.stringify({
           ...newPayment,
-          date: new Date().toISOString().split('T')[0]
+          date: toDateInputValue()
         })
       });
       if (res.ok) {
@@ -1374,7 +1386,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         toast.success('Досягнення додано (+10 балів)');
         setShowBadgeModal(null);
         setBadgeType('');
-        setBadgeDate(new Date().toISOString().split('T')[0]);
+        setBadgeDate(toDateInputValue());
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
       } else {
@@ -1414,7 +1426,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         setCompName('');
         setCompResult('participation');
         setCompType('competition');
-        setCompDate(new Date().toISOString().split('T')[0]);
+        setCompDate(toDateInputValue());
         fetchParticipants(); // Refresh main list for points
         if (showDetails?.id === participantId) fetchDetails(participantId);
       } else {
@@ -3640,7 +3652,7 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
   const [participants, setParticipants] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<number, string>>({});
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(toDateInputValue());
   const [loading, setLoading] = useState(true);
   const [filterGroup, setFilterGroup] = useState<string>('all');
   const [lastAction, setLastAction] = useState<{id: number, status: string} | null>(null);
@@ -3753,15 +3765,11 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-2 bg-zinc-900 p-2 rounded-2xl border border-white/5">
             <button onClick={() => {
-              const d = new Date(date);
-              d.setDate(d.getDate() - 1);
-              setDate(d.toISOString().split('T')[0]);
+              setDate(shiftDateInputValue(date, -1));
             }} className="p-2 hover:bg-white/5 rounded-xl transition-colors"><ChevronLeft size={18} /></button>
             <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent text-white font-bold outline-none px-2 text-xs" />
             <button onClick={() => {
-              const d = new Date(date);
-              d.setDate(d.getDate() + 1);
-              setDate(d.toISOString().split('T')[0]);
+              setDate(shiftDateInputValue(date, 1));
             }} className="p-2 hover:bg-white/5 rounded-xl transition-colors"><ChevronRight size={18} /></button>
           </div>
 
@@ -5550,7 +5558,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
         },
         body: JSON.stringify({
           ...newPayment,
-          date: new Date().toISOString().split('T')[0] // Ensure date is sent
+          date: toDateInputValue()
         })
       });
       if (res.ok) {
