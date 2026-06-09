@@ -71,7 +71,7 @@ export const Navbar = () => {
           ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black mt-0' 
           : `bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10 ${isMainPage ? 'md:mt-6 mt-0' : 'mt-0'}`
       }`}>
-        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between gap-3 overflow-hidden">
           <Link 
             to="/" 
             className="flex items-center shrink-0 cursor-pointer" 
@@ -79,7 +79,7 @@ export const Navbar = () => {
               if (isMainPage) window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           >
-            <div className="md:scale-100 scale-75 origin-left">
+            <div className="md:scale-100 sm:scale-75 scale-[0.58] origin-left">
               <BrandLogo size="sm" align="start" />
             </div>
           </Link>
@@ -150,9 +150,9 @@ export const Navbar = () => {
             </Button>
           </div>
 
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2 lg:hidden shrink-0">
             <button 
-              className="bg-red-600 text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl shadow-[0_4px_12px_rgba(220,38,38,0.4)] active:scale-95 transition-transform"
+              className="bg-red-600 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-widest px-3 sm:px-4 py-2.5 rounded-xl shadow-[0_4px_12px_rgba(220,38,38,0.4)] active:scale-95 transition-transform"
               onClick={() => {
                 const contactSection = document.getElementById('contact');
                 if (contactSection) {
@@ -162,7 +162,8 @@ export const Navbar = () => {
                 }
               }}
             >
-              ЗАПИСАТИСЬ
+              <span className="hidden min-[430px]:inline">ЗАПИСАТИСЬ</span>
+              <span className="min-[430px]:hidden">ЗАПИС</span>
             </button>
             <button 
               className="text-white p-2.5 bg-white/5 rounded-xl border border-white/10 active:bg-white/10 transition-colors" 
