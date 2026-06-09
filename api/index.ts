@@ -3407,7 +3407,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         SELECT pay.*, p.name as participant_name, g.name as group_name
         FROM payments pay
         JOIN participants p ON pay.participant_id = p.id
-        JOIN groups g ON p.group_id = g.id
+        LEFT JOIN groups g ON p.group_id = g.id
       `;
       let params: any[] = [];
       let conditions: string[] = [];
@@ -3444,29 +3444,30 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.post("/api/payments", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { participant_id, amount, date, month, year, type, method, notes } = req.body;
+      const { participant_id, amount, date, month, year, type, method, notes } = req.body;
     
     if (!participant_id || !amount) {
       return res.status(400).json({ error: "Participant ID and amount are required" });
     }
 
     const normalizedDate = normalizeDate(date);
-    const numAmount = parseFloat(amount.toString().replace(',', '.').replace(/\s/g, ''));
-    if (isNaN(numAmount)) {
-      return res.status(400).json({ error: "Invalid amount format" });
-    }
-    const numMonth = parseInt(month?.toString() || (new Date().getMonth() + 1).toString());
-    const numYear = parseInt(year?.toString() || new Date().getFullYear().toString());
+      const numAmount = parseFloat(amount.toString().replace(',', '.').replace(/\s/g, ''));
+      if (isNaN(numAmount)) {
+        return res.status(400).json({ error: "Invalid amount format" });
+      }
+      const numMonth = parseInt(month?.toString() || (new Date().getMonth() + 1).toString());
+      const numYear = parseInt(year?.toString() || new Date().getFullYear().toString());
+      const paymentType = type || 'subscription';
 
     try {
       const result = await pool.query(
         "INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
-        [participant_id, numAmount, normalizedDate, numMonth, numYear, type || 'subscription', method || 'cash', notes]
+        [participant_id, numAmount, normalizedDate, numMonth, numYear, paymentType, method || 'cash', notes]
       );
       
       // Update participant payment status if it's a subscription for current month
       const now = new Date();
-      if (type === 'subscription' && parseInt(month) === (now.getMonth() + 1) && parseInt(year) === now.getFullYear()) {
+      if (paymentType === 'subscription' && numMonth === (now.getMonth() + 1) && numYear === now.getFullYear()) {
         await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participant_id]);
       }
 
@@ -3500,7 +3501,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         SELECT n.*, p.name as participant_name
         FROM notifications n
         JOIN participants p ON n.participant_id = p.id
-        JOIN groups g ON p.group_id = g.id
+        LEFT JOIN groups g ON p.group_id = g.id
       `;
       let params: any[] = [];
       if (user.role === 'coach' && user.coach_id) {
