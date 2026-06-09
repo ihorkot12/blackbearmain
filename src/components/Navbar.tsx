@@ -79,7 +79,7 @@ export const Navbar = () => {
               if (isMainPage) window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
           >
-            <div className="md:scale-100 sm:scale-75 scale-[0.58] origin-left">
+            <div className="md:scale-100 sm:scale-75 scale-[0.48] origin-left">
               <BrandLogo size="sm" align="start" />
             </div>
           </Link>
@@ -162,8 +162,7 @@ export const Navbar = () => {
                 }
               }}
             >
-              <span className="hidden min-[430px]:inline">ЗАПИСАТИСЬ</span>
-              <span className="min-[430px]:hidden">ЗАПИС</span>
+              ЗАПИС
             </button>
             <button 
               className="text-white p-2.5 bg-white/5 rounded-xl border border-white/10 active:bg-white/10 transition-colors" 
