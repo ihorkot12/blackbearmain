@@ -1019,7 +1019,7 @@ export const AdminPage = () => {
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
         overflow-y-auto custom-scrollbar
       `}>
-        <div className="h-full flex flex-col p-6 lg:p-8">
+        <div className="h-full min-h-0 flex flex-col p-6 lg:p-8">
           <div className="flex items-center justify-between mb-10 lg:mb-12">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_10px_30px_rgba(220,38,38,0.3)]">
@@ -1038,7 +1038,7 @@ export const AdminPage = () => {
             </button>
           </div>
 
-          <nav className="flex-1 space-y-8 overflow-y-auto custom-scrollbar pr-2">
+          <nav className="flex-1 min-h-0 space-y-8 overflow-y-auto custom-scrollbar pr-2">
             {visibleGroups.map((group, gIdx) => (
               <div key={gIdx} className="space-y-3">
                 <h3 className="px-5 text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600">{group.title}</h3>
@@ -1067,7 +1067,7 @@ export const AdminPage = () => {
             ))}
           </nav>
 
-          <div className="pt-8 border-t border-white/5 mt-auto">
+          <div className="pt-8 border-t border-white/5 mt-auto shrink-0">
             <button 
               id="logout-button"
               onClick={() => {
