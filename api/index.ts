@@ -3813,7 +3813,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         SELECT a.* 
         FROM attendance a
         JOIN participants p ON a.participant_id = p.id
-        JOIN groups g ON p.group_id = g.id
+        LEFT JOIN groups g ON p.group_id = g.id
         WHERE a.date = $1
       `;
       let params: any[] = [req.params.date];
