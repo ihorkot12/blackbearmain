@@ -419,11 +419,12 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-6 text-center">
+        <div className="relative z-10 w-full min-w-0 max-w-7xl mx-auto px-4 md:px-6 text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
+            className="min-w-0"
           >
             <BrandLogo size="lg" />
             
@@ -431,31 +432,31 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600/10 border border-red-600/20 mb-8"
+              className="inline-flex max-w-full items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-full bg-red-600/10 border border-red-600/20 mb-6 md:mb-8"
             >
               <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-500">
+              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.08em] sm:tracking-[0.2em] text-red-500 leading-relaxed">
                 Перше тренування — БЕЗКОШТОВНО • Залишилось 3 місця
               </span>
             </motion.div>
 
-            <h1 className="text-xl md:text-2xl font-bold mb-4 tracking-tight uppercase text-red-600">
+            <h1 className="text-lg md:text-2xl font-bold mb-4 tracking-tight uppercase text-red-600 leading-tight">
               Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Сирець • Відрадний • Дитяче карате Київ</span>
             </h1>
 
-    <div className="text-3xl sm:text-5xl md:text-7xl font-black mb-6 tracking-tighter leading-[1.1] md:leading-none uppercase">
+    <div className="text-[2rem] sm:text-5xl md:text-7xl font-black mb-6 tracking-tight sm:tracking-tighter leading-[1.05] md:leading-none uppercase">
       <div dangerouslySetInnerHTML={{ __html: content?.hero_title || "<span class='bg-gradient-to-r from-white via-white to-zinc-500 bg-clip-text text-transparent'>Формуємо дисципліну,</span><br /><span class='text-red-600 tracking-tight'>силу та впевненість.</span>" }} />
     </div>
             
-            <p className="text-zinc-300 text-lg md:text-xl max-w-3xl mx-auto mb-10 leading-relaxed font-medium">
+            <p className="text-zinc-300 text-base md:text-xl max-w-3xl mx-auto mb-8 md:mb-10 leading-relaxed font-medium">
               {content?.hero_subtitle || "Професійна секція карате Київ під керівництвом 3 дану. 5+ років досвіду. Дитяче карате Київ для майбутніх чемпіонів України та Європи."}
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-5 mb-12">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-5 mb-10 md:mb-12">
               <Button 
                 id="cta-button-hero"
                 variant="primary" 
-                className="w-full sm:w-auto h-[64px] px-12 text-lg" 
+                className="w-full sm:w-auto h-[58px] sm:h-[64px] px-6 sm:px-12 text-sm sm:text-lg" 
                 onClick={() => {
                   if (window.fbq) window.fbq('track', 'Lead');
                   document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
@@ -471,7 +472,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               </a>
             </div>
             
-            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-[11px] font-black uppercase tracking-[0.3em] text-zinc-500">
+            <div className="flex flex-wrap items-center justify-center gap-x-6 md:gap-x-12 gap-y-3 md:gap-y-4 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] md:tracking-[0.3em] text-zinc-500">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-red-600" />
                 <span>+50 учнів пройшли школу</span>
@@ -1358,13 +1359,13 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         </footer>
       
       {/* Floating CTA for Mobile */}
-      <div className="fixed bottom-6 left-6 right-6 z-50 md:hidden">
+      <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
         <motion.button
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-          className="w-full h-[64px] bg-red-600 text-white font-black uppercase tracking-[0.2em] text-sm rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
+          className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
           Записатись на пробне

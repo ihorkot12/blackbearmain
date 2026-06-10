@@ -4,12 +4,12 @@ export const BrandLogo = ({ size = 'md', showKanji = false, align = 'center' }: 
   const sizes = {
     sm: { text: 'text-[28px]', b: 'w-6 h-6 text-xs', spacing: 'gap-3', kanji: 'text-[7px]', line: 'h-[2px]' },
     md: { text: 'text-[36px]', b: 'w-8 h-8 text-sm', spacing: 'gap-4', kanji: 'text-[9px]', line: 'h-[2px]' },
-    lg: { text: 'text-[42px] md:text-[56px]', b: 'w-10 h-10 md:w-14 md:h-14 text-lg md:text-2xl', spacing: 'gap-5 md:gap-6', kanji: 'text-[10px] md:text-sm', line: 'h-[2px]' },
+    lg: { text: 'text-[26px] sm:text-[42px] md:text-[56px]', b: 'w-6 h-6 sm:w-10 sm:h-10 md:w-14 md:h-14 text-xs sm:text-lg md:text-2xl', spacing: 'gap-2 sm:gap-5 md:gap-6', kanji: 'text-[10px] md:text-sm', line: 'h-[2px]' },
   };
   const s = sizes[size];
 
   return (
-    <div className={`flex flex-col ${align === 'center' ? 'items-center' : 'items-start'} ${size === 'lg' ? 'mb-10' : ''}`}>
+    <div className={`flex flex-col max-w-full ${align === 'center' ? 'items-center' : 'items-start'} ${size === 'lg' ? 'mb-6 md:mb-10' : ''}`}>
       <div className={`flex items-center ${s.spacing} font-sans uppercase group cursor-pointer`}>
         {/* Skewed B Icon */}
         <div 
