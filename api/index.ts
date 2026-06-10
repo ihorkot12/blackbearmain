@@ -2402,7 +2402,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         if (isBlank(value)) return undefined;
 
         if (typeof value === 'number') {
-          const parsed = xlsx.SSF.parse_date_code(value);
+          const xlsxModule = xlsx as any;
+          const parseExcelDate = xlsxModule.SSF?.parse_date_code || xlsxModule.default?.SSF?.parse_date_code;
+          const parsed = parseExcelDate?.(value);
           if (parsed) {
             return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
           }
