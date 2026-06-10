@@ -142,7 +142,7 @@ export const PersonalLanding = () => {
               Персональний наставник: Залишилось 1 вільне місце на вечір
             </div>
             <h1 
-              className="text-5xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.9] md:leading-[0.85] tracking-tighter mb-10"
+              className="text-4xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.95] md:leading-[0.85] tracking-tight sm:tracking-tighter mb-10"
               dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Індивідуальне <br /> <span className="text-red-600 text-glow">карате</span> <br /> у Києві' }}
             />
             <p 
@@ -311,13 +311,13 @@ export const PersonalLanding = () => {
         </div>
       </footer>
       {/* Floating CTA for Mobile */}
-      <div className="fixed bottom-6 left-6 right-6 z-50 md:hidden">
+      <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
         <motion.button
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-          className="w-full h-[64px] bg-red-600 text-white font-black uppercase tracking-[0.2em] text-sm rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
+          className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
           Забронювати час

@@ -392,13 +392,13 @@ export const JuniorLanding = () => {
         </div>
       </footer>
       {/* Floating CTA for Mobile */}
-      <div className="fixed bottom-6 left-6 right-6 z-50 md:hidden">
+      <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
         <motion.button
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
           onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
-          className="w-full h-[64px] bg-red-600 text-white font-black uppercase tracking-[0.2em] text-sm rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
+          className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
           Записатись на пробне
