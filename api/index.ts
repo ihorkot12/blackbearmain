@@ -2337,7 +2337,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       if (req.file) {
-        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const isCsvFile = req.file.mimetype.includes('csv') || /\.csv$/i.test(req.file.originalname || '');
+        const workbook = isCsvFile
+          ? xlsx.read(req.file.buffer.toString('utf8'), { type: 'string' })
+          : xlsx.read(req.file.buffer, { type: 'buffer' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
@@ -2353,8 +2356,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         
         const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error('Failed to fetch Google Sheet');
-        const buffer = await response.arrayBuffer();
-        const workbook = xlsx.read(new Uint8Array(buffer), { type: 'array' });
+        const contentType = response.headers.get('content-type') || '';
+        const isCsvResponse = contentType.includes('csv') || fetchUrl.includes('format=csv');
+        const workbook = isCsvResponse
+          ? xlsx.read(await response.text(), { type: 'string' })
+          : xlsx.read(new Uint8Array(await response.arrayBuffer()), { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
