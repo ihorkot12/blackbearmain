@@ -809,8 +809,8 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               { age: '4–7 років', title: content?.dir1_title || 'Перші кроки', desc: content?.dir1_text || 'Розвиток координації, ігрова форма, база дисципліни.', result: 'Координація', link: '/kids-4-7', badge: 'Популярно' },
               { age: '7–12 років', title: content?.dir2_title || 'Формування', desc: content?.dir2_text || 'Техніка, фізична підготовка, перші змагання.', result: 'База сили', link: '/juniors-7-12', badge: 'Набір' },
               { age: 'Підлітки', title: content?.dir3_title || 'Впевненість', desc: content?.dir3_text || 'Професійні турніри, самооборона та лідерство.', result: 'Лідерство', link: '/teens-12-plus' },
-              { age: 'Карате для дівчат', title: content?.dir4_title || 'Естетика та Сила', desc: content?.dir4_text || 'Гнучкість, самооборона та зняття стресу без травм.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
-              { age: 'Персональні', title: content?.dir5_title || 'Шлях майстра', desc: content?.dir5_text || 'Максимальний результат, індивідуальний графік та 100% уваги.', result: 'Результат x3', link: '/personal-training', badge: 'VIP' },
+              { age: 'Карате для дівчат', title: content?.dir4_title || 'Кардіо та Техніка', desc: content?.dir4_text || 'Активні тренування, робота руками й ногами, пари та впевненість у русі.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
+              { age: 'Персональні', title: content?.dir5_title || 'Індивідуальний формат', desc: content?.dir5_text || 'Розбір техніки, зручний темп, підготовка до цілі та більше уваги тренера.', result: 'Техніка', link: '/personal-training', badge: '1:1' },
             ].map((item, idx) => {
               const CardContent = (
                 <motion.div 

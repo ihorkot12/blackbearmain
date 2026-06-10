@@ -80,39 +80,39 @@ export const PersonalLanding = () => {
 
   const advantages = [
     {
-      title: "100% уваги тренера",
-      desc: "Кожна секунда тренування присвячена тільки вам. Корекція техніки в реальному часі для максимального результату.",
+      title: "Увага до техніки",
+      desc: "Тренер бачить помилки одразу, пояснює простіше і допомагає відпрацювати рух у вашому темпі.",
       icon: <Target size={24} />
     },
     {
-      title: "Гнучкий графік",
-      desc: "Тренуйтеся тоді, коли зручно вам. Ми підлаштовуємося під ваш ритм життя, а не навпаки.",
+      title: "Зручний темп",
+      desc: "Навантаження підбирається під вік, рівень підготовки та ціль: форма, самооборона, пояс або впевненість.",
       icon: <Clock size={24} />
     },
     {
-      title: "Індивідуальна програма",
-      desc: "План занять розробляється під ваші цілі: від самооборони до підготовки до чорного поясу або змагань.",
+      title: "Чітка ціль",
+      desc: "Перед стартом визначаємо, над чим працюємо: база карате, координація, удари руками й ногами, витривалість або іспит.",
       icon: <Brain size={24} />
     },
     {
-      title: "Швидкий прогрес",
-      desc: "Персональні заняття дозволяють засвоїти матеріал у 3-4 рази швидше, ніж у групі.",
+      title: "Зрозумілий прогрес",
+      desc: "Після занять зрозуміло, що вже виходить, що потрібно підтягнути і який наступний крок у тренуваннях.",
       icon: <TrendingUp size={24} />
     }
   ];
 
   const privileges = [
-    { title: "VIP-сервіс", desc: "Окремий розклад та пріоритет у виборі часу тренувань." },
-    { title: "Аналіз харчування", desc: "Рекомендації щодо дієти для підтримки спортивної форми." },
-    { title: "Підготовка до іспитів", desc: "Поглиблене вивчення ката та техніки для успішної здачі на пояси." },
-    { title: "Спецкурс самооборони", desc: "Прикладні навички для реальних життєвих ситуацій." }
+    { title: "Старт з розбору цілі", desc: "Узгоджуємо вік, досвід, стан підготовки та бажаний результат без зайвих обіцянок." },
+    { title: "Робота над помилками", desc: "Більше повторень, детальніші пояснення і корекція техніки під час заняття." },
+    { title: "Підготовка до іспитів", desc: "Відпрацювання ката, кіхону та базових вимог для складання на пояс." },
+    { title: "Практична самооборона", desc: "Дистанція, реакція, стійка, прості зв'язки руками й ногами для впевненішої поведінки." }
   ];
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title={content?.personal_seo_title || "Персональні тренування з карате Київ | Індивідуальні заняття"}
-        description={content?.personal_seo_description || "Індивідуальні тренування з карате Кіокушинкай у Києві. Гнучкий графік, персональна програма та 100% уваги тренера. Найкращий тренер з карате Київ (Шулявка, Сирець). Швидкий результат!"}
+        description={content?.personal_seo_description || "Персональні тренування з карате у Києві для дітей, підлітків і дорослих. Індивідуальний темп, розбір техніки, підготовка до іспитів та базова самооборона. Локації: Шулявка та Сирець."}
         keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ, карате шулявка індивідуально"}
       />
       <Navbar />
@@ -139,25 +139,25 @@ export const PersonalLanding = () => {
           >
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
-              Персональний наставник: Залишилось 1 вільне місце на вечір
+              Персональний формат • Шулявка / Сирець
             </div>
             <h1 
               className="text-4xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.95] md:leading-[0.85] tracking-tight sm:tracking-tighter mb-10"
-              dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Індивідуальне <br /> <span className="text-red-600 text-glow">карате</span> <br /> у Києві' }}
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_title || 'Персональні <br /> <span className="text-red-600 text-glow">тренування</span> <br /> з карате' }}
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Персональні тренування з карате Кіокушинкай на Шулявці та Сирці — це найшвидший спосіб опанувати бойове мистецтво під наглядом майстра. <span className="text-white">Перша консультація — БЕЗКОШТОВНО.</span>' }}
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Індивідуальний формат для тих, кому потрібен точний розбір техніки, спокійний темп і більше уваги тренера. Після заявки узгодимо ціль, рівень підготовки, локацію та час.' }}
             />
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
                 onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
               >
-                Забронювати час
+                Підібрати час тренування
               </Button>
               <Button variant="secondary" onClick={() => document.getElementById('advantages')?.scrollIntoView({ behavior: 'smooth' })}>
-                Переваги
+                Як це працює
               </Button>
             </div>
           </motion.div>
@@ -171,7 +171,7 @@ export const PersonalLanding = () => {
           <div className="max-w-3xl mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Чому персонально?</h2>
             <h3 className="text-3xl sm:text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
-              Твій прогрес — <br /> <span className="text-zinc-700">наш пріоритет</span>
+              Менше хаосу. <br /> <span className="text-zinc-700">Більше техніки</span>
             </h3>
           </div>
           
@@ -211,9 +211,9 @@ export const PersonalLanding = () => {
             </div>
 
             <div>
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Ексклюзивність</h2>
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Формат заняття</h2>
               <h3 className="text-4xl md:text-7xl font-black uppercase tracking-tighter mb-10 leading-[0.9]">
-                Більше ніж <br /> просто <span className="text-red-600">урок</span>
+                Тренування <br /> під вашу <span className="text-red-600">ціль</span>
               </h3>
               
               <div className="space-y-8">
@@ -282,8 +282,8 @@ export const PersonalLanding = () => {
       {/* Contact Section */}
       <ContactForm 
         locations={locations}
-        title="Забронюй час"
-        subtitle="Ми зв'яжемося з вами для узгодження графіка та вибору персонального тренера."
+        title="Підібрати час персонального тренування"
+        subtitle="Залиште номер — уточнимо ціль, рівень підготовки, локацію та доступні часові слоти."
         ageGroups={[
           { value: "Дорослий", label: "Дорослий" },
           { value: "Підліток", label: "Підліток" },
@@ -320,7 +320,7 @@ export const PersonalLanding = () => {
           className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
-          Забронювати час
+          Підібрати час
         </motion.button>
       </div>
     </div>

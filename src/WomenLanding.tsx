@@ -86,32 +86,32 @@ export const WomenLanding = () => {
 
   const benefits = [
     {
-      title: "Естетика та Гнучкість",
-      desc: "На відміну від боксу, карате розвиває не тільки силу, а й неймовірну гнучкість, грацію та правильну поставу.",
+      title: "Активне кардіо",
+      desc: "Розминка, переміщення, серії ударів і вправи на витривалість дають живе тренування без нудної рутини.",
       icon: <Sparkles className="text-red-500" size={24} />
     },
     {
-      title: "Розумна Самооборона",
-      desc: "Ви вчитеся використовувати силу супротивника проти нього самого. Це ідеально для дівчат будь-якої комплекції.",
+      title: "Руки й ноги",
+      desc: "Карате поєднує удари руками, ногами, стійки, захист і комбінації, тому тіло працює різноманітно.",
       icon: <Shield className="text-red-500" size={24} />
     },
     {
-      title: "Антистрес та Енергія",
-      desc: "Виплеск емоцій через удари та глибока концентрація допомагають повністю перезавантажити мозок після роботи.",
+      title: "Робота в парах",
+      desc: "Вправи з партнером розвивають реакцію, дистанцію, сміливість і контроль без хаосу та зайвої агресії.",
       icon: <Zap className="text-red-500" size={24} />
     },
     {
-      title: "Функціональне Тіло",
-      desc: "Рівномірне навантаження на всі групи м'язів без зайвого 'перекачування'. Тільки рельєф та витривалість.",
+      title: "Впевненість у тілі",
+      desc: "Регулярні заняття покращують координацію, поставу, витривалість і відчуття контролю над рухом.",
       icon: <Dumbbell className="text-red-500" size={24} />
     }
   ];
 
   const comparison = [
-    { karate: "Гармонійний розвиток всього тіла" },
-    { karate: "Робота ногами" },
-    { karate: "Філософія та контроль емоцій" },
-    { karate: "Естетика рухів та розтяжка" }
+    { karate: "Динамічне кардіо: розминка, переміщення, серії ударів і робота на витривалість" },
+    { karate: "Техніка руками й ногами: стійки, захист, удари та зв'язки" },
+    { karate: "Цікава робота в парах: реакція, дистанція, контроль і взаємна повага" },
+    { karate: "Дисципліна без тиску: тренування проходять у зрозумілому темпі та під наглядом тренера" }
   ];
 
   const fears = [
@@ -120,8 +120,8 @@ export const WomenLanding = () => {
       a: "Ми практикуємо Кіокушинкай з акцентом на техніку та контроль. У наших групах панує атмосфера підтримки, а не агресії."
     },
     {
-      q: "Я боюсь отримати синці на обличчі",
-      a: "У карате Кіокушинкай удари руками в голову заборонені. Ваше обличчя залишається недоторканим, на відміну від боксу."
+      q: "Чи буде робота в парах безпечною?",
+      a: "Так. Тренер поступово вводить парні вправи, стежить за дистанцією, технікою та рівнем контакту."
     },
     {
       q: "У мене немає спортивної підготовки",
@@ -133,7 +133,7 @@ export const WomenLanding = () => {
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
         title={content?.women_seo_title || "Карате для дівчат Київ | Секція карате Шулявка"}
-        description={content?.women_seo_description || "Секція карате для дівчат у Києві. Естетика, самооборона, гнучкість та зняття стресу. Чому карате Київ краще за бокс? Запишіться на безкоштовне тренування (Шулявка, Сирець)!"}
+        description={content?.women_seo_description || "Карате для дівчат у Києві: активне кардіо, робота руками й ногами, цікаві вправи в парах, координація, дисципліна та базова самооборона. Локації: Шулявка та Сирець."}
         keywords={content?.women_seo_keywords || "карате для дівчат київ, самооборона для дівчат київ, фітнес карате київ, секція карате шулявка, карате сирець дівчата"}
       />
       
@@ -160,7 +160,7 @@ export const WomenLanding = () => {
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-600/20 border border-red-600/30 text-red-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-8">
               <Flame size={12} />
-              Естетика • Сила • Впевненість
+              Кардіо • Техніка • Впевненість
             </div>
             <h1 
               className="text-4xl sm:text-5xl md:text-8xl font-black uppercase tracking-tighter leading-[1] md:leading-[0.9] mb-8"
@@ -168,11 +168,11 @@ export const WomenLanding = () => {
             />
             <p 
               className="text-lg md:text-xl text-zinc-400 mb-10 leading-relaxed max-w-xl"
-              dangerouslySetInnerHTML={{ __html: content?.women_hero_subtitle || 'Шукаєте секцію карате для дівчат на Шулявці чи Сирці? Відкрийте для себе мистецтво, яке дарує ідеальне тіло, спокій та навички самооборони.' }}
+              dangerouslySetInnerHTML={{ __html: content?.women_hero_subtitle || 'Тренування для дівчат і жінок, які хочуть стати фізично сильнішими, впевненішими й навчитися базовій самообороні в дисциплінованому середовищі.' }}
             />
             <div className="flex flex-col sm:flex-row gap-4">
               <Button onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
-                Спробувати безкоштовно
+                Записатися на тренування
               </Button>
               <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
                 <div className="flex -space-x-2">
@@ -183,7 +183,7 @@ export const WomenLanding = () => {
                   ))}
                 </div>
                 <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-400">
-                  <span className="text-white">40+ дівчат</span> вже з нами
+                  <span className="text-white">Шулявка та Сирець</span> у Києві
                 </div>
               </div>
             </div>
@@ -191,15 +191,15 @@ export const WomenLanding = () => {
         </div>
       </section>
 
-      {/* Comparison Section */}
+      {/* Training Value Section */}
       <section className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6 leading-none">
-              Чому Карате <span className="text-red-600">краще за Бокс?</span>
+              Що дає <span className="text-red-600">карате?</span>
             </h2>
             <p className="text-zinc-500 max-w-2xl mx-auto">
-              Ми поважаємо всі види спорту, але для організму дівчат карате пропонує більш гармонійний підхід.
+              Це не просто фізкультура. На тренуванні є рух, техніка, робота в парах, дисципліна і відчутний розвиток тіла.
             </p>
           </div>
 
@@ -234,7 +234,7 @@ export const WomenLanding = () => {
               <div className="absolute -bottom-6 -right-6 p-8 bg-red-600 rounded-3xl shadow-2xl max-w-[240px]">
                 <Quote className="text-white/30 mb-4" size={32} />
                 <p className="text-white font-bold italic text-sm">
-                  "Я шукала спорт для душі та тіла. В карате я знайшла набагато більше."
+                  "Мені зайшло, що тренування не одноманітні: кардіо, техніка, пари і постійний рух."
                 </p>
                 <div className="mt-4 text-[10px] uppercase tracking-widest font-black text-white/70">— Єва, 17 років</div>
               </div>
@@ -273,9 +273,9 @@ export const WomenLanding = () => {
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4">
-              Ваші <span className="text-red-600">Страхи</span> — Наші Відповіді
+              Питання <span className="text-red-600">перед стартом</span>
             </h2>
-            <p className="text-zinc-500">Ми розуміємо ваші сумніви. Ось як ми робимо тренування комфортними.</p>
+            <p className="text-zinc-500">Коротко про те, що зазвичай хвилює перед першим заняттям.</p>
           </div>
 
           <div className="space-y-4 md:space-y-6">
@@ -335,8 +335,8 @@ export const WomenLanding = () => {
       {/* Final CTA */}
       <ContactForm 
         locations={locations}
-        title="Запишіться на перше безкоштовне тренування"
-        subtitle="Ми зателефонуємо вам, щоб підібрати зручний час та відповісти на всі запитання."
+        title="Записатися на тренування для дівчат"
+        subtitle="Залиште номер — уточнимо вік, рівень підготовки, локацію та найближчі доступні заняття."
         ageGroups={[
           { value: "Група для дівчат", label: "Група для дівчат" },
           { value: "Дівчата (підлітки)", label: "Дівчата (підлітки)" },
@@ -374,7 +374,7 @@ export const WomenLanding = () => {
           className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
-          Записатись зараз
+          Записатися
         </motion.button>
       </div>
     </div>

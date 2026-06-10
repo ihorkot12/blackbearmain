@@ -8,6 +8,7 @@ import { Button } from './Button';
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const location = useLocation();
   const isMainPage = location.pathname === '/';
 
@@ -19,10 +20,23 @@ export const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenDropdown(null);
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  useEffect(() => {
+    setOpenDropdown(null);
+  }, [location.pathname]);
+
   const navLinks = [
     { name: 'Про клуб', href: '#about' },
     { 
-      name: 'Програми', 
+      name: 'Тренування',
       href: '#directions',
       subItems: [
         { name: 'Діти 4-7 років', href: '/kids-4-7' },
@@ -88,25 +102,36 @@ export const Navbar = () => {
           <div className="hidden lg:flex items-center lg:gap-10 md:gap-6">
             {navLinks.map((link) => {
               if (link.subItems) {
+                const isDropdownOpen = openDropdown === link.name;
                 return (
-                  <div key={link.name} className="relative group/dropdown">
-                    <Link 
-                      to={getHref(link.href)}
-                      onClick={(e) => handleAnchorClick(e, link.href)}
+                  <div
+                    key={link.name}
+                    className="relative"
+                    onMouseEnter={() => setOpenDropdown(link.name)}
+                    onMouseLeave={() => setOpenDropdown((current) => current === link.name ? null : current)}
+                  >
+                    <button
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={isDropdownOpen}
+                      onClick={() => setOpenDropdown(isDropdownOpen ? null : link.name)}
                       className="relative text-[11px] font-bold uppercase tracking-[0.15em] transition-all duration-300 flex items-center gap-1 group text-[#EAEAEA] hover:text-red-500"
                     >
                       {link.name}
-                      <ChevronDown size={12} className="group-hover/dropdown:rotate-180 transition-transform duration-300" />
+                      <ChevronDown size={12} className={`transition-transform duration-300 ${isDropdownOpen ? 'rotate-180' : ''}`} />
                       <span className="absolute -bottom-1 left-0 h-[1px] bg-red-600 transition-all duration-300 w-0 group-hover:w-full" />
-                    </Link>
+                    </button>
                     
                     {/* Dropdown Menu */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 pt-4 opacity-0 invisible group-hover/dropdown:opacity-100 group-hover/dropdown:visible transition-all duration-300 z-50">
+                    <div
+                      className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-200 z-50 ${isDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible translate-y-2'}`}
+                    >
                       <div className="bg-zinc-900 border border-white/10 rounded-2xl p-2 min-w-[200px] shadow-2xl backdrop-blur-xl">
                         {link.subItems.map((sub) => (
                           <Link 
                             key={sub.name}
                             to={sub.href}
+                            onClick={() => setOpenDropdown(null)}
                             className="block px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-red-600/10 rounded-xl transition-all"
                           >
                             {sub.name}
