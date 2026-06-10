@@ -61,9 +61,41 @@ async function ensureLeadSchema() {
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS landing_page TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS page_url TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer TEXT;
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
 
   schemaReady = true;
+}
+
+async function getSetting(keys: string[]) {
+  if (!pool) return null;
+
+  await ensureLeadSchema();
+  const result = await pool.query(
+    'SELECT key, value FROM settings WHERE key = ANY($1)',
+    [keys]
+  );
+
+  for (const key of keys) {
+    const row = result.rows.find((item) => item.key === key);
+    const value = clean(row?.value);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+async function getConfiguredValue(envKeys: string[], settingKeys: string[]) {
+  for (const key of envKeys) {
+    const value = clean(process.env[key]);
+    if (value) return value;
+  }
+
+  return getSetting(settingKeys);
 }
 
 function hash(value: any) {
@@ -81,8 +113,14 @@ function clientIp(req: any) {
 }
 
 async function sendTelegramMessage(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = await getConfiguredValue(
+    ['TELEGRAM_BOT_TOKEN'],
+    ['telegram_bot_token', 'TELEGRAM_BOT_TOKEN']
+  );
+  const chatId = await getConfiguredValue(
+    ['TELEGRAM_CHAT_ID'],
+    ['telegram_chat_id', 'TELEGRAM_CHAT_ID']
+  );
   if (!token || !chatId) return false;
 
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -95,11 +133,15 @@ async function sendTelegramMessage(text: string) {
 }
 
 async function sendMetaLeadEvent(body: any, req: any) {
-  const pixelId = process.env.META_PIXEL_ID || '2370050340139768';
-  const accessToken =
-    process.env.META_CAPI_ACCESS_TOKEN ||
-    process.env.META_PIXEL_ACCESS_TOKEN ||
-    process.env.META_ACCESS_TOKEN;
+  const pixelId =
+    await getConfiguredValue(
+      ['META_PIXEL_ID'],
+      ['meta_pixel_id', 'META_PIXEL_ID']
+    ) || '2370050340139768';
+  const accessToken = await getConfiguredValue(
+    ['META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN'],
+    ['meta_capi_access_token', 'meta_pixel_access_token', 'meta_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN']
+  );
 
   if (!accessToken) return false;
 
@@ -138,8 +180,12 @@ async function sendMetaLeadEvent(body: any, req: any) {
   };
 
   const payload: any = { data: [event] };
-  if (process.env.META_TEST_EVENT_CODE) {
-    payload.test_event_code = process.env.META_TEST_EVENT_CODE;
+  const testEventCode = await getConfiguredValue(
+    ['META_TEST_EVENT_CODE'],
+    ['meta_test_event_code', 'META_TEST_EVENT_CODE']
+  );
+  if (testEventCode) {
+    payload.test_event_code = testEventCode;
   }
 
   const response = await fetch(
