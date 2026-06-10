@@ -2,6 +2,14 @@
   "version": 2,
   "rewrites": [
     {
+      "source": "/api/leads-public",
+      "destination": "/api/leads-public.ts"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
