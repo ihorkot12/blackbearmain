@@ -2,6 +2,54 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Send } from 'lucide-react';
 
+const TRACKING_QUERY_KEYS = [
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
+  'utm_content',
+  'utm_term',
+  'fbclid'
+] as const;
+
+const getCookieValue = (name: string) => {
+  if (typeof document === 'undefined') return '';
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : '';
+};
+
+const getTrackingData = () => {
+  if (typeof window === 'undefined') return {};
+
+  const params = new URLSearchParams(window.location.search);
+  const tracking: Record<string, string> = {};
+
+  TRACKING_QUERY_KEYS.forEach((key) => {
+    const value = params.get(key);
+    if (value) tracking[key] = value;
+  });
+
+  const firstLandingPage = sessionStorage.getItem('first_landing_page') || window.location.href;
+  sessionStorage.setItem('first_landing_page', firstLandingPage);
+
+  const fbp = getCookieValue('_fbp');
+  const existingFbc = getCookieValue('_fbc');
+  const fbclid = tracking.fbclid;
+
+  if (fbp) tracking.fbp = fbp;
+  if (existingFbc) {
+    tracking.fbc = existingFbc;
+  } else if (fbclid) {
+    tracking.fbc = `fb.1.${Math.floor(Date.now() / 1000)}.${fbclid}`;
+  }
+
+  tracking.landing_page = firstLandingPage;
+  tracking.page_url = window.location.href;
+  if (document.referrer) tracking.referrer = document.referrer;
+
+  return tracking;
+};
+
 interface ContactFormProps {
   locations: any[];
   title?: string;
@@ -33,6 +81,7 @@ export const ContactForm = ({
 
     const formData = new FormData(e.target as HTMLFormElement);
     const eventId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const trackingData = getTrackingData();
 
     const data = {
       name: formData.get('name'),
@@ -40,11 +89,12 @@ export const ContactForm = ({
       age_group: formData.get('age'),
       location: formData.get('location'),
       event_id: eventId,
-      source: source
+      source,
+      ...trackingData
     };
 
     try {
-      const res = await fetch('/api/leads', {
+      const res = await fetch('/api/leads-public', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -58,7 +108,11 @@ export const ContactForm = ({
             (window as any).gtag('event', 'generate_lead', {
               'event_id': eventId,
               'value': 1.0,
-              'currency': 'UAH'
+              'currency': 'UAH',
+              'source': source,
+              'age_group': formData.get('age'),
+              'location': formData.get('location'),
+              ...trackingData
             });
           }
           // Meta Pixel
@@ -66,7 +120,11 @@ export const ContactForm = ({
             (window as any).fbq('track', 'Lead', {
               content_name: 'Trial Lesson Signup',
               currency: 'UAH',
-              value: 1.0
+              value: 1.0,
+              source,
+              age_group: formData.get('age'),
+              location: formData.get('location'),
+              ...trackingData
             }, { eventID: eventId });
           }
         }
