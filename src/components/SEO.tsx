@@ -13,7 +13,7 @@ const SEO: React.FC<SEOProps> = ({ title, description, keywords, image, url }) =
   const siteName = "Black Bear Dojo | Карате Кіокушинкай Київ";
   const fullTitle = `${title} | ${siteName}`;
   const defaultImage = "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=1200&auto=format&fit=crop";
-  const defaultUrl = "https://ais-pre-52dzs75wldpn6rggyas75b-286910022589.europe-west2.run.app";
+  const defaultUrl = "https://shin-karate.kyiv.ua/";
 
   return (
     <Helmet>
@@ -42,8 +42,8 @@ const SEO: React.FC<SEOProps> = ({ title, description, keywords, image, url }) =
       {/* Geo Tags */}
       <meta name="geo.region" content="UA-30" />
       <meta name="geo.placename" content="Kyiv" />
-      <meta name="geo.position" content="50.4501;30.5234" />
-      <meta name="ICBM" content="50.4501, 30.5234" />
+      <meta name="geo.position" content="50.451051;30.445565" />
+      <meta name="ICBM" content="50.451051, 30.445565" />
     </Helmet>
   );
 };
