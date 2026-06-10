@@ -74,7 +74,7 @@ export const Navbar = () => {
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between gap-3 overflow-hidden">
           <Link 
             to="/" 
-            className="flex items-center shrink-0 cursor-pointer" 
+            className="flex w-[112px] sm:w-[170px] md:w-auto shrink-0 items-center overflow-hidden cursor-pointer" 
             onClick={() => {
               if (isMainPage) window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
