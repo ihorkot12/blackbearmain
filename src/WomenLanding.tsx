@@ -125,7 +125,7 @@ export const WomenLanding = () => {
     },
     {
       q: "У мене немає спортивної підготовки",
-      a: "90% наших учениць прийшли 'з нуля'. Ми починаємо з базової розминки та поступово нарощуємо навантаження."
+      a: "Можна починати без досвіду. Ми стартуємо з базової розминки, простих рухів і поступово нарощуємо навантаження."
     }
   ];
 
@@ -231,10 +231,10 @@ export const WomenLanding = () => {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <div className="absolute -bottom-6 -right-6 p-8 bg-red-600 rounded-3xl shadow-2xl max-w-[240px]">
+              <div className="absolute -bottom-4 right-3 sm:-bottom-6 sm:-right-6 p-5 sm:p-8 bg-red-600 rounded-3xl shadow-2xl max-w-[220px] sm:max-w-[240px]">
                 <Quote className="text-white/30 mb-4" size={32} />
                 <p className="text-white font-bold italic text-sm">
-                  "Мені зайшло, що тренування не одноманітні: кардіо, техніка, пари і постійний рух."
+                  "Мені сподобалось, що тренування не одноманітні: кардіо, техніка, робота в парах і постійний рух."
                 </p>
                 <div className="mt-4 text-[10px] uppercase tracking-widest font-black text-white/70">— Єва, 17 років</div>
               </div>
