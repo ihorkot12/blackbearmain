@@ -67,7 +67,39 @@ async function ensureSchema() {
       ad_id TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    );
   `);
+}
+
+async function getSetting(keys: string[]) {
+  if (!pool) return null;
+
+  await ensureSchema();
+  const result = await pool.query(
+    'SELECT key, value FROM settings WHERE key = ANY($1)',
+    [keys]
+  );
+
+  for (const key of keys) {
+    const row = result.rows.find((item) => item.key === key);
+    const value = clean(row?.value);
+    if (value) return value;
+  }
+
+  return null;
+}
+
+async function getConfiguredValue(envKeys: string[], settingKeys: string[]) {
+  for (const key of envKeys) {
+    const value = clean(process.env[key]);
+    if (value) return value;
+  }
+
+  return getSetting(settingKeys);
 }
 
 async function markLeadSeen(leadgenId: string, formId?: string, adId?: string) {
@@ -128,8 +160,14 @@ async function saveLead(lead: any, fields: Record<string, string>, formName: str
 }
 
 async function sendTelegram(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = await getConfiguredValue(
+    ['TELEGRAM_BOT_TOKEN'],
+    ['telegram_bot_token', 'TELEGRAM_BOT_TOKEN']
+  );
+  const chatId = await getConfiguredValue(
+    ['TELEGRAM_CHAT_ID'],
+    ['telegram_chat_id', 'TELEGRAM_CHAT_ID']
+  );
   if (!token || !chatId) return false;
 
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -147,10 +185,10 @@ async function sendTelegram(text: string) {
 }
 
 async function graphGet(path: string, fields?: string) {
-  const accessToken =
-    process.env.META_PAGE_ACCESS_TOKEN ||
-    process.env.META_ACCESS_TOKEN ||
-    process.env.META_CAPI_ACCESS_TOKEN;
+  const accessToken = await getConfiguredValue(
+    ['META_PAGE_ACCESS_TOKEN', 'META_ACCESS_TOKEN', 'META_CAPI_ACCESS_TOKEN'],
+    ['meta_page_access_token', 'meta_access_token', 'META_PAGE_ACCESS_TOKEN', 'META_ACCESS_TOKEN']
+  );
 
   if (!accessToken) throw new Error('META_PAGE_ACCESS_TOKEN is not configured');
 
@@ -204,8 +242,12 @@ export default async function handler(req: any, res: any) {
     const mode = req.query?.['hub.mode'];
     const token = req.query?.['hub.verify_token'];
     const challenge = req.query?.['hub.challenge'];
+    const expectedToken = await getConfiguredValue(
+      ['META_WEBHOOK_VERIFY_TOKEN'],
+      ['meta_webhook_verify_token', 'META_WEBHOOK_VERIFY_TOKEN']
+    );
 
-    if (mode === 'subscribe' && token && token === process.env.META_WEBHOOK_VERIFY_TOKEN) {
+    if (mode === 'subscribe' && token && expectedToken && token === expectedToken) {
       return res.status(200).send(challenge);
     }
 
