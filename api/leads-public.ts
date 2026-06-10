@@ -139,8 +139,8 @@ async function sendMetaLeadEvent(body: any, req: any) {
       ['meta_pixel_id', 'META_PIXEL_ID']
     ) || '2370050340139768';
   const accessToken = await getConfiguredValue(
-    ['META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN'],
-    ['meta_capi_access_token', 'meta_pixel_access_token', 'meta_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN']
+    ['META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN'],
+    ['meta_capi_access_token', 'meta_pixel_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN']
   );
 
   if (!accessToken) return false;
@@ -239,7 +239,7 @@ export default async function handler(req: any, res: any) {
 
     const source = clean(body.source) || 'main';
     const message = `
-<b>🔔 Нова заявка на пробне заняття!</b>
+<b>Нова заявка на пробне заняття</b>
 <b>Джерело:</b> ${source}
 <b>Ім'я:</b> ${name}
 <b>Телефон:</b> ${phone}
