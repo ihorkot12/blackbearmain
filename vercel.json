@@ -6,6 +6,10 @@
       "destination": "/api/leads-public.ts"
     },
     {
+      "source": "/api/meta-lead-webhook",
+      "destination": "/api/meta-lead-webhook.ts"
+    },
+    {
       "source": "/privacy",
       "destination": "/privacy.html"
     },
