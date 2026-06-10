@@ -1,0 +1,19 @@
+{
+  "name": "Black Bear Admin",
+  "short_name": "BB Admin",
+  "description": "Admin panel for Black Bear Dojo.",
+  "start_url": "/admin",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

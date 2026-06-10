@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Black Bear Admin</string>
+    <string name="title_activity_main">Black Bear Admin</string>
+    <string name="package_name">ua.kyiv.shinkarate.admin</string>
+    <string name="custom_url_scheme">ua.kyiv.shinkarate.admin</string>
+</resources>
