@@ -85,7 +85,7 @@ export const Navbar = () => {
           ? 'bg-black/95 backdrop-blur-xl h-[64px] border-b border-amber-500/30 shadow-2xl shadow-black mt-0' 
           : `bg-gradient-to-r from-[#0F0F0F] to-[#1A0000] backdrop-blur-md h-[72px] border-b border-amber-500/10 ${isMainPage ? 'md:mt-6 mt-0' : 'mt-0'}`
       }`}>
-        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between gap-3 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 h-full flex items-center justify-between gap-3 overflow-visible">
           <Link 
             to="/" 
             className="flex w-[112px] sm:w-[170px] md:w-auto shrink-0 items-center overflow-hidden cursor-pointer" 
@@ -126,7 +126,7 @@ export const Navbar = () => {
                     <div
                       className={`absolute top-full left-1/2 -translate-x-1/2 pt-4 transition-all duration-200 z-50 ${isDropdownOpen ? 'opacity-100 visible translate-y-0' : 'opacity-0 invisible translate-y-2'}`}
                     >
-                      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-2 min-w-[200px] shadow-2xl backdrop-blur-xl">
+                      <div className="bg-zinc-900 border border-white/10 rounded-2xl p-2 min-w-[240px] shadow-2xl backdrop-blur-xl">
                         {link.subItems.map((sub) => (
                           <Link 
                             key={sub.name}

@@ -797,20 +797,20 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             <div className="absolute inset-0 bg-gradient-to-b from-black via-black/90 to-black" />
           </div>
         )}
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="max-w-[1560px] mx-auto px-5 sm:px-6 lg:px-8 relative z-10">
           <SectionTitle 
             title={content?.directions_title || "Секція карате для дітей у Києві"} 
             subtitle={content?.directions_subtitle || "Ми розробили спеціальні програми для кожної вікової категорії з чіткими результатами"}
             light
           />
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-16">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-5 lg:gap-6 mb-16">
             {[
               { age: '4–7 років', title: content?.dir1_title || 'Перші кроки', desc: content?.dir1_text || 'Розвиток координації, ігрова форма, база дисципліни.', result: 'Координація', link: '/kids-4-7', badge: 'Популярно' },
               { age: '7–12 років', title: content?.dir2_title || 'Формування', desc: content?.dir2_text || 'Техніка, фізична підготовка, перші змагання.', result: 'База сили', link: '/juniors-7-12', badge: 'Набір' },
               { age: 'Підлітки', title: content?.dir3_title || 'Впевненість', desc: content?.dir3_text || 'Професійні турніри, самооборона та лідерство.', result: 'Лідерство', link: '/teens-12-plus' },
               { age: 'Карате для дівчат', title: content?.dir4_title || 'Кардіо та Техніка', desc: content?.dir4_text || 'Активні тренування, робота руками й ногами, пари та впевненість у русі.', result: 'Впевненість', link: '/women-karate', badge: 'New' },
-              { age: 'Персональні', title: content?.dir5_title || 'Індивідуальний формат', desc: content?.dir5_text || 'Розбір техніки, зручний темп, підготовка до цілі та більше уваги тренера.', result: 'Техніка', link: '/personal-training', badge: '1:1' },
+              { age: 'Персональні', title: content?.dir5_title || '1:1 формат', desc: content?.dir5_text || 'Розбір техніки, зручний темп, підготовка до цілі та більше уваги тренера.', result: 'Техніка', link: '/personal-training', badge: '1:1' },
             ].map((item, idx) => {
               const CardContent = (
                 <motion.div 
@@ -819,15 +819,17 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: idx * 0.1 }}
-                  className="group p-6 sm:p-8 bg-zinc-900 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/50 transition-all duration-500 flex flex-col h-full cursor-pointer relative overflow-hidden"
+                  className="group p-5 sm:p-6 xl:p-7 bg-zinc-900 rounded-3xl lg:rounded-[2rem] border border-white/5 hover:border-red-600/50 transition-all duration-500 flex flex-col h-full min-h-[320px] cursor-pointer relative overflow-hidden"
                 >
                   {item.badge && (
-                    <div className="absolute top-6 right-6 px-3 py-1 rounded-full bg-red-600 text-white text-[8px] font-black uppercase tracking-widest shadow-lg">
+                    <div className="absolute top-5 right-5 px-3 py-1 rounded-full bg-red-600 text-white text-[8px] font-black uppercase tracking-widest shadow-lg">
                       {item.badge}
                     </div>
                   )}
-                  <div className="text-red-600 font-black text-[10px] uppercase tracking-[0.2em] mb-4">{item.age}</div>
-                  <h3 className="text-2xl font-black mb-4 group-hover:text-red-500 transition-colors uppercase tracking-tighter">{item.title}</h3>
+                  <div className="text-red-600 font-black text-[10px] uppercase tracking-[0.2em] mb-5 pr-20">{item.age}</div>
+                  <h3 className="text-[1.45rem] xl:text-[1.6rem] font-black mb-4 group-hover:text-red-500 transition-colors uppercase tracking-normal leading-[1.08] break-words hyphens-auto">
+                    {item.title}
+                  </h3>
                   <p className="text-zinc-500 text-sm leading-relaxed mb-8 flex-grow font-medium">{item.desc}</p>
                   <div className="pt-6 border-t border-white/5 flex items-center justify-between">
                     <div className="text-[9px] font-black uppercase tracking-widest text-zinc-500">
@@ -1327,8 +1329,8 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       {/* Contact & Footer Section */}
       <ContactForm 
         locations={locations} 
-        title={content?.contact_title}
-        subtitle={content?.contact_subtitle}
+        title={content?.contact_title || "Записатися на тренування"}
+        subtitle={content?.contact_subtitle || "Залиште заявку, і ми зателефонуємо вам для узгодження групи, локації та зручного часу."}
         source="main"
         onSuccess={() => {
           setIsSubmitted(true);
