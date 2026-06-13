@@ -1973,6 +1973,7 @@ async function startServer() {
 
       // Нормалізуємо телефон (видаляємо всі non-digits) для пошуку
       const normalizedPhone = normalizePhone(login);
+      const phoneWithoutPlus = normalizedPhone.replace(/^\+/, '');
       console.log('Normalized phone for login:', normalizedPhone);
 
       if (!pool) return res.status(500).json({ error: 'Database not configured' });
@@ -1988,10 +1989,12 @@ async function startServer() {
              phone LIKE '%' || $2 OR
              parent_phone LIKE '%' || $1 OR
              parent_phone LIKE '%' || $2 OR
-             parent_login = $3
-           )
-           LIMIT 1`,
-          [normalizedPhone, login, login]
+              parent_login = $1 OR
+              parent_login = $2 OR
+              parent_login = $3
+            )
+            LIMIT 1`,
+          [normalizedPhone, phoneWithoutPlus, login]
         );
         if (result.rows.length > 0) {
           user = result.rows[0];
