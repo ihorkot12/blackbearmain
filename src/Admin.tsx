@@ -108,6 +108,12 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, title, message, loading }: a
   </AnimatePresence>
 );
 
+const clampProgress = (value: unknown) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.min(100, Math.max(0, numericValue));
+};
+
 export const LoginPage = () => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
@@ -1578,12 +1584,12 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                   <div className="w-32">
                     <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">
                       <span>Готовність</span>
-                      <span>{p.exam_readiness || 0}%</span>
+                      <span>{clampProgress(p.exam_readiness)}%</span>
                     </div>
                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-red-600 shadow-[0_0_10px_rgba(220,38,38,0.5)]" 
-                        style={{ width: `${p.exam_readiness || 0}%` }} 
+                        style={{ width: `${clampProgress(p.exam_readiness)}%` }} 
                       />
                     </div>
                   </div>
@@ -1676,12 +1682,12 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                   <div className="space-y-4">
                     <div className="flex justify-between items-end">
                       <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Готовність до іспиту</label>
-                      <span className="text-xl font-black text-red-500">{showDetails.exam_readiness || 0}%</span>
+                      <span className="text-xl font-black text-red-500">{clampProgress(showDetails.exam_readiness)}%</span>
                     </div>
                     <input 
                       type="range" 
                       min="0" max="100" step="10"
-                      value={showDetails.exam_readiness || 0}
+                      value={clampProgress(showDetails.exam_readiness)}
                       onChange={(e) => {
                         const val = parseInt(e.target.value);
                         setShowDetails({...showDetails, exam_readiness: val});
@@ -1703,7 +1709,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                                 ? (showDetails.skill_checklist || []).filter((s: string) => s !== skill)
                                 : [...(showDetails.skill_checklist || []), skill];
                               setShowDetails({...showDetails, skill_checklist: newSkills});
-                              handleUpdateProgress(showDetails.id, showDetails.exam_readiness || 0, newSkills);
+                              handleUpdateProgress(showDetails.id, clampProgress(showDetails.exam_readiness), newSkills);
                             }}
                             className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${
                               isChecked 
@@ -3208,16 +3214,16 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   <td className="p-4 lg:p-6">
                     <div className="w-24 lg:w-32">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{p.exam_readiness || 0}%</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{clampProgress(p.exam_readiness)}%</span>
                         <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Іспит</span>
                       </div>
                       <div className="h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
                         <div 
                           className={`h-full transition-all duration-1000 ${
-                            (p.exam_readiness || 0) >= 80 ? 'bg-green-500' : 
-                            (p.exam_readiness || 0) >= 50 ? 'bg-yellow-500' : 'bg-red-600'
+                            clampProgress(p.exam_readiness) >= 80 ? 'bg-green-500' : 
+                            clampProgress(p.exam_readiness) >= 50 ? 'bg-yellow-500' : 'bg-red-600'
                           }`}
-                          style={{ width: `${p.exam_readiness || 0}%` }}
+                          style={{ width: `${clampProgress(p.exam_readiness)}%` }}
                         />
                       </div>
                     </div>
@@ -3567,7 +3573,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                     type="number" 
                     min="0"
                     max="100"
-                    value={editingParticipant.exam_readiness || 0}
+                    value={clampProgress(editingParticipant.exam_readiness)}
                     onChange={e => setEditingParticipant({...editingParticipant, exam_readiness: parseInt(e.target.value)})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   />

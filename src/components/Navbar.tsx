@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, ChevronDown, User } from 'lucide-react';
@@ -9,6 +9,7 @@ export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
   const location = useLocation();
   const isMainPage = location.pathname === '/';
 
@@ -27,6 +28,17 @@ export const Navbar = () => {
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setOpenDropdown(null);
+      }
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, []);
 
   useEffect(() => {
@@ -106,9 +118,9 @@ export const Navbar = () => {
                 return (
                   <div
                     key={link.name}
+                    ref={dropdownRef}
                     className="relative"
                     onMouseEnter={() => setOpenDropdown(link.name)}
-                    onMouseLeave={() => setOpenDropdown((current) => current === link.name ? null : current)}
                   >
                     <button
                       type="button"

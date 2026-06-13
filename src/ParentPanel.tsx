@@ -26,6 +26,12 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 
+const clampProgress = (value: unknown) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  return Math.min(100, Math.max(0, numericValue));
+};
+
 const ParentPanel = () => {
   const [participant, setParticipant] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
@@ -274,7 +280,7 @@ const ParentPanel = () => {
             <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-white/5">
               <div className="flex justify-between items-end mb-4">
                 <div>
-                  <div className="text-4xl font-black text-white mb-1">{participant?.exam_readiness || 0}%</div>
+                  <div className="text-4xl font-black text-white mb-1">{clampProgress(participant?.exam_readiness)}%</div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Готовність до іспиту</div>
                 </div>
                 <div className="text-right">
@@ -285,7 +291,7 @@ const ParentPanel = () => {
               <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${participant?.exam_readiness || 0}%` }}
+                  animate={{ width: `${clampProgress(participant?.exam_readiness)}%` }}
                   className="h-full bg-gradient-to-r from-red-600 to-orange-500 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)]"
                 />
               </div>
@@ -582,7 +588,7 @@ const ParentPanel = () => {
                         </div>
                         <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
                           <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Прогрес</div>
-                          <div className="text-xs font-black text-white">{child.exam_readiness || 0}%</div>
+                          <div className="text-xs font-black text-white">{clampProgress(child.exam_readiness)}%</div>
                         </div>
                       </div>
                     </div>
@@ -878,7 +884,7 @@ const ParentPanel = () => {
                   <div className="bg-zinc-900/50 p-10 rounded-[3rem] border border-white/5">
                     <div className="flex justify-between items-end mb-4">
                       <div>
-                        <div className="text-4xl font-black text-white mb-1">{participant?.exam_readiness || 0}%</div>
+                        <div className="text-4xl font-black text-white mb-1">{clampProgress(participant?.exam_readiness)}%</div>
                         <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest">Загальна готовність</div>
                       </div>
                       <div className="text-right">
@@ -889,7 +895,7 @@ const ParentPanel = () => {
                     <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
                       <motion.div 
                         initial={{ width: 0 }}
-                        animate={{ width: `${participant?.exam_readiness || 0}%` }}
+                        animate={{ width: `${clampProgress(participant?.exam_readiness)}%` }}
                         className="h-full bg-gradient-to-r from-red-600 to-red-500 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)]"
                       />
                     </div>

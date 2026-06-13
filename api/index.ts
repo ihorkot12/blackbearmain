@@ -17,6 +17,9 @@ const { Pool } = pkg;
 
 dotenv.config();
 
+const isBcryptHash = (value: unknown): value is string =>
+  typeof value === 'string' && /^\$2[aby]\$/.test(value);
+
 // Session secret - MUST be stable on Vercel
 const SESSION_SECRET = process.env.SESSION_SECRET || 'black-bear-default-secret-change-me';
 
@@ -2020,7 +2023,7 @@ async function startServer() {
         // Спроба 1: bcrypt.compare (якщо пароль хешований)
         if (user.parent_password) {
           try {
-            if (user.parent_password.startsWith('$2a$') || user.parent_password.startsWith('$2b$')) {
+            if (isBcryptHash(user.parent_password)) {
               passwordMatch = await bcrypt.compare(password, user.parent_password);
               console.log('Bcrypt compare result:', passwordMatch);
             } else {
@@ -2063,7 +2066,7 @@ async function startServer() {
         let passwordMatch = false;
         
         try {
-          if (user.admin_password && user.admin_password.startsWith('$2a$')) {
+          if (isBcryptHash(user.admin_password)) {
             passwordMatch = await bcrypt.compare(password, user.admin_password);
             console.log('Admin bcrypt compare result:', passwordMatch);
           } else {
@@ -2298,7 +2301,7 @@ ${childrenList}
       if (result.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
       
       const p = result.rows[0];
-      const isHashed = p.parent_password?.startsWith('$2a$') || p.parent_password?.startsWith('$2b$');
+      const isHashed = isBcryptHash(p.parent_password);
       const passwordDisplay = isHashed ? "******** (зашифровано)" : p.parent_password;
 
       const message = `
@@ -2491,24 +2494,38 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         return groupLookup.get(normalizeImportKey(value));
       };
 
+      const generatedParentPasswords = new Map<string, string>();
+      const getImportParentPassword = (parentLogin: string, explicitPassword?: string) => {
+        if (explicitPassword) return explicitPassword;
+        if (!generatedParentPasswords.has(parentLogin)) {
+          generatedParentPasswords.set(parentLogin, crypto.randomBytes(4).toString('hex'));
+        }
+        return generatedParentPasswords.get(parentLogin)!;
+      };
+
       const participantsToImport = data.map((row, index) => {
         const birthday = parseDateValue(getRowValue(row, [
-          'birthday', 'birth date', 'date of birth', 'dob',
-          'дата народження', 'день народження', 'дн', 'дата рождения'
+          'birthday', 'birth_date', 'birth date', 'date of birth', 'dob',
+          'child_birth_date', 'child birth date', 'adult_birth_date',
+          'дата народження', 'день народження', 'дн', 'дата рождения',
+          'дата народження дитини', 'дата народження учасника'
         ]));
         const parentPhone = cleanText(getRowValue(row, [
-          'parent_phone', 'parent phone', 'contact phone', 'contact',
+          'parent_phone', 'parent phone', 'contact phone', 'contact', 'phone_number',
           'телефон', 'номер телефону', 'телефон батьків', 'телефон батька', 'телефон мами',
-          'контакт', 'контактний телефон', 'phone'
+          'контакт', 'контактний телефон', 'phone', 'номер телефону батьків'
         ]));
         const childPhone = cleanText(getRowValue(row, [
-          'child phone', 'participant phone', 'student phone',
+          'child_phone', 'child phone', 'participant_phone', 'participant phone', 'student phone',
           'телефон дитини', 'телефон учня'
         ]));
         const explicitParentLogin = cleanText(getRowValue(row, [
           'parent_login', 'login', 'логін', 'логин', 'логін батьків', 'логін parent'
         ]));
-        const parentLogin = explicitParentLogin || `parent_${crypto.createHash('sha1').update(`${parentPhone || ''}|${childPhone || ''}|${birthday || ''}|${index}`).digest('hex').slice(0, 10)}`;
+        const normalizedParentPhone = normalizePhone(parentPhone || childPhone || '');
+        const normalizedChildPhone = normalizePhone(childPhone || parentPhone || '');
+        const phoneLogin = normalizedParentPhone || normalizedChildPhone;
+        const parentLogin = explicitParentLogin || phoneLogin || `parent_${crypto.createHash('sha1').update(`${parentPhone || ''}|${childPhone || ''}|${index}`).digest('hex').slice(0, 10)}`;
         const explicitParentPassword = cleanText(getRowValue(row, [
           'parent_password', 'password', 'пароль', 'пароль батьків'
         ]));
@@ -2516,30 +2533,40 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         return {
           rowNumber: index + 2,
           name: cleanText(getRowValue(row, [
-            'name', 'full name', 'participant name', 'student name', 'child name',
-            "ім'я", 'імя', 'піб', 'піб дитини', 'дитина', 'учень', 'учасник', 'фио', 'имя'
+            'name', 'full_name', 'full name', 'participant_name', 'participant name',
+            'student_name', 'student name', 'child_full_name', 'child full name',
+            'child_name', 'child name', 'adult_full_name', 'adult full name',
+            "ім'я", 'імя', 'піб', 'піб дитини', 'піб учасника', 'дитина', 'учень', 'учасник', 'фио', 'имя'
           ])),
           age: parseNumber(getRowValue(row, ['age', 'вік', 'возраст'])) || calculateAge(birthday),
           birthday,
-          group_id: resolveGroupId(getRowValue(row, ['group_id', 'group', 'group name', 'група', 'назва групи'])),
+          group_id: resolveGroupId(getRowValue(row, ['group_id', 'group', 'group name', 'group_name', 'група', 'назва групи'])),
           parent_name: cleanText(getRowValue(row, [
-            'parent_name', 'parent name', 'father mother', 'guardian',
-            'батьки', 'батько', 'мама', 'тато', "ім'я батьків", 'імя батьків', 'піб батьків', 'родитель'
+            'parent_name', 'parent name', 'parent_full_name', 'parent full name',
+            'father mother', 'guardian', 'guardian_full_name',
+            'батьки', 'батько', 'мама', 'тато', "ім'я батьків", 'імя батьків', 'піб батьків',
+            'піб батька', 'піб матері', 'піб контактної особи', 'родитель'
           ])),
-          phone: normalizePhone(childPhone || parentPhone || ''),
-          parent_phone: normalizePhone(parentPhone || childPhone || ''),
+          phone: normalizedChildPhone,
+          parent_phone: normalizedParentPhone,
           parent_login: parentLogin,
           has_explicit_login: !!explicitParentLogin,
-          parent_password: explicitParentPassword || crypto.randomBytes(4).toString('hex'),
+          parent_password: getImportParentPassword(parentLogin, explicitParentPassword),
           has_explicit_password: !!explicitParentPassword,
           belt: cleanText(getRowValue(row, ['belt', 'пояс'])) || 'Білий',
           payment_status: normalizePaymentStatus(getRowValue(row, ['payment_status', 'payment', 'оплата', 'статус оплати'])),
           status: normalizeStatus(getRowValue(row, ['status', 'статус'])),
           telegram_chat_id: cleanText(getRowValue(row, ['telegram_chat_id', 'telegram chat id', 'chat_id', 'telegram id', 'тг id'])),
-          exam_readiness: cleanText(getRowValue(row, ['exam_readiness', 'exam readiness', 'готовність', 'готовність до іспиту'])),
+          exam_readiness: parseNumber(getRowValue(row, ['exam_readiness', 'exam readiness', 'готовність', 'готовність до іспиту'])),
           skill_checklist: parseChecklist(getRowValue(row, ['skill_checklist', 'skills', 'навички', 'чеклист'])),
           rank_points: parseNumber(getRowValue(row, ['rank_points', 'points', 'бали', 'рейтинг'])),
-          achievements_text: cleanText(getRowValue(row, ['achievements_text', 'achievements', 'досягнення', 'нотатки']))
+          achievements_text: [
+            cleanText(getRowValue(row, ['achievements_text', 'achievements', 'досягнення', 'нотатки'])),
+            cleanText(getRowValue(row, ['school_class_or_occupation', 'school class or occupation', 'клас', 'школа'])),
+            cleanText(getRowValue(row, ['previous_sport_experience', 'previous sport experience', 'досвід'])),
+            cleanText(getRowValue(row, ['training_goal', 'training goal', 'ціль тренувань'])),
+            cleanText(getRowValue(row, ['medical_notes', 'medical notes', 'медичні примітки']))
+          ].filter(Boolean).join('\n')
         };
       });
 
@@ -2557,10 +2584,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
           if (p.parent_login) {
             existing = await client.query(
-              p.has_explicit_login
-                ? "SELECT id FROM participants WHERE parent_login = $1 LIMIT 1"
-                : "SELECT id FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND parent_login = $2 LIMIT 1",
-              p.has_explicit_login ? [p.parent_login] : [p.name, p.parent_login]
+              "SELECT id FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM($1)) AND parent_login = $2 LIMIT 1",
+              [p.name, p.parent_login]
             );
           }
           if ((!existing || existing.rows.length === 0) && p.phone) {
@@ -2577,9 +2602,20 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             );
           }
 
-          const passwordValue = p.parent_password.startsWith('$2a$') || p.parent_password.startsWith('$2b$')
-            ? p.parent_password
-            : await bcrypt.hash(p.parent_password, 10);
+          let importPassword = p.parent_password;
+          if (!p.has_explicit_password && p.parent_login) {
+            const existingParentPassword = await client.query(
+              "SELECT parent_password FROM participants WHERE parent_login = $1 AND parent_password IS NOT NULL LIMIT 1",
+              [p.parent_login]
+            );
+            if (existingParentPassword.rows[0]?.parent_password) {
+              importPassword = existingParentPassword.rows[0].parent_password;
+            }
+          }
+
+          const passwordValue = isBcryptHash(importPassword)
+            ? importPassword
+            : await bcrypt.hash(importPassword, 10);
 
           const insertData: Record<string, any> = {
             name: p.name,
@@ -2595,7 +2631,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             payment_status: p.payment_status || 'unpaid',
             status: p.status || 'active',
             telegram_chat_id: p.telegram_chat_id || null,
-            exam_readiness: p.exam_readiness || 'not_started',
+            exam_readiness: p.exam_readiness ?? 0,
             skill_checklist: p.skill_checklist || '[]',
             rank_points: p.rank_points ?? 0,
             achievements_text: p.achievements_text || ''
@@ -2695,7 +2731,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     
     try {
       let hashedPassword = rawPassword;
-      if (!hashedPassword.startsWith('$2a$')) {
+      if (!isBcryptHash(hashedPassword)) {
         hashedPassword = await bcrypt.hash(rawPassword, 10);
       }
       await pool.query(
@@ -2733,7 +2769,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const oldParentLogin = currentRes.rows[0]?.parent_login;
 
       // Handle password hashing if provided
-      if (updateData.parent_password && !updateData.parent_password.startsWith('$2a$')) {
+      if (updateData.parent_password && !isBcryptHash(updateData.parent_password)) {
         updateData.parent_password = await bcrypt.hash(updateData.parent_password, 10);
       }
 
