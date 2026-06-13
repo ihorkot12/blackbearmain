@@ -4092,9 +4092,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const aResult = await pool.query("SELECT * FROM attendance WHERE participant_id = $1 ORDER BY date DESC", [participantId]);
       const bResult = await pool.query("SELECT * FROM badges WHERE participant_id = $1 ORDER BY date DESC", [participantId]);
       const cResult = await pool.query("SELECT * FROM competitions WHERE participant_id = $1 ORDER BY date DESC", [participantId]);
+      const participant = pResult.rows[0];
+      delete participant.parent_password;
 
       res.json({
-        participant: pResult.rows[0],
+        participant,
         attendance: aResult.rows,
         badges: bResult.rows,
         competitions: cResult.rows
