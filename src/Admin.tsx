@@ -151,9 +151,18 @@ export const LoginPage = () => {
         }
 
         if (data.role === 'parent') {
+          localStorage.removeItem('admin_token');
+          localStorage.removeItem('admin_role');
+          localStorage.removeItem('admin_name');
+          if (data.token) {
+            localStorage.setItem('parent_token', data.token);
+            localStorage.setItem('parent_name', data.name);
+          }
           navigate('/parent');
           return;
         }
+        localStorage.removeItem('parent_token');
+        localStorage.removeItem('parent_name');
         localStorage.setItem('admin_token', data.token);
         localStorage.setItem('admin_role', data.role);
         localStorage.setItem('admin_name', data.name);

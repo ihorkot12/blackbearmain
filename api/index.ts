@@ -2059,6 +2059,7 @@ async function startServer() {
             role: 'parent', 
             name: user.name,
             participantId: user.id,
+            token: `${user.id}-parent`,
             redirect: '/parent'
           });
         });

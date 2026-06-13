@@ -32,6 +32,21 @@ const clampProgress = (value: unknown) => {
   return Math.min(100, Math.max(0, numericValue));
 };
 
+const getParentAuthHeaders = () => {
+  const token = localStorage.getItem('parent_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const parentFetch = (url: string, options: RequestInit = {}) =>
+  fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...getParentAuthHeaders(),
+      ...(options.headers || {}),
+    },
+  });
+
 const ParentPanel = () => {
   const [participant, setParticipant] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
@@ -71,7 +86,7 @@ const ParentPanel = () => {
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`/api/messages/${participant.id}`);
+      const res = await parentFetch(`/api/messages/${participant.id}`);
       if (res.ok) {
         const data = await res.json();
         setMessages(data);
@@ -84,7 +99,7 @@ const ParentPanel = () => {
   const handleSendMessage = async () => {
     if (!coachMessage.trim()) return;
     try {
-      const res = await fetch('/api/messages', {
+      const res = await parentFetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -106,13 +121,13 @@ const ParentPanel = () => {
   useEffect(() => {
     if (participant?.id) {
       // Fetch belt progress
-      fetch(`/api/parent/${participant.id}/belt-progress`)
+      parentFetch(`/api/parent/${participant.id}/belt-progress`)
         .then(r => r.json())
         .then(data => setBeltProgress(data.children || []))
         .catch(e => console.log(e));
       
       // Fetch attendance streak
-      fetch(`/api/parent/${participant.id}/attendance-streak`)
+      parentFetch(`/api/parent/${participant.id}/attendance-streak`)
         .then(r => r.json())
         .then(data => setAttendanceStreak(data.children || []))
         .catch(e => console.log(e));
@@ -129,17 +144,19 @@ const ParentPanel = () => {
     if (isInitial) setLoading(true);
     try {
       const [pRes, aRes, bRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
-        fetch('/api/parent/me'),
-        fetch('/api/parent/attendance'),
-        fetch('/api/parent/badges'),
-        fetch('/api/parent/schedule'),
-        fetch('/api/parent/children'),
-        fetch('/api/parent/payments'),
+        parentFetch('/api/parent/me'),
+        parentFetch('/api/parent/attendance'),
+        parentFetch('/api/parent/badges'),
+        parentFetch('/api/parent/schedule'),
+        parentFetch('/api/parent/children'),
+        parentFetch('/api/parent/payments'),
         fetch('/api/announcements'),
-        fetch('/api/parent/notifications')
+        parentFetch('/api/parent/notifications')
       ]);
 
       if (pRes.status === 401) {
+        localStorage.removeItem('parent_token');
+        localStorage.removeItem('parent_name');
         window.location.href = '/auth?role=parent';
         return;
       }
@@ -170,7 +187,7 @@ const ParentPanel = () => {
 
   const handleSwitchChild = async (childId: number) => {
     try {
-      const res = await fetch('/api/parent/switch-child', {
+      const res = await parentFetch('/api/parent/switch-child', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ childId })
@@ -185,7 +202,9 @@ const ParentPanel = () => {
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    localStorage.removeItem('parent_token');
+    localStorage.removeItem('parent_name');
+    await parentFetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/';
   };
 
