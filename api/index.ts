@@ -706,6 +706,29 @@ async function startServer() {
     });
   };
 
+  const getParentParticipantId = async (req: express.Request): Promise<number | null> => {
+    const sessionParticipantId = (req.session as any).participantId;
+    if (sessionParticipantId) {
+      const parsed = Number(sessionParticipantId);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return null;
+
+    const token = authHeader.slice('Bearer '.length);
+    const [id, role] = token.split('-');
+    if (role !== 'parent' || !/^\d+$/.test(id)) return null;
+
+    try {
+      const result = await pool.query("SELECT id FROM participants WHERE id = $1", [Number(id)]);
+      return result.rows[0]?.id ?? null;
+    } catch (e) {
+      console.error('Parent token auth error:', e);
+      return null;
+    }
+  };
+
   // Instagram OAuth Routes
   app.get('/api/auth/instagram/url', (req, res) => {
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
@@ -4053,7 +4076,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   // Profile (for parents)
   app.get("/api/profile", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const participantId = (req.session as any).participantId;
+    const participantId = await getParentParticipantId(req);
     if (!participantId) return res.status(401).json({ error: "Unauthorized" });
 
     try {
@@ -4202,7 +4225,7 @@ ${content}
 
   app.get("/api/parent/notifications", async (req, res) => {
     if (!pool) return res.json([]);
-    const participantId = (req.session as any).participantId;
+    const participantId = await getParentParticipantId(req);
     if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
     
     try {
@@ -4218,7 +4241,7 @@ ${content}
 
   app.get("/api/parent/me", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4241,7 +4264,7 @@ ${content}
 
     app.get("/api/parent/children", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4285,7 +4308,7 @@ ${content}
 
     app.post("/api/parent/absence-confirm", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in" });
       
       const { date, reason } = req.body;
@@ -4302,7 +4325,7 @@ ${content}
 
     app.post("/api/parent/switch-child", async (req, res) => {
       const { childId } = req.body;
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in" });
 
       try {
@@ -4312,7 +4335,7 @@ ${content}
         if (meRes.rows.length > 0 && childRes.rows.length > 0 && meRes.rows[0].parent_login === childRes.rows[0].parent_login) {
           (req.session as any).participantId = childId;
           return req.session.save(() => {
-            res.json({ success: true });
+            res.json({ success: true, token: `${childId}-parent` });
           });
         }
         res.status(403).json({ error: "Forbidden" });
@@ -4323,7 +4346,7 @@ ${content}
 
     app.get("/api/parent/attendance", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4336,7 +4359,7 @@ ${content}
 
     app.get("/api/parent/payments", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4349,7 +4372,7 @@ ${content}
 
     app.get("/api/parent/badges", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4362,7 +4385,7 @@ ${content}
 
     app.get("/api/parent/schedule", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
-      const participantId = (req.session as any).participantId;
+      const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
@@ -4397,14 +4420,16 @@ ${content}
     // ===== PARENT PORTAL ROUTES =====
     app.get('/api/parent/:parentId/belt-progress', async (req, res) => {
       try {
-        const { parentId } = req.params;
+        const participantId = await getParentParticipantId(req);
+        if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
         const result = await pool.query(
           `SELECT id, name as first_name, belt as belt_level, updated_at as belt_updated_at 
            FROM participants 
            WHERE parent_login = (SELECT parent_login FROM participants WHERE id = $1)
            OR id = $1 
            ORDER BY name ASC`,
-          [parentId]
+          [participantId]
         );
         res.json({ children: result.rows });
       } catch (error: any) {
@@ -4414,14 +4439,16 @@ ${content}
 
     app.get('/api/parent/:parentId/attendance-streak', async (req, res) => {
       try {
-        const { parentId } = req.params;
+        const participantId = await getParentParticipantId(req);
+        if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
         const result = await pool.query(
           `SELECT p.id, p.name as first_name, COUNT(a.id) as total_attendance 
            FROM participants p 
            LEFT JOIN attendance a ON p.id = a.participant_id AND a.date >= NOW() - INTERVAL '30 days'
            WHERE p.parent_login = (SELECT parent_login FROM participants WHERE id = $1) OR p.id = $1
            GROUP BY p.id, p.name ORDER BY p.name ASC`,
-          [parentId]
+          [participantId]
         );
         res.json({ children: result.rows });
       } catch (error: any) {

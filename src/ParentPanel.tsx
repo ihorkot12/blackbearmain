@@ -193,6 +193,10 @@ const ParentPanel = () => {
         body: JSON.stringify({ childId })
       });
       if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          localStorage.setItem('parent_token', data.token);
+        }
         fetchData();
         toast.success('Дитину змінено');
       }
