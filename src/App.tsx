@@ -369,7 +369,8 @@ function LandingPage({ initialContent }: { initialContent: any }) {
   }, [location.hash]);
 
   React.useEffect(() => {
-    fetch('/api/init')
+    const controller = new AbortController();
+    fetch('/api/init', { signal: controller.signal })
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
@@ -381,10 +382,17 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           sessionStorage.setItem('site_init_data', JSON.stringify(data));
         }
       })
-      .catch(err => console.error('Init fetch failed', err))
+      .catch(err => {
+        if (err?.name !== 'AbortError') {
+          console.error('Init fetch failed', err);
+        }
+      })
       .finally(() => {
-        setIsInitialLoading(false);
+        if (!controller.signal.aborted) {
+          setIsInitialLoading(false);
+        }
       });
+    return () => controller.abort();
   }, []);
 
   if (isInitialLoading && !content) {
