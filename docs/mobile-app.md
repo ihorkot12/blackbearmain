@@ -24,6 +24,30 @@ npm run mobile:ios
 
 `mobile:ios` opens Xcode after syncing. Building iOS requires macOS with Xcode or a cloud build/publishing service.
 
+## Preflight before building
+
+`npm run mobile:sync` must pass first. It builds the web app and copies the current admin shell into both native projects.
+
+Android local build requirements:
+
+```powershell
+java -version
+$env:JAVA_HOME
+cd android
+.\gradlew.bat assembleDebug
+```
+
+Use JDK 17+ and Android Studio/SDK. If `JAVA_HOME` is missing, Gradle stops before it can test the project.
+
+iOS local build requirements:
+
+```bash
+npm run mobile:sync
+npm run mobile:ios
+```
+
+iOS packaging requires macOS with Xcode. On Windows, use Median or another cloud build service if we want to publish without a Mac.
+
 ## Store note
 
 For internal testing, the live web admin shell is the fastest path.
