@@ -980,9 +980,10 @@ async function startServer() {
         [participantId, type, message]
       );
 
-      // 3. Send to Parent Telegram if connected
+      // 3. Send to Parent Telegram only for direct, intentional messages.
       const token = process.env.TELEGRAM_BOT_TOKEN;
-      if (token && participant.telegram_chat_id) {
+      const parentTelegramTypes = new Set(['manual', 'message']);
+      if (token && participant.telegram_chat_id && parentTelegramTypes.has(type)) {
         const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
           method: 'POST',
@@ -995,8 +996,8 @@ async function startServer() {
         });
       }
 
-      // 4. LOG to Admin Channel (TELEGRAM_CHAT_ID)
-      if (!skipAdminLog) {
+      // 4. Optional admin audit channel. Disabled by default to avoid Telegram noise.
+      if (!skipAdminLog && process.env.TELEGRAM_ADMIN_AUDIT_ENABLED === 'true') {
         const coachInfo = coachName ? `\n👤 Виконав: ${coachName}` : '';
         const adminText = `📢 <b>СИСТЕМА СПОВІЩЕНЬ</b>\n\n👤 Учень: <b>${participant.name}</b>\n📝 Тип: ${type}\n💬 Повідомлення: ${message}${coachInfo}`;
         await sendTelegramMessage(adminText);
@@ -4456,14 +4457,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         [title, content, adminId]
       );
 
-      // Also send to Telegram if configured
-      const telegramMessage = `
-<b>📢 НОВЕ ОГОЛОШЕННЯ!</b>
-<b>${title}</b>
-
-${content}
-      `;
-      sendTelegramMessage(telegramMessage).catch(err => console.error('Failed to send announcement to Telegram:', err));
+      console.log('Announcement saved; Telegram delivery disabled to keep the bot quiet.');
 
       res.json(result.rows[0]);
     } catch (e) {
