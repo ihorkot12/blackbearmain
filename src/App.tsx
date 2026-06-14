@@ -87,8 +87,11 @@ const PixelManager = ({ content }: { content: any }) => {
       const scripts = tempDiv.querySelectorAll('script');
       if (scripts.length > 0) {
         scripts.forEach((s, idx) => {
+          const scriptId = `${id}-script-${idx}`;
+          if (document.getElementById(scriptId)) return;
           const newScript = document.createElement('script');
-          newScript.id = `${id}-script-${idx}`;
+          newScript.id = scriptId;
+          newScript.dataset.bbPixelManager = id;
           if (s.src) {
             newScript.src = s.src;
             newScript.async = s.async;
@@ -110,8 +113,11 @@ const PixelManager = ({ content }: { content: any }) => {
       
       const noscripts = tempDiv.querySelectorAll('noscript');
       noscripts.forEach((ns, idx) => {
+        const noscriptId = `${id}-noscript-${idx}`;
+        if (document.getElementById(noscriptId)) return;
         const newNoScript = document.createElement('noscript');
-        newNoScript.id = `${id}-noscript-${idx}`;
+        newNoScript.id = noscriptId;
+        newNoScript.dataset.bbPixelManager = id;
         newNoScript.innerHTML = ns.innerHTML;
         document.body.appendChild(newNoScript);
         elements.push(newNoScript);

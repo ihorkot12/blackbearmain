@@ -201,6 +201,7 @@ export const LoginPage = () => {
             </label>
             <input 
               type="text" 
+              autoComplete={isParent ? "tel" : "username"}
               placeholder={isParent ? "+380..." : "Логін"}
               value={login} 
               onChange={e => setLogin(e.target.value)} 
@@ -211,6 +212,7 @@ export const LoginPage = () => {
             <label className="block text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2 ml-1">Пароль</label>
             <input 
               type="password" 
+              autoComplete="current-password"
               placeholder="••••••••"
               value={password} 
               onChange={e => setPassword(e.target.value)} 

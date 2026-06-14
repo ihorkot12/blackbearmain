@@ -232,7 +232,7 @@ export const Navbar = () => {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-8 px-6">
+            <div className="flex-1 overflow-y-auto py-8 px-6 pb-28">
               <div className="flex flex-col gap-6">
                 {navLinks.map((link, idx) => {
                   if (link.subItems) {

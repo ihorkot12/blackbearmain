@@ -1309,15 +1309,45 @@ async function startServer() {
       return res.status(400).json({ error: "Invalid bulk data" });
     }
 
+    const participantIds = participants
+      .map((participant: any) => Number(typeof participant === 'object' ? participant.id ?? participant.participant_id : participant))
+      .filter((id: number) => Number.isInteger(id) && id > 0);
+
+    if (participantIds.length !== participants.length || participantIds.length === 0) {
+      return res.status(400).json({ error: "Invalid participant IDs" });
+    }
+
     const normalizedDate = normalizeDate(date);
-    const coachId = (req as any).user?.id || null;
-    const userRole = (req as any).user?.role || 'coach';
+    const user = (req as any).user;
+    const coachId = user?.id || null;
+    const userRole = user?.role || 'coach';
 
     try {
+      if (user?.role === 'coach' && user.coach_id) {
+        const scopeResult = await pool.query(
+          `SELECT COUNT(DISTINCT p.id)::int AS count
+           FROM participants p
+           LEFT JOIN groups g ON p.group_id = g.id
+           WHERE p.id = ANY($1::int[]) AND g.coach_id = $2`,
+          [participantIds, user.coach_id]
+        );
+        if (scopeResult.rows[0]?.count !== participantIds.length) {
+          return res.status(403).json({ error: "Forbidden" });
+        }
+      } else {
+        const existsResult = await pool.query(
+          "SELECT COUNT(DISTINCT id)::int AS count FROM participants WHERE id = ANY($1::int[])",
+          [participantIds]
+        );
+        if (existsResult.rows[0]?.count !== participantIds.length) {
+          return res.status(404).json({ error: "Participant not found" });
+        }
+      }
+
       await pool.query("BEGIN");
 
       const results = [];
-      for (const pId of participants) {
+      for (const pId of participantIds) {
         // Find current streak to update
         const pInfo = await pool.query("SELECT streak, last_attendance_date FROM participants WHERE id = $1", [pId]);
         const p = pInfo.rows[0];
@@ -1375,7 +1405,7 @@ async function startServer() {
 
       await pool.query("COMMIT");
 
-      logAuditAction(coachId, userRole, `Масова відмітка: ${status} (${participants.length} учнів)`, 'attendance', null, { date: normalizedDate, count: participants.length });
+      logAuditAction(coachId, userRole, `Масова відмітка: ${status} (${participantIds.length} учнів)`, 'attendance', null, { date: normalizedDate, count: participantIds.length });
 
       res.json({ success: true, count: results.length });
     } catch (e) {
@@ -4904,9 +4934,28 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     });
 
     // ===== COACH ROUTES =====
-    app.post('/api/coach/attendance/bulk', async (req, res) => {
+    app.post('/api/coach/attendance/bulk', requireAuth, async (req, res) => {
       try {
+        const user = (req as any).user;
         const { attendance_records } = req.body; // [{participant_id, date, status}]
+        if (!Array.isArray(attendance_records)) {
+          return res.status(400).json({ error: "attendance_records must be an array" });
+        }
+
+        if (user?.role === 'coach' && user.coach_id && attendance_records.length > 0) {
+          const participantIds = [...new Set(attendance_records.map((record: any) => Number(record.participant_id)).filter(Boolean))];
+          const scopeResult = await pool.query(
+            `SELECT COUNT(DISTINCT p.id)::int AS count
+             FROM participants p
+             LEFT JOIN groups g ON p.group_id = g.id
+             WHERE p.id = ANY($1::int[]) AND g.coach_id = $2`,
+            [participantIds, user.coach_id]
+          );
+          if (scopeResult.rows[0]?.count !== participantIds.length) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+
         for (const record of attendance_records) {
           await pool.query(
             `INSERT INTO attendance (participant_id, date, status)
@@ -4921,13 +4970,28 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
     });
 
-    app.post('/api/coach/notes/:participantId', async (req, res) => {
+    app.post('/api/coach/notes/:participantId', requireAuth, async (req, res) => {
       try {
+        const user = (req as any).user;
         const { participantId } = req.params;
         const { note, date } = req.body;
+        if (user?.role === 'coach' && user.coach_id) {
+          const scopeResult = await pool.query(
+            `SELECT p.id
+             FROM participants p
+             LEFT JOIN groups g ON p.group_id = g.id
+             WHERE p.id = $1 AND g.coach_id = $2`,
+            [participantId, user.coach_id]
+          );
+          if (scopeResult.rows.length === 0) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
         const result = await pool.query(
           `INSERT INTO attendance (participant_id, date, coach_notes)
-           VALUES ($1, $2, $3) RETURNING *`,
+           VALUES ($1, $2, $3)
+           ON CONFLICT (participant_id, date) DO UPDATE SET coach_notes = $3
+           RETURNING *`,
           [participantId, date, note]
         );
         res.json(result.rows[0]);
