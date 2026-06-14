@@ -1037,16 +1037,12 @@ async function startServer() {
         try {
           if (type === "p") {
             await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
-            await sendTelegramMessage("✅ Ваш акаунт батьків успішно підключено!", String(chatId));
           } else if (type === "c") {
             await pool.query("UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
-            await sendTelegramMessage("✅ Ваш акаунт тренера успішно підключено!", String(chatId));
           }
         } catch (e) {
           console.error("Telegram connection error:", e);
         }
-      } else {
-        await sendTelegramMessage("👋 Вітаємо у Black Bear Dojo! Щоб підключити акаунт, скористайтеся кнопкою в особистому кабінеті.", String(chatId));
       }
     }
 
@@ -1091,6 +1087,93 @@ async function startServer() {
       return false;
     }
   }
+
+  const escapeTelegramHtml = (value: any) =>
+    String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+  async function sendMonthlyClubSummary(label: string) {
+    if (!pool) return;
+
+    const [debtorsRes, absenceRes] = await Promise.all([
+      pool.query(`
+        SELECT p.name, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.status = 'active'
+        AND COALESCE(p.payment_status, 'unpaid') != 'paid'
+        ORDER BY g.name NULLS LAST, p.name ASC
+        LIMIT 40
+      `),
+      pool.query(`
+        SELECT
+          p.name,
+          g.name as group_name,
+          COUNT(a.id) FILTER (
+            WHERE a.status = 'absent'
+            AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+          )::int as absent_count,
+          COALESCE(
+            CURRENT_DATE - MAX(a.date) FILTER (WHERE a.status = 'present'),
+            999
+          )::int as days_since_last
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        LEFT JOIN attendance a ON p.id = a.participant_id
+        WHERE p.status = 'active'
+        GROUP BY p.id, p.name, g.name
+        HAVING
+          COUNT(a.id) FILTER (
+            WHERE a.status = 'absent'
+            AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+          ) >= 3
+          OR COALESCE(
+            CURRENT_DATE - MAX(a.date) FILTER (WHERE a.status = 'present'),
+            999
+          ) >= 14
+        ORDER BY absent_count DESC, days_since_last DESC, p.name ASC
+        LIMIT 40
+      `)
+    ]);
+
+    const debtors = debtorsRes.rows;
+    const absenceRisk = absenceRes.rows;
+
+    if (debtors.length === 0 && absenceRisk.length === 0) {
+      console.log(`${label} club summary skipped: no debtors or absence risks.`);
+      return;
+    }
+
+    let message = `<b>📌 ${escapeTelegramHtml(label)}: важливе по клубу</b>\n\n`;
+
+    if (debtors.length > 0) {
+      message += `<b>💳 Боржники (${debtors.length})</b>\n`;
+      debtors.slice(0, 20).forEach((p: any) => {
+        message += `• ${escapeTelegramHtml(p.name)}${p.group_name ? ` — ${escapeTelegramHtml(p.group_name)}` : ''}\n`;
+      });
+      if (debtors.length > 20) message += `• +${debtors.length - 20} ще\n`;
+      message += `\n`;
+    }
+
+    if (absenceRisk.length > 0) {
+      message += `<b>⚠️ Багато прогулів / давно не були (${absenceRisk.length})</b>\n`;
+      absenceRisk.slice(0, 20).forEach((p: any) => {
+        const daysText = Number(p.days_since_last) >= 999 ? 'не було відміток' : `${p.days_since_last} дн. без присутності`;
+        message += `• ${escapeTelegramHtml(p.name)}${p.group_name ? ` — ${escapeTelegramHtml(p.group_name)}` : ''}: ${p.absent_count || 0} пропусків, ${daysText}\n`;
+      });
+      if (absenceRisk.length > 20) message += `• +${absenceRisk.length - 20} ще\n`;
+    }
+
+    await sendTelegramMessage(message);
+  }
+
+  const isLastDayOfMonth = (date = new Date()) => {
+    const tomorrow = new Date(date);
+    tomorrow.setDate(date.getDate() + 1);
+    return tomorrow.getMonth() !== date.getMonth();
+  };
 
   async function sendMetaEvent(eventName: string, userData: any, req: express.Request) {
     const pixelId = process.env.META_PIXEL_ID;
@@ -1410,30 +1493,22 @@ async function startServer() {
 
   // Monthly Payment Reminder - Every 1st of the month at 09:00
   cron.schedule('0 9 1 * *', async () => {
-    console.log('Running monthly payment reminder...');
+    console.log('Running start-of-month club summary...');
     try {
-      if (!pool) return;
-
-      const result = await pool.query(`
-        SELECT name, belt FROM participants
-        WHERE payment_status != 'paid' AND status = 'active'
-      `);
-
-      const debtors = result.rows;
-      if (debtors.length === 0) return;
-
-      let message = `<b>💳 Нагадування про оплату (до 5 числа)</b>\n\n`;
-      message += `Нагадуємо про необхідність оплати за поточний місяць для наступних учнів:\n\n`;
-
-      debtors.forEach(p => {
-        message += `• ${p.name} (${p.belt || 'Білий'})\n`;
-      });
-
-      message += `\nБудь ласка, здійсніть оплату вчасно. Дякуємо!`;
-
-      console.log('Monthly payment reminder prepared; Telegram delivery disabled to keep the bot quiet.');
+      await sendMonthlyClubSummary('Початок місяця');
     } catch (err) {
-      console.error('Failed to send payment reminder:', err);
+      console.error('Failed to send start-of-month club summary:', err);
+    }
+  });
+
+  // End-of-month summary - Last day of each month at 09:00
+  cron.schedule('0 9 * * *', async () => {
+    if (!isLastDayOfMonth()) return;
+    console.log('Running end-of-month club summary...');
+    try {
+      await sendMonthlyClubSummary('Кінець місяця');
+    } catch (err) {
+      console.error('Failed to send end-of-month club summary:', err);
     }
   });
 
@@ -2348,19 +2423,7 @@ async function startServer() {
         results.push(result.rows[0].id);
       }
 
-      // Send Telegram notification
-      const childrenList = children.map(c => `- ${c.name} (${c.age} р.)`).join('\n');
-      const message = `
-<b>🆕 Нова реєстрація (${children.length} уч.)</b>
-<b>Батько/Мати:</b> ${parent_name || 'Не вказано'}
-<b>Телефон:</b> ${contactPhone}
-<b>Діти:</b>
-${childrenList}
-<b>Логін:</b> ${parent_login}
-<b>Пароль:</b> ${rawPassword}
-      `;
-
-      sendTelegramMessage(message).catch(err => console.error('Telegram notification failed:', err));
+      console.log('Member registration saved; Telegram delivery disabled to keep the bot quiet.');
 
       // Auto-login: set session for the first registered child
       if (results.length > 0) {
