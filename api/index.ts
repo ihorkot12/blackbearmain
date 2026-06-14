@@ -763,6 +763,28 @@ async function startServer() {
     return result.rows.map((row: any) => Number(row.id)).filter((id: number) => Number.isFinite(id));
   };
 
+  const canAccessParticipant = async (user: any, participantId: any): Promise<boolean> => {
+    const id = Number(participantId);
+    if (!Number.isFinite(id)) return false;
+    if (!user || user.role === 'admin') return true;
+    if (user.role === 'coach') {
+      if (!user.coach_id) return false;
+      const result = await pool.query(`
+        SELECT p.id
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.id = $1 AND g.coach_id = $2
+        LIMIT 1
+      `, [id, user.coach_id]);
+      return result.rows.length > 0;
+    }
+    if (user.role === 'parent') {
+      const familyIds = await getParentFamilyParticipantIds(user.id);
+      return familyIds.includes(id);
+    }
+    return false;
+  };
+
   // Instagram OAuth Routes
   app.get('/api/auth/instagram/url', (req, res) => {
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
@@ -985,7 +1007,7 @@ async function startServer() {
 
       // 3. Send to Parent Telegram only for direct, intentional messages.
       const token = process.env.TELEGRAM_BOT_TOKEN;
-      const parentTelegramTypes = new Set(['manual', 'message']);
+      const parentTelegramTypes = new Set(['manual', 'message', 'announcement']);
       if (token && participant.telegram_chat_id && parentTelegramTypes.has(type)) {
         const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
         await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -2950,6 +2972,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "Database not configured" });
 
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, req.params.id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       const allowedKeys = [
         'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password',
         'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone',
@@ -3051,6 +3078,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.delete("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, req.params.id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       await pool.query("DELETE FROM participants WHERE id = $1", [req.params.id]);
       res.json({ success: true });
     } catch (e) {
@@ -3063,6 +3094,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { id } = req.params;
     const { exam_readiness, skill_checklist } = req.body;
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       await pool.query(
         "UPDATE participants SET exam_readiness = $1, skill_checklist = $2 WHERE id = $3",
         [exam_readiness, JSON.stringify(skill_checklist), id]
@@ -3077,6 +3112,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { belt, rank_points } = req.body;
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, req.params.id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       await pool.query(
         "UPDATE participants SET belt = $1, rank_points = $2 WHERE id = $3",
         [belt, rank_points, req.params.id]
@@ -3805,6 +3844,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       return res.status(400).json({ error: "Participant ID and amount are required" });
     }
 
+    const user = (req as any).user;
+    if (!(await canAccessParticipant(user, participant_id))) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const normalizedDate = normalizeDate(date);
       const numAmount = parseFloat(amount.toString().replace(',', '.').replace(/\s/g, ''));
       if (isNaN(numAmount)) {
@@ -4036,6 +4080,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "DB error" });
     const { participantId, message } = req.body;
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       const coachName = (req as any).user?.name || 'Адмін';
       await notifyParent(participantId, 'manual', message, coachName);
       res.json({ success: true });
@@ -4049,20 +4097,39 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { message, group_id } = req.body;
     const coachName = (req as any).user?.name || 'Адмін';
     try {
-      let query = "SELECT id FROM participants WHERE status = 'active'";
-      let params = [];
+      const user = (req as any).user;
+      let query = `
+        SELECT p.id
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.status = 'active'
+      `;
+      let params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` AND g.coach_id = $${params.length}`;
+      }
       if (group_id && group_id !== 'all') {
-        query += " AND group_id = $1";
+        if (user.role === 'coach') {
+          const allowed = await pool.query(
+            "SELECT id FROM groups WHERE id = $1 AND coach_id = $2",
+            [group_id, user.coach_id]
+          );
+          if (allowed.rows.length === 0) {
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
         params.push(group_id);
+        query += ` AND p.group_id = $${params.length}`;
       }
       const result = await pool.query(query, params);
 
-      // Async notify all
-      result.rows.forEach(p => {
-        notifyParent(p.id, 'announcement', message, coachName);
-      });
+      const deliveries = await Promise.allSettled(
+        result.rows.map((p: any) => notifyParent(p.id, 'announcement', message, coachName))
+      );
+      const failed = deliveries.filter(d => d.status === 'rejected').length;
 
-      res.json({ success: true, count: result.rows.length });
+      res.json({ success: true, count: result.rows.length, failed });
     } catch (e) {
       res.status(500).json({ error: "Failed mass notify" });
     }
@@ -4072,6 +4139,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.get("/api/messages/:participantId", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, req.params.participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
       const result = await pool.query(
         "SELECT * FROM messages WHERE participant_id = $1 ORDER BY created_at ASC",
         [req.params.participantId]
@@ -4088,44 +4159,48 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const user = (req as any).user;
 
     try {
+      if (!(await canAccessParticipant(user, participant_id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const actualSenderType = user?.role === 'parent'
+        ? 'parent'
+        : user?.role === 'admin'
+          ? (sender_type === 'admin' ? 'admin' : 'coach')
+          : 'coach';
+
       let sender_id = null;
-      if (sender_type === 'coach') sender_id = user.coach_id;
-      else if (sender_type === 'admin') sender_id = user.id;
+      if (actualSenderType === 'coach') sender_id = user.coach_id || user.id;
+      else if (actualSenderType === 'admin') sender_id = user.id;
 
       const result = await pool.query(
         "INSERT INTO messages (participant_id, content, sender_type, sender_id) VALUES ($1, $2, $3, $4) RETURNING *",
-        [participant_id, content, sender_type, sender_id]
+        [participant_id, content, actualSenderType, sender_id]
       );
 
       // If parent sends to coach, notify coach via Telegram if possible
-      if (sender_type === 'parent') {
+      if (actualSenderType === 'parent') {
         const coachRes = await pool.query(`
-          SELECT c.telegram_chat_id, p.name as child_name
+          SELECT c.telegram_chat_id, c.name as coach_name, p.name as child_name
           FROM participants p
           JOIN groups g ON p.group_id = g.id
-          JOIN coaches c ON g.coach_id = c.id
+          LEFT JOIN coaches c ON g.coach_id = c.id
           WHERE p.id = $1
         `, [participant_id]);
 
-        if (coachRes.rows[0]?.telegram_chat_id) {
-          const token = process.env.TELEGRAM_BOT_TOKEN;
-          if (token) {
-            const text = `<b>📩 Нове повідомлення від батьків ${coachRes.rows[0].child_name}</b>\n\n${content}`;
-            await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: coachRes.rows[0].telegram_chat_id,
-                text: text,
-                parse_mode: 'HTML'
-              })
-            }).catch(err => console.error('Telegram notify coach error:', err));
-          }
+        const childName = coachRes.rows[0]?.child_name || 'учень';
+        const coachName = coachRes.rows[0]?.coach_name || 'тренер';
+        const text = `<b>Нове повідомлення від батьків</b>\n\nУчень: <b>${escapeTelegramHtml(childName)}</b>\nТренер: <b>${escapeTelegramHtml(coachName)}</b>\n\n${escapeTelegramHtml(content)}`;
+        const sentToCoach = coachRes.rows[0]?.telegram_chat_id
+          ? await sendTelegramMessage(text, coachRes.rows[0].telegram_chat_id)
+          : false;
+        if (!sentToCoach) {
+          await sendTelegramMessage(text);
         }
       } else {
         // If coach/admin sends to parent, notify parent via Telegram
         const coachName = (req as any).user?.name || 'Тренер';
-        notifyParent(participant_id, 'message', `Нове повідомлення від тренера: ${content}`, coachName);
+        await notifyParent(participant_id, 'message', `Нове повідомлення від тренера: ${content}`, coachName);
       }
 
       res.json(result.rows[0]);
@@ -4259,6 +4334,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const coach_id = (req as any).user?.role === 'coach' ? (req as any).user?.id : null;
 
     try {
+      const user = (req as any).user;
+      if (!(await canAccessParticipant(user, participant_id))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
       await pool.query("BEGIN");
 
       // Check if attendance already exists

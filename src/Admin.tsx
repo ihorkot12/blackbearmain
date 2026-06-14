@@ -756,25 +756,29 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           <h3 className="text-xl lg:text-2xl font-black uppercase tracking-tighter mb-3 lg:mb-4">Швидкі дії</h3>
           <p className="text-zinc-500 text-[10px] lg:text-sm font-medium mb-6 lg:mb-10 max-w-xs leading-relaxed">Керуйте розкладом, контентом та учасниками в один клік.</p>
           <div className="grid grid-cols-2 gap-2 lg:gap-4 w-full">
-            <button 
+            <button
+              type="button"
               onClick={() => onQuickAction('participants', 'add')}
               className="px-4 lg:px-6 py-3 lg:py-4 bg-red-600 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-red-700 transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)]"
             >
               Новий учень
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => onQuickAction('attendance', 'mark_attendance')}
               className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
             >
               Відмітити
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => onQuickAction('crm', 'add_payment')}
               className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
             >
               Оплата
             </button>
-            <button 
+            <button
+              type="button"
               onClick={() => onQuickAction('rank_management', 'add_activity')}
               className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
             >
@@ -790,6 +794,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
 export const AdminPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [initialAction, setInitialAction] = useState<string | null>(null);
+  const mainContentRef = useRef<HTMLElement | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState<string>('admin');
   const [userName, setUserName] = useState<string>('Адміністратор');
@@ -954,11 +959,14 @@ export const AdminPage = () => {
     setInitialAction(null);
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
-    // Use a small timeout to ensure the component has mounted before setting initialAction
+    requestAnimationFrame(() => {
+      mainContentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
     if (action) {
       setTimeout(() => {
         setInitialAction(action);
-      }, 300);
+      }, 350);
     }
   };
 
@@ -1225,7 +1233,7 @@ export const AdminPage = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-6 lg:p-12 max-w-7xl mx-auto w-full overflow-y-auto custom-scrollbar">
+        <main ref={mainContentRef} className="flex-1 p-6 lg:p-12 max-w-7xl mx-auto w-full overflow-y-auto custom-scrollbar">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
