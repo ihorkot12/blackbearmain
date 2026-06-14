@@ -13,6 +13,7 @@
     "clean": "rm -rf dist",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
     "start": "tsx api/index.ts",
+    "mobile:preflight": "node scripts/mobile-preflight.mjs",
     "mobile:sync": "npm run build && cap sync",
     "mobile:android": "npm run build && cap sync android && cap open android",
     "mobile:ios": "npm run build && cap sync ios && cap open ios"

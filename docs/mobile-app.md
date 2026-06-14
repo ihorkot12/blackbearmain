@@ -15,6 +15,7 @@ This keeps all admin functions in one place: participants, attendance, payments,
 ## Commands
 
 ```bash
+npm run mobile:preflight
 npm run mobile:sync
 npm run mobile:android
 npm run mobile:ios
@@ -27,6 +28,12 @@ npm run mobile:ios
 ## Preflight before building
 
 `npm run mobile:sync` must pass first. It builds the web app and copies the current admin shell into both native projects.
+
+Run this first:
+
+```bash
+npm run mobile:preflight
+```
 
 Android local build requirements:
 
