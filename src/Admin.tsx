@@ -281,7 +281,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       try {
         const [statsRes, birthdaysRes, messagesRes] = await Promise.all([
           fetch('/api/dashboard/stats', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
-          fetch('/api/birthdays', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+          fetch('/api/birthdays?days=30', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
           fetch('/api/admin/recent-messages', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
         ]);
         
@@ -298,9 +298,10 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
         setBirthdays(Array.isArray(birthdaysRes) ? birthdaysRes : []);
         setRecentMessages(Array.isArray(messagesRes) ? messagesRes : []);
         
-        if (Array.isArray(birthdaysRes) && birthdaysRes.length > 0) {
-          toast.info(`Сьогодні день народження у ${birthdaysRes.length} учнів!`, {
-            description: birthdaysRes.map(b => b.name).join(', '),
+        const todaysBirthdays = Array.isArray(birthdaysRes) ? birthdaysRes.filter((b: any) => Number(b.days_until || 0) === 0) : [];
+        if (todaysBirthdays.length > 0) {
+          toast.info(`Сьогодні день народження у ${todaysBirthdays.length} учнів!`, {
+            description: todaysBirthdays.map((b: any) => b.name).join(', '),
             duration: 10000
           });
         }
@@ -540,7 +541,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center justify-between mb-6 lg:mb-8 text-red-500">
               <div className="flex items-center gap-3">
                 <Smile size={20} />
-                Сьогодні день народження!
+                Найближчі дні народження
               </div>
               <ArrowUpRight size={18} className="text-red-600/50 group-hover:text-red-500 transition-colors" />
             </h3>
@@ -552,7 +553,9 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
                   </div>
                   <div>
                     <p className="text-sm font-black uppercase tracking-tight">{b.name}</p>
-                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{b.group_name}</p>
+                    <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
+                      {b.group_name} • {Number(b.days_until || 0) === 0 ? 'сьогодні' : `через ${b.days_until} дн.`}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -2376,7 +2379,7 @@ const RatingEditor = () => {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-white uppercase tracking-tight">1 місце</p>
-                  <p className="text-xs text-zinc-500 font-medium">+15 балів за перемогу</p>
+                  <p className="text-xs text-zinc-500 font-medium">+30 балів за перемогу</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -2385,7 +2388,7 @@ const RatingEditor = () => {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-white uppercase tracking-tight">2 місце</p>
-                  <p className="text-xs text-zinc-500 font-medium">+10 балів</p>
+                  <p className="text-xs text-zinc-500 font-medium">+20 балів</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -2394,7 +2397,7 @@ const RatingEditor = () => {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-white uppercase tracking-tight">3 місце</p>
-                  <p className="text-xs text-zinc-500 font-medium">+7 балів</p>
+                  <p className="text-xs text-zinc-500 font-medium">+15 балів</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">
@@ -2404,6 +2407,24 @@ const RatingEditor = () => {
                 <div>
                   <p className="text-sm font-bold text-white uppercase tracking-tight">Участь</p>
                   <p className="text-xs text-zinc-500 font-medium">+5 балів за участь у змаганнях</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-blue-500/10 text-blue-500 rounded-lg flex items-center justify-center shrink-0">
+                  <Book size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">Семінар</p>
+                  <p className="text-xs text-zinc-500 font-medium">+10 балів за навчальну подію</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-red-500/10 text-red-500 rounded-lg flex items-center justify-center shrink-0">
+                  <ShieldCheck size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">Атестація</p>
+                  <p className="text-xs text-zinc-500 font-medium">+20 балів за успішну атестацію</p>
                 </div>
               </div>
             </div>
@@ -5562,6 +5583,7 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
   });
 
   const [confirmDeleteAnnouncement, setConfirmDeleteAnnouncement] = useState<{id: number} | null>(null);
+  const [sendingPaymentReminders, setSendingPaymentReminders] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);
@@ -5673,6 +5695,28 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
     }
   };
 
+  const handleSendPaymentReminders = async () => {
+    setSendingPaymentReminders(true);
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/payment-reminders', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast.success(`Нагадування створено: ${data.created}`, {
+          description: data.skipped_recent ? `${data.skipped_recent} учнів вже мали нагадування за останні 7 днів` : undefined
+        });
+      } else {
+        toast.error(data.error || 'Не вдалося створити нагадування');
+      }
+    } catch (e) {
+      toast.error('Помилка мережі при створенні нагадувань');
+    }
+    setSendingPaymentReminders(false);
+  };
+
   const monthlyData = useMemo(() => {
     if (!report?.monthly) return [];
     const months = ['Січ', 'Лют', 'Бер', 'Квіт', 'Трав', 'Черв', 'Лип', 'Серп', 'Вер', 'Жовт', 'Лист', 'Груд'];
@@ -5710,7 +5754,15 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
           <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">CRM & Фінанси</h1>
           <p className="text-zinc-500 font-medium max-w-2xl">Керування лідами, оплатами та фінансова звітність.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
+          <button
+            onClick={handleSendPaymentReminders}
+            disabled={sendingPaymentReminders}
+            className="bg-orange-600/10 hover:bg-orange-600 text-orange-500 hover:text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3 border border-orange-600/20 disabled:opacity-50"
+          >
+            <Bell size={18} />
+            {sendingPaymentReminders ? 'Створюю...' : 'Нагадати оплату'}
+          </button>
           <button 
             onClick={() => setIsAddingAnnouncement(true)}
             className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3"

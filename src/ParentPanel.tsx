@@ -47,11 +47,33 @@ const parentFetch = (url: string, options: RequestInit = {}) =>
     },
   });
 
+const eventTypeLabel = (type?: string) => {
+  if (type === 'seminar') return 'Семінар';
+  if (type === 'certification') return 'Атестація';
+  if (type === 'club_event') return 'Подія клубу';
+  return 'Змагання';
+};
+
+const pointReasonLabel = (reason?: string) => {
+  if (!reason) return 'Бали';
+  if (reason === 'attendance') return 'Відвідування';
+  if (reason === 'attendance_removal') return 'Корекція відвідування';
+  if (reason === 'badge') return 'Досягнення';
+  if (reason.startsWith('seminar')) return 'Семінар';
+  if (reason.startsWith('certification')) return 'Атестація';
+  if (reason.startsWith('club_event')) return 'Подія клубу';
+  if (reason.startsWith('competition')) return 'Змагання';
+  return reason;
+};
+
 const ParentPanel = () => {
   const [participant, setParticipant] = useState<any>(null);
   const [children, setChildren] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [pointsLog, setPointsLog] = useState<any[]>([]);
+  const [ratingsSummary, setRatingsSummary] = useState<any>(null);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
@@ -143,10 +165,13 @@ const ParentPanel = () => {
   const fetchData = async (isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
-      const [pRes, aRes, bRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
+      const [pRes, aRes, bRes, eventRes, pointsRes, ratingsRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
         parentFetch('/api/parent/me'),
         parentFetch('/api/parent/attendance'),
         parentFetch('/api/parent/badges'),
+        parentFetch('/api/parent/events'),
+        parentFetch('/api/parent/points-log'),
+        parentFetch('/api/parent/ratings'),
         parentFetch('/api/parent/schedule'),
         parentFetch('/api/parent/children'),
         parentFetch('/api/parent/payments'),
@@ -164,6 +189,9 @@ const ParentPanel = () => {
       const pData = pRes.ok ? await pRes.json() : null;
       const aData = aRes.ok ? await aRes.json() : [];
       const bData = bRes.ok ? await bRes.json() : [];
+      const eventData = eventRes.ok ? await eventRes.json() : [];
+      const pointsData = pointsRes.ok ? await pointsRes.json() : [];
+      const ratingsData = ratingsRes.ok ? await ratingsRes.json() : null;
       const sData = sRes.ok ? await sRes.json() : [];
       const cData = cRes.ok ? await cRes.json() : [];
       const payData = payRes.ok ? await payRes.json() : [];
@@ -173,6 +201,9 @@ const ParentPanel = () => {
       if (pData) setParticipant(pData);
       setAttendance(aData);
       setBadges(bData);
+      setEvents(Array.isArray(eventData) ? eventData : []);
+      setPointsLog(Array.isArray(pointsData) ? pointsData : []);
+      setRatingsSummary(ratingsData && !ratingsData.error ? ratingsData : null);
       setSchedule(sData);
       setChildren(cData);
       setPayments(payData);
@@ -217,6 +248,11 @@ const ParentPanel = () => {
     const token = `p_${participant.id}`;
     window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
   };
+
+  const bestAthlete = ratingsSummary?.bestAthlete;
+  const currentRank = ratingsSummary?.currentChild?.rank_position;
+  const currentPoints = ratingsSummary?.currentChild?.total_points ?? participant?.rank_points ?? 0;
+  const totalAchievements = badges.length + events.length;
 
   if (loading) {
     return (
@@ -654,8 +690,8 @@ const ParentPanel = () => {
                     <Award size={80} />
                   </div>
                   <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Досягнення</div>
-                  <div className="text-4xl font-black mb-2">{badges.length}</div>
-                  <div className="text-xs text-zinc-400">отримано відзнак</div>
+                  <div className="text-4xl font-black mb-2">{totalAchievements}</div>
+                  <div className="text-xs text-zinc-400">відзнаки, семінари та події</div>
                 </div>
                 <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
@@ -688,6 +724,28 @@ const ParentPanel = () => {
                   </div>
                 </div>
               </div>
+
+              {(bestAthlete || currentRank) && (
+                <div className="grid lg:grid-cols-2 gap-6">
+                  <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-amber-500/20 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                      <Trophy size={96} />
+                    </div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 mb-4">Кращий спортсмен групи</div>
+                    <div className="text-2xl font-black uppercase tracking-tight mb-2">{bestAthlete?.name || 'Поки немає даних'}</div>
+                    <div className="text-sm text-zinc-400">{bestAthlete ? `${bestAthlete.total_points} балів • ${bestAthlete.attendance_count} відвідувань` : 'Рейтинг зʼявиться після перших балів'}</div>
+                  </div>
+
+                  <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-8 opacity-10">
+                      <Star size={96} />
+                    </div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Місце вашої дитини</div>
+                    <div className="text-4xl font-black mb-2">{currentRank ? `#${currentRank}` : '—'}</div>
+                    <div className="text-sm text-zinc-400">{currentPoints} балів у поточному рейтингу групи</div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid lg:grid-cols-2 gap-12">
                 <section>
@@ -943,6 +1001,105 @@ const ParentPanel = () => {
                           <div className="col-span-2 text-center p-8 text-zinc-500 italic text-sm">Чек-лист поки порожній</div>
                         )}
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-8">
+                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-black uppercase tracking-tight">Рейтинг групи</h3>
+                    <span className="px-3 py-1 bg-amber-500/10 text-amber-500 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                      {currentRank ? `Ваше місце #${currentRank}` : 'Без місця'}
+                    </span>
+                  </div>
+                  {bestAthlete && (
+                    <div className="mb-5 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-amber-500 text-black flex items-center justify-center">
+                        <Trophy size={24} />
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Кращий спортсмен</div>
+                        <div className="font-black uppercase tracking-tight">{bestAthlete.name}</div>
+                        <div className="text-xs text-zinc-400">{bestAthlete.total_points} балів</div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-3">
+                    {(ratingsSummary?.groupTop || []).slice(0, 8).map((row: any) => (
+                      <div key={row.id} className={`flex items-center justify-between p-4 rounded-2xl border ${
+                        row.id === participant?.id ? 'bg-red-600/10 border-red-600/30' : 'bg-white/[0.03] border-white/5'
+                      }`}>
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                            Number(row.rank_position) === 1 ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-zinc-400'
+                          }`}>
+                            {row.rank_position}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold truncate">{row.name}</div>
+                            <div className="text-[10px] text-zinc-500">{row.attendance_count || 0} відвідувань • {row.seminar_count || 0} семінарів</div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-black text-white">{row.total_points}</div>
+                      </div>
+                    ))}
+                    {(!ratingsSummary?.groupTop || ratingsSummary.groupTop.length === 0) && (
+                      <div className="p-10 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-sm">
+                        Рейтинг зʼявиться після перших відвідувань або подій
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-8">
+                  <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+                    <h3 className="text-xl font-black uppercase tracking-tight mb-6">Семінари та події</h3>
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {events.slice(0, 8).map((event) => (
+                        <div key={event.id} className="p-4 bg-white/[0.03] rounded-2xl border border-white/5 flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-[10px] font-black uppercase tracking-widest text-red-500 mb-1">{eventTypeLabel(event.type)}</div>
+                            <div className="text-sm font-bold truncate">{event.name}</div>
+                            <div className="text-[10px] text-zinc-500 mt-1">
+                              {event.participant_name} • {event.date ? new Date(event.date).toLocaleDateString('uk-UA') : 'без дати'}
+                            </div>
+                          </div>
+                          <div className="px-3 py-1 rounded-lg bg-green-500/10 text-green-500 text-[10px] font-black whitespace-nowrap">
+                            +{event.points_awarded || 0}
+                          </div>
+                        </div>
+                      ))}
+                      {events.length === 0 && (
+                        <div className="p-10 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-sm">
+                          Подій і семінарів поки немає
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5">
+                    <h3 className="text-xl font-black uppercase tracking-tight mb-6">Журнал балів</h3>
+                    <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                      {pointsLog.slice(0, 10).map((point) => (
+                        <div key={point.id} className="p-4 bg-white/[0.03] rounded-2xl border border-white/5 flex items-center justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="text-sm font-bold truncate">{pointReasonLabel(point.reason)}</div>
+                            <div className="text-[10px] text-zinc-500">
+                              {point.participant_name} • {point.date ? new Date(point.date).toLocaleDateString('uk-UA') : 'без дати'}
+                            </div>
+                          </div>
+                          <div className={`text-sm font-black ${Number(point.points) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {Number(point.points) >= 0 ? '+' : ''}{point.points}
+                          </div>
+                        </div>
+                      ))}
+                      {pointsLog.length === 0 && (
+                        <div className="p-10 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-sm">
+                          Бали ще не нараховувались
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

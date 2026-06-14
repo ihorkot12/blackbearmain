@@ -109,7 +109,7 @@ async function initDb() {
         order_index INTEGER DEFAULT 0,
         capacity INTEGER DEFAULT 20
       );
-      
+
       ALTER TABLE groups ADD COLUMN IF NOT EXISTS capacity INTEGER DEFAULT 20;
     `);
 
@@ -118,11 +118,11 @@ async function initDb() {
       await client.query("ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key");
       // Normalize existing parent_login values (remove spaces, dashes, etc.)
       await client.query("UPDATE participants SET parent_login = REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') WHERE parent_login IS NOT NULL AND parent_login ~ '[^\\d+]'");
-      
+
       // Ensure parent_login is set for all participants who have a phone
       await client.query(`
-        UPDATE participants 
-        SET parent_login = REGEXP_REPLACE(COALESCE(parent_phone, phone), '[^\\d]', '', 'g') 
+        UPDATE participants
+        SET parent_login = REGEXP_REPLACE(COALESCE(parent_phone, phone), '[^\\d]', '', 'g')
         WHERE (parent_login IS NULL OR parent_login = '') AND (parent_phone IS NOT NULL OR phone IS NOT NULL)
       `);
     } catch (e) {
@@ -156,16 +156,16 @@ async function initDb() {
       );
 
       -- Ensure achievements_text exists
-      DO $$ 
-      BEGIN 
+      DO $$
+      BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='achievements_text') THEN
           ALTER TABLE participants ADD COLUMN achievements_text TEXT;
         END IF;
       END $$;
 
       -- Ensure updated_at exists
-      DO $$ 
-      BEGIN 
+      DO $$
+      BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='participants' AND column_name='updated_at') THEN
           ALTER TABLE participants ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
         END IF;
@@ -185,7 +185,7 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS skill_checklist JSONB DEFAULT '[]';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS last_attendance_date DATE;
-      
+
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
         user_id INTEGER, -- admin or coach id
@@ -251,9 +251,9 @@ async function initDb() {
       );
 
       ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS admin_user_id INTEGER REFERENCES admin_users(id) ON DELETE CASCADE;
-      
-      DO $$ 
-      BEGIN 
+
+      DO $$
+      BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'instagram_accounts_instagram_business_account_id_key') THEN
           ALTER TABLE instagram_accounts ADD CONSTRAINT instagram_accounts_instagram_business_account_id_key UNIQUE (instagram_business_account_id);
         END IF;
@@ -547,7 +547,7 @@ async function initDb() {
       if (parseInt(schedRes.rows[0].count) === 0) {
         const coachIgor = await client.query("SELECT id FROM coaches WHERE name = 'Ігор Котляревський' LIMIT 1");
         const coachOleg = await client.query("SELECT id FROM coaches WHERE name = 'Олег Крамаренко' LIMIT 1");
-        
+
         const igorId = coachIgor.rows[0]?.id;
         const olegId = coachOleg.rows[0]?.id;
 
@@ -589,20 +589,20 @@ async function initDb() {
 
 async function startServer() {
   await initDb();
-  
+
   const app = express();
   const PORT = 3000;
 
   // Trust the first proxy (Cloud Run / Nginx)
   app.set('trust proxy', 1);
-  
+
   // Security and Performance Middleware
   app.use(helmet({
     contentSecurityPolicy: false, // Disable for easier integration of external scripts if needed, or configure properly
     crossOriginEmbedderPolicy: false,
   }));
   app.use(compression());
-  
+
   // General API Rate Limiter
   const apiLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 minute
@@ -613,7 +613,7 @@ async function startServer() {
     validate: false,
   });
   app.use('/api/', apiLimiter);
-  
+
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
   app.set('trust proxy', 1);
@@ -629,9 +629,9 @@ async function startServer() {
     resave: false,
     saveUninitialized: false,
     proxy: true,
-    cookie: { 
-      secure: true, 
-      httpOnly: true, 
+    cookie: {
+      secure: true,
+      httpOnly: true,
       sameSite: 'none',
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
@@ -671,10 +671,10 @@ async function startServer() {
 
     // Also check session for parent
     if ((req.session as any).participantId) {
-      (req as any).user = { 
-        id: (req.session as any).participantId, 
-        role: 'parent', 
-        name: (req.session as any).userName 
+      (req as any).user = {
+        id: (req.session as any).participantId,
+        role: 'parent',
+        name: (req.session as any).userName
       };
       return next();
     }
@@ -729,6 +729,37 @@ async function startServer() {
     }
   };
 
+  const getParentFamilyParticipantIds = async (participantId: number): Promise<number[]> => {
+    const meRes = await pool.query(
+      "SELECT parent_login, parent_phone, phone FROM participants WHERE id = $1",
+      [participantId]
+    );
+    if (meRes.rows.length === 0) return [];
+
+    const { parent_login, parent_phone, phone } = meRes.rows[0];
+    const normalizedPhone = normalizePhone(parent_phone || phone || "").replace(/\D/g, "");
+    const params: any[] = [participantId];
+    const filters = [`p.id = $${params.length}`];
+
+    if (parent_login) {
+      params.push(parent_login);
+      filters.push(`p.parent_login = $${params.length}`);
+    }
+
+    if (normalizedPhone) {
+      params.push(normalizedPhone);
+      filters.push(`REGEXP_REPLACE(COALESCE(p.parent_phone, ''), '[^\\d]', '', 'g') = $${params.length}`);
+      filters.push(`REGEXP_REPLACE(COALESCE(p.phone, ''), '[^\\d]', '', 'g') = $${params.length}`);
+      filters.push(`REGEXP_REPLACE(COALESCE(p.parent_login, ''), '[^\\d]', '', 'g') = $${params.length}`);
+    }
+
+    const result = await pool.query(
+      `SELECT DISTINCT p.id FROM participants p WHERE ${filters.join(' OR ')}`,
+      params
+    );
+    return result.rows.map((row: any) => Number(row.id)).filter((id: number) => Number.isFinite(id));
+  };
+
   // Instagram OAuth Routes
   app.get('/api/auth/instagram/url', (req, res) => {
     const clientId = process.env.INSTAGRAM_CLIENT_ID;
@@ -738,7 +769,7 @@ async function startServer() {
     const host = process.env.APP_URL ? new URL(process.env.APP_URL).host : req.get('host');
     const protocol = process.env.APP_URL ? new URL(process.env.APP_URL).protocol.replace(':', '') : req.protocol;
     const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
-    
+
     // Scopes needed for Business Account insights
     const scopes = [
       'instagram_basic',
@@ -750,7 +781,7 @@ async function startServer() {
 
     const state = action === 'login' ? 'login' : 'connect';
     const authUrl = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code&state=${state}`;
-    
+
     res.json({ url: authUrl });
   });
 
@@ -785,11 +816,11 @@ async function startServer() {
         for (const page of pagesData.data) {
           const igRes = await fetch(`https://graph.facebook.com/v19.0/${page.id}?fields=instagram_business_account&access_token=${accessToken}`);
           const igData: any = await igRes.json();
-          
+
           if (igData.instagram_business_account) {
             instagramBusinessAccountId = igData.instagram_business_account.id;
             facebookPageId = page.id;
-            
+
             const userRes = await fetch(`https://graph.facebook.com/v19.0/${instagramBusinessAccountId}?fields=username&access_token=${accessToken}`);
             const userData: any = await userRes.json();
             username = userData.username || username;
@@ -1001,7 +1032,7 @@ async function startServer() {
       if (parts.length > 1) {
         const token = parts[1];
         const [type, id] = token.split("_");
-        
+
         try {
           if (type === "p") {
             await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
@@ -1017,7 +1048,7 @@ async function startServer() {
         await sendTelegramMessage("👋 Вітаємо у Black Bear Dojo! Щоб підключити акаунт, скористайтеся кнопкою в особистому кабінеті.", String(chatId));
       }
     }
-    
+
     res.sendStatus(200);
   });
 
@@ -1031,7 +1062,7 @@ async function startServer() {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const defaultChatId = process.env.TELEGRAM_CHAT_ID;
     const chatId = customChatId || defaultChatId;
-    
+
     if (!token || !chatId) {
       console.warn('Telegram notification skipped: TELEGRAM_BOT_TOKEN or chatId is missing.');
       return;
@@ -1162,7 +1193,7 @@ async function startServer() {
     if (!dateStr) return new Date().toISOString().split('T')[0];
     const s = dateStr.toString().trim();
     if (!s) return new Date().toISOString().split('T')[0];
-    
+
     // Check for DD.MM.YYYY
     if (s.includes('.') && s.split('.').length === 3) {
       const parts = s.split('.');
@@ -1170,7 +1201,7 @@ async function startServer() {
         return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
       }
     }
-    
+
     // Check for YYYY-MM-DD
     if (s.includes('-') && s.split('-').length === 3) {
       return s;
@@ -1189,7 +1220,7 @@ async function startServer() {
   app.post("/api/attendance/bulk", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participants, date, status } = req.body;
-    
+
     if (!Array.isArray(participants) || !date || !status) {
       return res.status(400).json({ error: "Invalid bulk data" });
     }
@@ -1200,19 +1231,24 @@ async function startServer() {
 
     try {
       await pool.query("BEGIN");
-      
+
       const results = [];
       for (const pId of participants) {
         // Find current streak to update
         const pInfo = await pool.query("SELECT streak, last_attendance_date FROM participants WHERE id = $1", [pId]);
         const p = pInfo.rows[0];
-        
+        const existing = await pool.query(
+          "SELECT status FROM attendance WHERE participant_id = $1 AND date = $2",
+          [pId, normalizedDate]
+        );
+        const previousStatus = existing.rows[0]?.status;
+
         let newStreak = (p?.streak || 0);
         if (status === 'present') {
           const yesterday = new Date(normalizedDate);
           yesterday.setDate(yesterday.getDate() - 1);
           const yesterdayStr = yesterday.toISOString().split('T')[0];
-          
+
           if (p?.last_attendance_date && p.last_attendance_date.toISOString().split('T')[0] === yesterdayStr) {
             newStreak += 1;
           } else if (!p?.last_attendance_date || p.last_attendance_date.toISOString().split('T')[0] < yesterdayStr) {
@@ -1223,23 +1259,29 @@ async function startServer() {
         }
 
         await pool.query(
-          `INSERT INTO attendance (participant_id, date, status, coach_id) 
-           VALUES ($1, $2, $3, $4) 
+          `INSERT INTO attendance (participant_id, date, status, coach_id)
+           VALUES ($1, $2, $3, $4)
            ON CONFLICT (participant_id, date) DO UPDATE SET status = EXCLUDED.status, coach_id = EXCLUDED.coach_id`,
           [pId, normalizedDate, status, coachId]
         );
 
-        if (status === 'present') {
+        if (status === 'present' && previousStatus !== 'present') {
            // Increment rank points and streak
            await pool.query(
             "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
             [pId, 1, 'attendance', normalizedDate]
           );
-          
+
           await pool.query(
             "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3",
             [newStreak, normalizedDate, pId]
           );
+        } else if (status === 'absent' && previousStatus === 'present') {
+          await pool.query(
+            "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+            [pId, -1, 'attendance_removal', normalizedDate]
+          );
+          await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [pId]);
         } else if (status === 'absent') {
           await pool.query("UPDATE participants SET streak = 0 WHERE id = $1", [pId]);
         }
@@ -1262,7 +1304,7 @@ async function startServer() {
   app.post("/api/leads", leadLimiter, async (req, res) => {
     const { name, phone, age_group, location, event_id, source } = req.body;
     console.log(`New lead submission: ${name}, ${phone}, source: ${source}`);
-    
+
     const sourceMap: Record<string, string> = {
       'main': 'Головна сторінка',
       'kids_landing': 'Діти (4-7 років)',
@@ -1281,7 +1323,7 @@ async function startServer() {
       } else {
         console.log('Database not configured, skipping lead save');
       }
-      
+
       const message = `
 <b>🔔 Нова заявка на пробне заняття!</b>
 <b>Джерело:</b> ${sourceName}
@@ -1290,12 +1332,12 @@ async function startServer() {
 <b>Вікова група:</b> ${age_group}
 <b>Локація:</b> ${location || 'Не вказано'}
       `;
-      
+
       // Send notifications (Synchronous for stability)
       try {
         const tgStatus = await sendTelegramMessage(message);
         console.log(`Telegram notification status: ${tgStatus ? 'Success' : 'Failed'}`);
-        
+
         // 2. Send to Meta Pixel (Background is fine for this)
         sendMetaEvent('Lead', { name, phone, event_id, source }, req).catch(err => console.error('Meta CAPI error:', err));
 
@@ -1318,13 +1360,13 @@ async function startServer() {
     console.log('Running weekly attendance report...');
     try {
       if (!pool) return;
-      
+
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
       const dateStr = oneWeekAgo.toISOString().split('T')[0];
 
       const result = await pool.query(`
-        SELECT 
+        SELECT
           p.name,
           COUNT(CASE WHEN a.status = 'present' THEN 1 END) as present_count,
           COUNT(CASE WHEN a.status = 'absent' THEN 1 END) as absent_count
@@ -1340,7 +1382,7 @@ async function startServer() {
       const missing = participants.filter(p => parseInt(p.present_count) === 0);
 
       let report = `<b>📊 Звіт про відвідуваність за тиждень</b>\n\n`;
-      
+
       report += `<b>✅ Регулярно ходять:</b>\n`;
       if (regular.length > 0) {
         regular.slice(0, 10).forEach(p => {
@@ -1372,7 +1414,7 @@ async function startServer() {
       if (!pool) return;
 
       const result = await pool.query(`
-        SELECT name, belt FROM participants 
+        SELECT name, belt FROM participants
         WHERE payment_status != 'paid' AND status = 'active'
       `);
 
@@ -1381,7 +1423,7 @@ async function startServer() {
 
       let message = `<b>💳 Нагадування про оплату (до 5 числа)</b>\n\n`;
       message += `Нагадуємо про необхідність оплати за поточний місяць для наступних учнів:\n\n`;
-      
+
       debtors.forEach(p => {
         message += `• ${p.name} (${p.belt || 'Білий'})\n`;
       });
@@ -1509,7 +1551,7 @@ async function startServer() {
     if (!pool) return res.status(500).send("Database not configured");
     const cacheKey = `content_${req.params.key}`;
     const cached = imageCache.get(cacheKey);
-    
+
     if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
       res.setHeader('Content-Type', cached.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -1521,19 +1563,19 @@ async function startServer() {
       if (result.rows.length === 0 || !result.rows[0].value.startsWith('data:image/')) {
         return res.status(404).send("Image not found");
       }
-      
+
       const base64Data = result.rows[0].value;
       const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
         return res.status(400).send("Invalid image format");
       }
-      
+
       const contentType = matches[1];
       const buffer = Buffer.from(matches[2], 'base64');
-      
+
       // Update cache
       imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
-      
+
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
       res.send(buffer);
@@ -1547,7 +1589,7 @@ async function startServer() {
     if (!pool) return res.status(500).send("Database not configured");
     const cacheKey = `coach_${req.params.id}`;
     const cached = imageCache.get(cacheKey);
-    
+
     if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
       res.setHeader('Content-Type', cached.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -1559,19 +1601,19 @@ async function startServer() {
       if (result.rows.length === 0 || !result.rows[0].photo || !result.rows[0].photo.startsWith('data:image/')) {
         return res.status(404).send("Image not found");
       }
-      
+
       const base64Data = result.rows[0].photo;
       const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
         return res.status(400).send("Invalid image format");
       }
-      
+
       const contentType = matches[1];
       const buffer = Buffer.from(matches[2], 'base64');
-      
+
       // Update cache
       imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
-      
+
       res.setHeader('Content-Type', contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
       res.send(buffer);
@@ -1584,7 +1626,7 @@ async function startServer() {
   // Combined Init Data for Optimization
   app.get("/api/init", async (req, res) => {
     const now = Date.now();
-    
+
     // Serve from cache if available and not expired
     if (initCache && (now - lastInitUpdate < CACHE_TTL)) {
       res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes browser cache
@@ -1592,11 +1634,11 @@ async function startServer() {
     }
 
     if (!pool) return res.json({ content: {}, coaches: [], locations: [], schedule: [] });
-    
+
     try {
       const [contentRes, coachesRes, locationsRes, scheduleRes, groupsRes] = await Promise.all([
         pool.query(`
-          SELECT key, 
+          SELECT key,
                  CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
                  CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
           FROM site_content
@@ -1610,13 +1652,13 @@ async function startServer() {
         `),
         pool.query("SELECT * FROM locations"),
         pool.query(`
-          SELECT s.*, c.name as coach_name, l.name as location_name 
+          SELECT s.*, c.name as coach_name, l.name as location_name
           FROM schedule s
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
         `),
         pool.query(`
-          SELECT g.*, l.name as location_name, c.name as coach_name 
+          SELECT g.*, l.name as location_name, c.name as coach_name
           FROM groups g
           LEFT JOIN locations l ON g.location_id = l.id
           LEFT JOIN coaches c ON g.coach_id = c.id
@@ -1634,7 +1676,7 @@ async function startServer() {
 
       const coaches = coachesRes.rows.map(coach => {
         const c = { ...coach };
-        
+
         // One-time fix for Oleg Kramarenko if photo is missing or broken
         if (c.name === "Олег Крамаренко" && (!c.photo || c.photo.includes('unsplash.com/photo-1544367567-0f2fcb009e0b'))) {
           c.photo = "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop";
@@ -1672,7 +1714,7 @@ async function startServer() {
   // Site Content
   app.get("/api/content", async (req, res) => {
     const now = Date.now();
-    
+
     // Serve from cache if available and not expired
     if (contentCache && (now - lastCacheUpdate < CACHE_TTL)) {
       res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes browser cache
@@ -1682,7 +1724,7 @@ async function startServer() {
     if (!pool) return res.json({});
     try {
       const result = await pool.query(`
-        SELECT key, 
+        SELECT key,
                CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
                CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
         FROM site_content
@@ -1695,11 +1737,11 @@ async function startServer() {
         }
         return acc;
       }, {});
-      
+
       // Update cache
       contentCache = content;
       lastCacheUpdate = now;
-      
+
       res.setHeader('Cache-Control', 'public, max-age=300');
       res.json(content);
     } catch (e: any) {
@@ -1722,7 +1764,7 @@ async function startServer() {
       }
       // Invalidate cache
       invalidateInitCache();
-      
+
       res.json({ success: true });
     } catch (e) {
       console.error(e);
@@ -1738,7 +1780,7 @@ async function startServer() {
         SELECT id, name, role, bio, achievements, order_index,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
-        FROM coaches 
+        FROM coaches
         ORDER BY order_index ASC
       `);
       res.json(result.rows.map((c: any) => {
@@ -1748,9 +1790,9 @@ async function startServer() {
         } catch (err) {
           console.error('Failed to parse achievements for coach', c.id, err);
         }
-        
+
         const coach = { ...c, achievements: parsedAchievements };
-        
+
         // One-time fix for Oleg Kramarenko if photo is missing or broken
         if (coach.name === "Олег Крамаренко" && (!coach.photo || coach.photo.includes('unsplash.com/photo-1544367567-0f2fcb009e0b'))) {
           coach.photo = "https://images.unsplash.com/photo-1594381898411-846e7d193883?q=80&w=800&auto=format&fit=crop";
@@ -1828,7 +1870,7 @@ async function startServer() {
     try {
       let query = 'UPDATE coaches SET name = $1, role = $2, bio = $3, achievements = $4';
       let params = [name, role, bio, JSON.stringify(achievements || [])];
-      
+
       // Only update photo if it's not a generated URL that points back to the base64 data
       // This prevents overwriting the base64 data with its own serving URL
       if (photo && !photo.startsWith('/api/images/coaches/')) {
@@ -1838,7 +1880,7 @@ async function startServer() {
         query += ' WHERE id = $5';
         params.push(req.params.id);
       }
-      
+
       await pool.query(query, params);
       // Invalidate cache
       invalidateInitCache();
@@ -1912,7 +1954,7 @@ async function startServer() {
     if (!pool) return res.json([]);
     try {
       const result = await pool.query(`
-        SELECT s.*, c.name as coach_name, l.name as location_name 
+        SELECT s.*, c.name as coach_name, l.name as location_name
         FROM schedule s
         LEFT JOIN coaches c ON s.coach_id = c.id
         LEFT JOIN locations l ON s.location_id = l.id
@@ -1950,7 +1992,7 @@ async function startServer() {
     const user = (req as any).user;
     try {
       let query = `
-        SELECT s.*, c.name as coach_name, l.name as location_name 
+        SELECT s.*, c.name as coach_name, l.name as location_name
         FROM schedule s
         LEFT JOIN coaches c ON s.coach_id = c.id
         LEFT JOIN locations l ON s.location_id = l.id
@@ -2017,7 +2059,7 @@ async function startServer() {
   // Auth
   const loginHandler = async (req: express.Request, res: express.Response) => {
     console.log('Login attempt with:', req.body.login);
-    
+
     try {
       const { login, password } = req.body;
       if (!login || !password) {
@@ -2035,10 +2077,10 @@ async function startServer() {
       let user = null;
       if (normalizedPhone.length >= 9) {
         const result = await pool.query(
-          `SELECT id, name, phone, parent_phone, parent_password, parent_login 
-           FROM participants 
+          `SELECT id, name, phone, parent_phone, parent_password, parent_login
+           FROM participants
            WHERE (phone IS NOT NULL OR parent_phone IS NOT NULL) AND (
-             phone LIKE '%' || $1 OR 
+             phone LIKE '%' || $1 OR
              phone LIKE '%' || $2 OR
              parent_phone LIKE '%' || $1 OR
              parent_phone LIKE '%' || $2 OR
@@ -2075,7 +2117,7 @@ async function startServer() {
       // ===== БАТЬКІВ LOGIN =====
       if (!user.isAdmin) {
         let passwordMatch = false;
-        
+
         // Спроба 1: bcrypt.compare (якщо пароль хешований)
         if (user.parent_password) {
           try {
@@ -2107,9 +2149,9 @@ async function startServer() {
             console.error('Session save error:', err);
             return res.status(500).json({ error: 'Session save failed' });
           }
-          res.json({ 
-            success: true, 
-            role: 'parent', 
+          res.json({
+            success: true,
+            role: 'parent',
             name: user.name,
             participantId: user.id,
             token: `${user.id}-parent`,
@@ -2121,7 +2163,7 @@ async function startServer() {
       // ===== АДМІН LOGIN =====
       else {
         let passwordMatch = false;
-        
+
         try {
           if (isBcryptHash(user.admin_password)) {
             passwordMatch = await bcrypt.compare(password, user.admin_password);
@@ -2149,10 +2191,10 @@ async function startServer() {
             console.error('Session save error:', err);
             return res.status(500).json({ error: 'Session save failed' });
           }
-          res.json({ 
-            success: true, 
-            role: user.role || 'admin', 
-            name: user.name, 
+          res.json({
+            success: true,
+            role: user.role || 'admin',
+            name: user.name,
             id: user.id,
             token: `${user.id}-${user.role || 'admin'}`,
             redirect: '/admin'
@@ -2240,7 +2282,7 @@ async function startServer() {
   app.post('/api/auth/change-password', requireAuth, async (req, res) => {
     const { newPassword } = req.body;
     if (!newPassword) return res.status(400).json({ error: 'New password required' });
-    
+
     // In this environment, we use process.env for the password.
     // However, for a "real" app we'd update a database.
     // Since we can't update process.env permanently, we'll just mock success
@@ -2258,13 +2300,13 @@ async function startServer() {
         LEFT JOIN groups g ON p.group_id = g.id
         ORDER BY p.name ASC
       `);
-      
+
       const worksheet = xlsx.utils.json_to_sheet(result.rows);
       const workbook = xlsx.utils.book_new();
       xlsx.utils.book_append_sheet(workbook, worksheet, "Participants");
-      
+
       const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
-      
+
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=participants.xlsx');
       res.send(buffer);
@@ -2277,7 +2319,7 @@ async function startServer() {
   app.post("/api/register-member", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { children, parent_name, phone, parent_phone, password } = req.body;
-    
+
     if (!children || !Array.isArray(children) || children.length === 0) {
       return res.status(400).json({ error: "No children data provided" });
     }
@@ -2287,11 +2329,11 @@ async function startServer() {
     const normalizedPhone = normalizePhone(contactPhone);
     const parent_login = normalizedPhone || `user_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = password;
-    
+
     if (!rawPassword) {
       return res.status(400).json({ error: "Password is required" });
     }
-    
+
     try {
       const hashedPassword = await bcrypt.hash(rawPassword, 10);
       const results = [];
@@ -2304,7 +2346,7 @@ async function startServer() {
         );
         results.push(result.rows[0].id);
       }
-      
+
       // Send Telegram notification
       const childrenList = children.map(c => `- ${c.name} (${c.age} р.)`).join('\n');
       const message = `
@@ -2316,7 +2358,7 @@ ${childrenList}
 <b>Логін:</b> ${parent_login}
 <b>Пароль:</b> ${rawPassword}
       `;
-      
+
       sendTelegramMessage(message).catch(err => console.error('Telegram notification failed:', err));
 
       // Auto-login: set session for the first registered child
@@ -2324,20 +2366,20 @@ ${childrenList}
         (req.session as any).participantId = results[0];
         return req.session.save((err) => {
           if (err) console.error('Session save error after registration:', err);
-          res.json({ 
-            success: true, 
+          res.json({
+            success: true,
             count: children.length,
-            login: parent_login, 
-            password: rawPassword 
+            login: parent_login,
+            password: rawPassword
           });
         });
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         count: children.length,
-        login: parent_login, 
-        password: rawPassword 
+        login: parent_login,
+        password: rawPassword
       });
     } catch (e) {
       console.error('Registration failed:', e);
@@ -2348,15 +2390,15 @@ ${childrenList}
   app.post("/api/parent/send-credentials", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { participantId } = req.body;
-    
+
     try {
       const result = await pool.query(
         "SELECT name, parent_login, parent_password, telegram_chat_id, parent_name FROM participants WHERE id = $1",
         [participantId]
       );
-      
+
       if (result.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
-      
+
       const p = result.rows[0];
       const isHashed = isBcryptHash(p.parent_password);
       const passwordDisplay = isHashed ? "******** (зашифровано)" : p.parent_password;
@@ -2373,7 +2415,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
 <i>Зберігайте ці дані в надійному місці.</i>
       `;
-      
+
       if (p.telegram_chat_id) {
         await sendTelegramMessage(message, p.telegram_chat_id);
         res.json({ success: true, message: "Credentials sent via Telegram" });
@@ -2391,7 +2433,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.post("/api/participants/import", requireAuth, upload.single('file'), async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    
+
     let data: any[] = [];
     const { sheetUrl, group_id } = req.body;
 
@@ -2413,7 +2455,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             fetchUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gid ? `&gid=${gid}` : ''}`;
           }
         }
-        
+
         const response = await fetch(fetchUrl);
         if (!response.ok) throw new Error('Failed to fetch Google Sheet');
         const contentType = response.headers.get('content-type') || '';
@@ -2746,9 +2788,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const search = req.query.search as string;
     try {
       let query = `
-        SELECT p.*, g.name as group_name 
-        FROM participants p 
-        LEFT JOIN groups g ON p.group_id = g.id 
+        SELECT p.*, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
       `;
       let params: any[] = [];
       let whereClauses: string[] = [];
@@ -2781,11 +2823,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text } = req.body;
-    
+
     // Auto-generate credentials if missing
     const finalLogin = parent_login || phone || `parent_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = parent_password || Math.random().toString(36).substring(2, 10);
-    
+
     try {
       let hashedPassword = rawPassword;
       if (!isBcryptHash(hashedPassword)) {
@@ -2804,22 +2846,22 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.put("/api/participants/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    
+
     try {
       const allowedKeys = [
-        'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password', 
-        'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone', 
+        'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password',
+        'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone',
         'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
         'achievements_text'
       ];
-      
+
       const updateData: any = {};
       for (const key of allowedKeys) {
         if (req.body[key] !== undefined) {
           updateData[key] = req.body[key];
         }
       }
-      
+
       // Get current participant to check parent_login
       const currentRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [req.params.id]);
       if (currentRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
@@ -2843,7 +2885,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       const keys = Object.keys(updateData);
-      
+
       if (keys.length === 0) {
         return res.json({ success: true, message: "No fields to update" });
       }
@@ -2870,7 +2912,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           syncFields.push(`parent_password = $${syncValues.length + 1}`);
           syncValues.push(updateData.parent_password);
         }
-        
+
         if (syncFields.length > 0) {
           syncValues.push(oldParentLogin);
           await pool.query(
@@ -2935,13 +2977,21 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   // Badges (Achievements)
   app.get("/api/badges", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query(`
-        SELECT b.*, p.name as participant_name 
-        FROM badges b 
-        JOIN participants p ON b.participant_id = p.id 
-        ORDER BY b.date DESC
-      `);
+      let query = `
+        SELECT b.*, p.name as participant_name
+        FROM badges b
+        JOIN participants p ON b.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+      `;
+      const params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` WHERE g.coach_id = $${params.length}`;
+      }
+      query += " ORDER BY b.date DESC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch badges" });
@@ -2950,8 +3000,22 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.get("/api/participants/:id/badges", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query("SELECT * FROM badges WHERE participant_id = $1 ORDER BY date DESC", [req.params.id]);
+      let query = `
+        SELECT b.*
+        FROM badges b
+        JOIN participants p ON b.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE b.participant_id = $1
+      `;
+      const params: any[] = [req.params.id];
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` AND g.coach_id = $${params.length}`;
+      }
+      query += " ORDER BY b.date DESC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch participant badges" });
@@ -2963,6 +3027,17 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { participant_id, type, date } = req.body;
     const normalizedDate = normalizeDate(date);
     try {
+      const user = (req as any).user;
+      if (user?.role === 'coach' && user.coach_id) {
+        const access = await pool.query(`
+          SELECT p.id
+          FROM participants p
+          LEFT JOIN groups g ON p.group_id = g.id
+          WHERE p.id = $1 AND g.coach_id = $2
+        `, [participant_id, user.coach_id]);
+        if (access.rows.length === 0) return res.status(403).json({ error: "Forbidden" });
+      }
+
       await pool.query("BEGIN");
       const result = await pool.query(
         "INSERT INTO badges (participant_id, type, date) VALUES ($1, $2, $3) RETURNING id",
@@ -2977,7 +3052,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       );
       await pool.query("UPDATE participants SET rank_points = rank_points + 10 WHERE id = $1", [participant_id]);
       await pool.query("COMMIT");
-      
+
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
@@ -2999,8 +3074,22 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const badgeRes = await pool.query("SELECT participant_id FROM badges WHERE id = $1", [req.params.id]);
       if (badgeRes.rows.length > 0) {
         const participantId = badgeRes.rows[0].participant_id;
+        const user = (req as any).user;
+        if (user?.role === 'coach' && user.coach_id) {
+          const access = await pool.query(`
+            SELECT p.id
+            FROM participants p
+            LEFT JOIN groups g ON p.group_id = g.id
+            WHERE p.id = $1 AND g.coach_id = $2
+          `, [participantId, user.coach_id]);
+          if (access.rows.length === 0) {
+            await pool.query("ROLLBACK");
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+
         await pool.query("DELETE FROM badges WHERE id = $1", [req.params.id]);
-        
+
         // Find points from log to decrement correctly
         const logRes = await pool.query("SELECT points FROM points_log WHERE reference_id = $1", [`badge_${req.params.id}`]);
         const pointsToSubtract = logRes.rows.length > 0 ? logRes.rows[0].points : 10;
@@ -3019,13 +3108,21 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   // Competitions
   app.get("/api/competitions", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query(`
-        SELECT c.*, p.name as participant_name 
-        FROM competitions c 
-        JOIN participants p ON c.participant_id = p.id 
-        ORDER BY c.date DESC
-      `);
+      let query = `
+        SELECT c.*, p.name as participant_name
+        FROM competitions c
+        JOIN participants p ON c.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+      `;
+      const params: any[] = [];
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` WHERE g.coach_id = $${params.length}`;
+      }
+      query += " ORDER BY c.date DESC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch competitions" });
@@ -3034,8 +3131,22 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.get("/api/participants/:id/competitions", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
-      const result = await pool.query("SELECT * FROM competitions WHERE participant_id = $1 ORDER BY date DESC", [req.params.id]);
+      let query = `
+        SELECT c.*
+        FROM competitions c
+        JOIN participants p ON c.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE c.participant_id = $1
+      `;
+      const params: any[] = [req.params.id];
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` AND g.coach_id = $${params.length}`;
+      }
+      query += " ORDER BY c.date DESC";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch participant competitions" });
@@ -3050,16 +3161,27 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     }
     const normalizedDate = normalizeDate(date);
     try {
+      const user = (req as any).user;
+      if (user?.role === 'coach' && user.coach_id) {
+        const access = await pool.query(`
+          SELECT p.id
+          FROM participants p
+          LEFT JOIN groups g ON p.group_id = g.id
+          WHERE p.id = $1 AND g.coach_id = $2
+        `, [participant_id, user.coach_id]);
+        if (access.rows.length === 0) return res.status(403).json({ error: "Forbidden" });
+      }
+
       await pool.query("BEGIN");
       const insertRes = await pool.query(
         "INSERT INTO competitions (participant_id, name, type, result, date) VALUES ($1, $2, $3, $4, $5) RETURNING id",
         [participant_id, name, type, result, normalizedDate]
       );
       const compId = insertRes.rows[0].id;
-      
+
       // Points logic
       let points = 5; // Default participation
-      
+
       const normalizedResult = result?.toLowerCase()?.trim() || "";
       if (type === 'competition') {
         if (normalizedResult.includes('1 місце') || normalizedResult === '1' || normalizedResult === '1st') points = 30;
@@ -3081,7 +3203,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       await pool.query("UPDATE participants SET rank_points = rank_points + $1 WHERE id = $2", [points, participant_id]);
       await pool.query("COMMIT");
-      
+
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
@@ -3103,7 +3225,20 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const compRes = await pool.query("SELECT participant_id FROM competitions WHERE id = $1", [req.params.id]);
       if (compRes.rows.length > 0) {
         const participantId = compRes.rows[0].participant_id;
-        
+        const user = (req as any).user;
+        if (user?.role === 'coach' && user.coach_id) {
+          const access = await pool.query(`
+            SELECT p.id
+            FROM participants p
+            LEFT JOIN groups g ON p.group_id = g.id
+            WHERE p.id = $1 AND g.coach_id = $2
+          `, [participantId, user.coach_id]);
+          if (access.rows.length === 0) {
+            await pool.query("ROLLBACK");
+            return res.status(403).json({ error: "Forbidden" });
+          }
+        }
+
         // Find points from log to decrement correctly
         const logRes = await pool.query("SELECT points FROM points_log WHERE reference_id = $1", [`comp_${req.params.id}`]);
         const pointsToSubtract = logRes.rows.length > 0 ? logRes.rows[0].points : 5;
@@ -3147,7 +3282,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { name, location_id, coach_id, order_index } = req.body;
     const user = (req as any).user;
     const finalCoachId = user.role === 'coach' ? user.coach_id : coach_id;
-    
+
     try {
       const result = await pool.query(
         "INSERT INTO groups (name, location_id, coach_id, order_index) VALUES ($1, $2, $3, $4) RETURNING id",
@@ -3163,7 +3298,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { name, location_id, coach_id, order_index } = req.body;
     const user = (req as any).user;
-    
+
     try {
       if (user.role === 'coach') {
         const check = await pool.query("SELECT coach_id FROM groups WHERE id = $1", [req.params.id]);
@@ -3271,10 +3406,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       let totalsQuery = "";
       let totalsParams: any[] = [];
-      
+
       if (user.role === 'coach' && user.coach_id) {
         totalsQuery = `
-          SELECT 
+          SELECT
             (SELECT COUNT(*) FROM leads WHERE assigned_coach_id = $1) as total_leads,
             (SELECT COUNT(*) FROM leads WHERE assigned_coach_id = $1 AND status = 'new') as new_leads,
             1 as total_coaches,
@@ -3287,7 +3422,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         totalsParams.push(user.coach_id);
       } else {
         totalsQuery = `
-          SELECT 
+          SELECT
             (SELECT COUNT(*) FROM leads) as total_leads,
             (SELECT COUNT(*) FROM leads WHERE status = 'new') as new_leads,
             (SELECT COUNT(*) FROM coaches) as total_coaches,
@@ -3301,8 +3436,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       const [leadsByDay, groupDistribution, recentLeads, totals, debtors, churnRisk] = await Promise.all([
         pool.query(`
-          SELECT DATE(created_at) as date, COUNT(*) as count 
-          FROM leads 
+          SELECT DATE(created_at) as date, COUNT(*) as count
+          FROM leads
           WHERE created_at > CURRENT_DATE - INTERVAL '14 days'
           ${user.role === 'coach' ? 'AND assigned_coach_id = $1' : ''}
           GROUP BY DATE(created_at)
@@ -3310,9 +3445,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         `, user.role === 'coach' ? [user.coach_id] : []),
         pool.query(groupDistQuery, groupDistParams),
         pool.query(`
-          SELECT * FROM leads 
+          SELECT * FROM leads
           ${user.role === 'coach' ? 'WHERE assigned_coach_id = $1' : ''}
-          ORDER BY created_at DESC 
+          ORDER BY created_at DESC
           LIMIT 5
         `, user.role === 'coach' ? [user.coach_id] : []),
         pool.query(totalsQuery, totalsParams),
@@ -3367,7 +3502,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { title, audience, goal, pain, format, source_signal, score, reason, content, scoring, status } = req.body;
     try {
       const result = await pool.query(
-        `INSERT INTO smm_posts (title, audience, goal, pain, format, source_signal, score, reason, content, scoring, status) 
+        `INSERT INTO smm_posts (title, audience, goal, pain, format, source_signal, score, reason, content, scoring, status)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
         [title, audience, goal, pain, format, source_signal, score, reason, JSON.stringify(content), JSON.stringify(scoring), status || 'generated']
       );
@@ -3383,9 +3518,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { status, metrics, result_tag, notes, published_at } = req.body;
     try {
       const result = await pool.query(
-        `UPDATE smm_posts SET 
-         status = COALESCE($1, status), 
-         metrics = COALESCE($2, metrics), 
+        `UPDATE smm_posts SET
+         status = COALESCE($1, status),
+         metrics = COALESCE($2, metrics),
          result_tag = COALESCE($3, result_tag),
          notes = COALESCE($4, notes),
          published_at = COALESCE($5, published_at),
@@ -3414,13 +3549,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { week_start, strategy_text, patterns, blind_spots, swot } = req.body;
     try {
       const result = await pool.query(
-        `INSERT INTO smm_strategy (week_start, strategy_text, patterns, blind_spots, swot) 
-         VALUES ($1, $2, $3, $4, $5) 
-         ON CONFLICT (week_start) DO UPDATE SET 
-         strategy_text = EXCLUDED.strategy_text, 
-         patterns = EXCLUDED.patterns, 
-         blind_spots = EXCLUDED.blind_spots, 
-         swot = EXCLUDED.swot 
+        `INSERT INTO smm_strategy (week_start, strategy_text, patterns, blind_spots, swot)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (week_start) DO UPDATE SET
+         strategy_text = EXCLUDED.strategy_text,
+         patterns = EXCLUDED.patterns,
+         blind_spots = EXCLUDED.blind_spots,
+         swot = EXCLUDED.swot
          RETURNING *`,
         [week_start, strategy_text, JSON.stringify(patterns), JSON.stringify(blind_spots), JSON.stringify(swot)]
       );
@@ -3455,7 +3590,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { strengths, weaknesses, missing_content, adjacent_opportunities, recommendations } = req.body;
     try {
       const result = await pool.query(
-        `INSERT INTO smm_account_analysis (strengths, weaknesses, missing_content, adjacent_opportunities, recommendations) 
+        `INSERT INTO smm_account_analysis (strengths, weaknesses, missing_content, adjacent_opportunities, recommendations)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [JSON.stringify(strengths), JSON.stringify(weaknesses), JSON.stringify(missing_content), JSON.stringify(adjacent_opportunities), JSON.stringify(recommendations)]
       );
@@ -3480,9 +3615,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { followers, following, posts_count, engagement_rate, reach, impressions, date } = req.body;
     try {
       const result = await pool.query(
-        `INSERT INTO smm_account_metrics (followers, following, posts_count, engagement_rate, reach, impressions, date) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7) 
-         ON CONFLICT (date) DO UPDATE SET 
+        `INSERT INTO smm_account_metrics (followers, following, posts_count, engagement_rate, reach, impressions, date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (date) DO UPDATE SET
          followers = EXCLUDED.followers,
          following = EXCLUDED.following,
          posts_count = EXCLUDED.posts_count,
@@ -3546,7 +3681,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/payments", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
       const { participant_id, amount, date, month, year, type, method, notes } = req.body;
-    
+
     if (!participant_id || !amount) {
       return res.status(400).json({ error: "Participant ID and amount are required" });
     }
@@ -3565,7 +3700,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         "INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
         [participant_id, numAmount, normalizedDate, numMonth, numYear, paymentType, method || 'cash', notes]
       );
-      
+
       // Update participant payment status if it's a subscription for current month
       const now = new Date();
       if (paymentType === 'subscription' && numMonth === (now.getMonth() + 1) && numYear === now.getFullYear()) {
@@ -3591,6 +3726,73 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete payment" });
+    }
+  });
+
+  app.post("/api/payment-reminders", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+
+    try {
+      let query = `
+        SELECT p.id, p.name, p.parent_name, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.status = 'active'
+        AND COALESCE(p.payment_status, 'unpaid') != 'paid'
+      `;
+      const params: any[] = [];
+
+      if (user.role === 'coach' && user.coach_id) {
+        params.push(user.coach_id);
+        query += ` AND g.coach_id = $${params.length}`;
+      }
+
+      query += " ORDER BY p.name ASC";
+      const debtors = await pool.query(query, params);
+      const now = new Date();
+      const monthLabel = now.toLocaleDateString('uk-UA', { month: 'long', year: 'numeric' });
+      let created = 0;
+      const skipped: number[] = [];
+
+      for (const debtor of debtors.rows) {
+        const message = `Нагадування про оплату за ${monthLabel}: будь ласка, перевірте оплату занять для ${debtor.name}. Якщо вже оплатили, повідомте тренера або адміністратора.`;
+        const insertRes = await pool.query(`
+          INSERT INTO notifications (participant_id, type, message)
+          SELECT $1, 'payment', $2
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM notifications
+            WHERE participant_id = $1
+            AND type = 'payment'
+            AND created_at >= NOW() - INTERVAL '7 days'
+          )
+          RETURNING id
+        `, [debtor.id, message]);
+
+        if (insertRes.rowCount && insertRes.rowCount > 0) {
+          created += 1;
+        } else {
+          skipped.push(Number(debtor.id));
+        }
+      }
+
+      const coachId = user?.id || null;
+      const userRole = user?.role || 'admin';
+      logAuditAction(coachId, userRole, `Створено нагадування оплат: ${created}`, 'payment', null, {
+        total_debtors: debtors.rows.length,
+        skipped_recent: skipped.length
+      });
+
+      res.json({
+        success: true,
+        created,
+        total_debtors: debtors.rows.length,
+        skipped_recent: skipped.length
+      });
+    } catch (e) {
+      console.error("Failed to create payment reminders:", e);
+      res.status(500).json({ error: "Failed to create payment reminders" });
     }
   });
 
@@ -3625,10 +3827,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         await pool.query("DELETE FROM notifications");
       } else if (user.role === 'coach' && user.coach_id) {
         await pool.query(`
-          DELETE FROM notifications 
+          DELETE FROM notifications
           WHERE participant_id IN (
-            SELECT p.id FROM participants p 
-            JOIN groups g ON p.group_id = g.id 
+            SELECT p.id FROM participants p
+            JOIN groups g ON p.group_id = g.id
             WHERE g.coach_id = $1
           )
         `, [user.coach_id]);
@@ -3655,7 +3857,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const user = (req as any).user;
     const { year } = req.query;
     const targetYear = year || new Date().getFullYear();
-    
+
     try {
       let query = `
         SELECT month, SUM(amount) as total
@@ -3679,7 +3881,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       const result = await pool.query(query, params);
-      
+
       // Group by type
       let typeQuery = `
         SELECT type, SUM(amount) as total
@@ -3735,7 +3937,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         params.push(group_id);
       }
       const result = await pool.query(query, params);
-      
+
       // Async notify all
       result.rows.forEach(p => {
         notifyParent(p.id, 'announcement', message, coachName);
@@ -3765,7 +3967,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "DB error" });
     const { participant_id, content, sender_type } = req.body;
     const user = (req as any).user;
-    
+
     try {
       let sender_id = null;
       if (sender_type === 'coach') sender_id = user.coach_id;
@@ -3779,13 +3981,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       // If parent sends to coach, notify coach via Telegram if possible
       if (sender_type === 'parent') {
         const coachRes = await pool.query(`
-          SELECT c.telegram_chat_id, p.name as child_name 
-          FROM participants p 
-          JOIN groups g ON p.group_id = g.id 
-          JOIN coaches c ON g.coach_id = c.id 
+          SELECT c.telegram_chat_id, p.name as child_name
+          FROM participants p
+          JOIN groups g ON p.group_id = g.id
+          JOIN coaches c ON g.coach_id = c.id
           WHERE p.id = $1
         `, [participant_id]);
-        
+
         if (coachRes.rows[0]?.telegram_chat_id) {
           const token = process.env.TELEGRAM_BOT_TOKEN;
           if (token) {
@@ -3911,7 +4113,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const user = (req as any).user;
     try {
       let query = `
-        SELECT a.* 
+        SELECT a.*
         FROM attendance a
         JOIN participants p ON a.participant_id = p.id
         LEFT JOIN groups g ON p.group_id = g.id
@@ -3939,7 +4141,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       await pool.query("BEGIN");
-      
+
       // Check if attendance already exists
       const existing = await pool.query(
         "SELECT status FROM attendance WHERE participant_id = $1 AND date = $2",
@@ -3958,18 +4160,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
           [participant_id, 1, 'attendance', date]
         );
-        
+
         // Streak logic
         const pRes = await pool.query("SELECT streak, last_attendance_date FROM participants WHERE id = $1", [participant_id]);
         const p = pRes.rows[0];
         let newStreak = 1;
-        
+
         if (p.last_attendance_date) {
           const lastDate = new Date(p.last_attendance_date);
           const currentDate = new Date(date);
           // Use UTC for comparison to avoid timezone issues
           const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
-          
+
           if (diffDays <= 4 && diffDays > 0) { // Allow up to 4 days gap, but only if it's a forward date
             newStreak = (p.streak || 0) + 1;
           } else if (diffDays <= 0) {
@@ -3977,12 +4179,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             newStreak = p.streak || 1;
           }
         }
-        
+
         // Only update last_attendance_date if the new date is more recent
         const updateQuery = p.last_attendance_date && new Date(date) <= new Date(p.last_attendance_date)
           ? "UPDATE participants SET rank_points = rank_points + 1, streak = $1 WHERE id = $2"
           : "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3";
-        
+
         const updateParams = p.last_attendance_date && new Date(date) <= new Date(p.last_attendance_date)
           ? [newStreak, participant_id]
           : [newStreak, date, participant_id];
@@ -3998,7 +4200,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       await pool.query("COMMIT");
-      
+
       // Trigger workflows in background
       runWorkflows().catch(console.error);
 
@@ -4020,7 +4222,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     try {
       const { limit = 100 } = req.query;
       const result = await pool.query(`
-        SELECT al.*, 
+        SELECT al.*,
                COALESCE(au.name, c.name, 'Система') as user_name
         FROM audit_logs al
         LEFT JOIN admin_users au ON al.user_id = au.id AND al.user_role != 'parent'
@@ -4040,7 +4242,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.json([]);
     const { period, global } = req.query; // 'month', 'season', 'year', global: 'true'
     const user = (req as any).user;
-    
+
     try {
       let dateFilter = "";
       if (period === 'month') {
@@ -4048,7 +4250,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       } else if (period === 'year') {
         dateFilter = "AND pl.date >= date_trunc('year', CURRENT_DATE)";
       } else if (period === 'season') {
-        dateFilter = `AND pl.date >= CASE 
+        dateFilter = `AND pl.date >= CASE
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) = 12 THEN date_trunc('year', CURRENT_DATE) + INTERVAL '11 months'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (1, 2) THEN date_trunc('year', CURRENT_DATE) - INTERVAL '1 month'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (3, 4, 5) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '2 months'
@@ -4058,20 +4260,25 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       let query = `
-        SELECT p.id, p.name, SUM(pl.points) as total_points, g.name as group_name, l.name as location_name
+        SELECT
+          p.id,
+          p.name,
+          GREATEST(COALESCE(SUM(pl.points), 0), COALESCE(p.rank_points, 0))::int as total_points,
+          g.name as group_name,
+          l.name as location_name
         FROM participants p
-        JOIN points_log pl ON p.id = pl.participant_id
+        LEFT JOIN points_log pl ON p.id = pl.participant_id ${dateFilter}
         LEFT JOIN groups g ON p.group_id = g.id
         LEFT JOIN locations l ON g.location_id = l.id
-        WHERE 1=1 ${dateFilter}
+        WHERE p.status = 'active'
       `;
       let params: any[] = [];
       if (user.role === 'coach' && user.coach_id && global !== 'true') {
         query += " AND g.coach_id = $1";
         params.push(user.coach_id);
       }
-      query += " GROUP BY p.id, p.name, g.name, l.name ORDER BY total_points DESC LIMIT 20";
-      
+      query += " GROUP BY p.id, p.name, p.rank_points, g.name, l.name ORDER BY total_points DESC, p.name ASC LIMIT 20";
+
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e) {
@@ -4083,13 +4290,14 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.get("/api/birthdays", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
     const user = (req as any).user;
+    const daysWindow = Math.max(0, Math.min(365, Number(req.query.days || 0)));
     try {
       let query = `
         SELECT p.*, g.name as group_name
         FROM participants p
         LEFT JOIN groups g ON p.group_id = g.id
-        WHERE EXTRACT(MONTH FROM p.birthday) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND EXTRACT(DAY FROM p.birthday) = EXTRACT(DAY FROM CURRENT_DATE)
+        WHERE p.birthday IS NOT NULL
+        AND p.status = 'active'
       `;
       let params: any[] = [];
       if (user.role === 'coach' && user.coach_id) {
@@ -4097,7 +4305,26 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         params.push(user.coach_id);
       }
       const result = await pool.query(query, params);
-      res.json(result.rows);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const birthdays = result.rows
+        .map((row: any) => {
+          const birthDate = new Date(row.birthday);
+          const nextBirthday = new Date(today.getFullYear(), birthDate.getMonth(), birthDate.getDate());
+          if (nextBirthday < today) nextBirthday.setFullYear(today.getFullYear() + 1);
+          const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
+          return {
+            ...row,
+            days_until: daysUntil,
+            next_birthday: nextBirthday.toISOString().split('T')[0],
+            age_turning: row.age ? Number(row.age) + (daysUntil === 0 ? 0 : 1) : null
+          };
+        })
+        .filter((row: any) => row.days_until <= daysWindow)
+        .sort((a: any, b: any) => a.days_until - b.days_until || a.name.localeCompare(b.name, 'uk'));
+
+      res.json(birthdays);
     } catch (e) {
       res.status(500).json({ error: "Failed to fetch birthdays" });
     }
@@ -4111,12 +4338,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       const pResult = await pool.query(`
-        SELECT p.*, g.name as group_name 
-        FROM participants p 
-        LEFT JOIN groups g ON p.group_id = g.id 
+        SELECT p.*, g.name as group_name
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
         WHERE p.id = $1
       `, [participantId]);
-      
+
       if (pResult.rows.length === 0) return res.status(404).json({ error: "Not found" });
 
       const aResult = await pool.query("SELECT * FROM attendance WHERE participant_id = $1 ORDER BY date DESC", [participantId]);
@@ -4149,13 +4376,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       if (!matches || matches.length !== 3) {
         return res.status(400).json({ error: "Invalid image format" });
       }
-      
+
       const contentType = matches[1];
       const result = await pool.query(
         "INSERT INTO images (data, content_type) VALUES ($1, $2) RETURNING id",
         [image, contentType]
       );
-      
+
       const id = result.rows[0].id;
       res.json({ url: `/api/images/${id}` });
     } catch (e) {
@@ -4169,7 +4396,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const id = req.params.id;
     const cacheKey = `img_${id}`;
     const cached = imageCache.get(cacheKey);
-    
+
     if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
       res.setHeader('Content-Type', cached.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -4181,18 +4408,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       if (result.rows.length === 0) {
         return res.status(404).send("Image not found");
       }
-      
+
       const { data, content_type } = result.rows[0];
       const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
         return res.status(400).send("Invalid image format in database");
       }
-      
+
       const buffer = Buffer.from(matches[2], 'base64');
-      
+
       // Update cache
       imageCache.set(cacheKey, { contentType: content_type, buffer, timestamp: Date.now() });
-      
+
       res.setHeader('Content-Type', content_type);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
       res.send(buffer);
@@ -4228,7 +4455,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         "INSERT INTO announcements (title, content, author_id) VALUES ($1, $2, $3) RETURNING *",
         [title, content, adminId]
       );
-      
+
       // Also send to Telegram if configured
       const telegramMessage = `
 <b>📢 НОВЕ ОГОЛОШЕННЯ!</b>
@@ -4259,7 +4486,7 @@ ${content}
     if (!pool) return res.json([]);
     const participantId = await getParentParticipantId(req);
     if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
-    
+
     try {
       const result = await pool.query(
         "SELECT * FROM notifications WHERE participant_id = $1 ORDER BY created_at DESC LIMIT 20",
@@ -4278,14 +4505,14 @@ ${content}
 
       try {
         const result = await pool.query(`
-          SELECT p.*, g.name as group_name 
-          FROM participants p 
-          LEFT JOIN groups g ON p.group_id = g.id 
+          SELECT p.*, g.name as group_name
+          FROM participants p
+          LEFT JOIN groups g ON p.group_id = g.id
           WHERE p.id = $1
         `, [participantId]);
-        
+
         if (result.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
-        
+
         const participant = result.rows[0];
         delete participant.parent_password; // Security
         res.json(participant);
@@ -4302,18 +4529,18 @@ ${content}
       try {
         const meRes = await pool.query("SELECT parent_login, parent_phone, phone FROM participants WHERE id = $1", [participantId]);
         if (meRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
-        
+
         const { parent_login, parent_phone, phone } = meRes.rows[0];
-        const normalizedPhone = normalizePhone(parent_phone || phone || "");
+        const normalizedPhone = normalizePhone(parent_phone || phone || "").replace(/\D/g, "");
 
         let query = `
-          SELECT 
+          SELECT
             p.id, p.name, p.age, p.belt, p.rank_points, p.payment_status, p.streak, p.exam_readiness,
             g.name as group_name,
             (SELECT status FROM attendance WHERE participant_id = p.id AND date = CURRENT_DATE LIMIT 1) as today_status,
             (SELECT COUNT(*) FROM attendance WHERE participant_id = p.id AND status = 'present') as total_attendance
-          FROM participants p 
-          LEFT JOIN groups g ON p.group_id = g.id 
+          FROM participants p
+          LEFT JOIN groups g ON p.group_id = g.id
           WHERE 1=0
         `;
         const params = [];
@@ -4322,7 +4549,7 @@ ${content}
           params.push(parent_login);
           query += ` OR p.parent_login = $${params.length}`;
         }
-        
+
         if (normalizedPhone) {
           params.push(normalizedPhone);
           query += ` OR REGEXP_REPLACE(p.parent_phone, '[^\\d]', '', 'g') = $${params.length}`;
@@ -4342,7 +4569,7 @@ ${content}
       if (!pool) return res.status(500).json({ error: "Database not configured" });
       const participantId = await getParentParticipantId(req);
       if (!participantId) return res.status(401).json({ error: "Not logged in" });
-      
+
       const { date, reason } = req.body;
       try {
         await pool.query(
@@ -4361,10 +4588,8 @@ ${content}
       if (!participantId) return res.status(401).json({ error: "Not logged in" });
 
       try {
-        const meRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [participantId]);
-        const childRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [childId]);
-        
-        if (meRes.rows.length > 0 && childRes.rows.length > 0 && meRes.rows[0].parent_login === childRes.rows[0].parent_login) {
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (familyIds.includes(Number(childId))) {
           (req.session as any).participantId = childId;
           return req.session.save(() => {
             res.json({ success: true, token: `${childId}-parent` });
@@ -4415,6 +4640,139 @@ ${content}
       }
     });
 
+    app.get("/api/parent/events", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = await getParentParticipantId(req);
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (familyIds.length === 0) return res.json([]);
+
+        const result = await pool.query(`
+          SELECT
+            c.*,
+            p.name as participant_name,
+            COALESCE(pl.points, 0) as points_awarded
+          FROM competitions c
+          JOIN participants p ON c.participant_id = p.id
+          LEFT JOIN points_log pl ON pl.reference_id = 'comp_' || c.id::text
+          WHERE c.participant_id = ANY($1::int[])
+          ORDER BY c.date DESC NULLS LAST, c.id DESC
+          LIMIT 50
+        `, [familyIds]);
+        res.json(result.rows);
+      } catch (e) {
+        console.error("Failed to fetch parent events:", e);
+        res.status(500).json({ error: "Failed to fetch events" });
+      }
+    });
+
+    app.get("/api/parent/points-log", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = await getParentParticipantId(req);
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (familyIds.length === 0) return res.json([]);
+
+        const result = await pool.query(`
+          SELECT pl.*, p.name as participant_name
+          FROM points_log pl
+          JOIN participants p ON pl.participant_id = p.id
+          WHERE pl.participant_id = ANY($1::int[])
+          ORDER BY pl.date DESC NULLS LAST, pl.created_at DESC
+          LIMIT 60
+        `, [familyIds]);
+        res.json(result.rows);
+      } catch (e) {
+        console.error("Failed to fetch parent points log:", e);
+        res.status(500).json({ error: "Failed to fetch points log" });
+      }
+    });
+
+    app.get("/api/parent/ratings", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = await getParentParticipantId(req);
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const participantRes = await pool.query("SELECT id, group_id FROM participants WHERE id = $1", [participantId]);
+        if (participantRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
+
+        const groupId = participantRes.rows[0].group_id;
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (!groupId) {
+          return res.json({ bestAthlete: null, currentChild: null, groupTop: [], family: [] });
+        }
+
+        const ratingsRes = await pool.query(`
+          WITH scored AS (
+            SELECT
+              p.id,
+              p.name,
+              p.belt,
+              p.rank_points,
+              g.name as group_name,
+              l.name as location_name,
+              GREATEST(
+                COALESCE((SELECT SUM(points) FROM points_log pl WHERE pl.participant_id = p.id), 0),
+                COALESCE(p.rank_points, 0)
+              )::int as total_points,
+              COALESCE((SELECT COUNT(*) FROM attendance a WHERE a.participant_id = p.id AND a.status = 'present'), 0)::int as attendance_count,
+              COALESCE((SELECT COUNT(*) FROM competitions c WHERE c.participant_id = p.id AND c.type = 'seminar'), 0)::int as seminar_count,
+              COALESCE((SELECT COUNT(*) FROM competitions c WHERE c.participant_id = p.id AND c.type = 'competition'), 0)::int as competition_count
+            FROM participants p
+            LEFT JOIN groups g ON p.group_id = g.id
+            LEFT JOIN locations l ON g.location_id = l.id
+            WHERE p.group_id = $1
+            AND p.status = 'active'
+          ),
+          ranked AS (
+            SELECT
+              *,
+              ROW_NUMBER() OVER (ORDER BY total_points DESC, attendance_count DESC, name ASC) as rank_position
+            FROM scored
+          )
+          SELECT * FROM ranked
+          ORDER BY rank_position ASC
+          LIMIT 30
+        `, [groupId]);
+
+        const familyRes = familyIds.length > 0 ? await pool.query(`
+          WITH scored AS (
+            SELECT
+              p.id,
+              p.name,
+              p.belt,
+              g.name as group_name,
+              GREATEST(
+                COALESCE((SELECT SUM(points) FROM points_log pl WHERE pl.participant_id = p.id), 0),
+                COALESCE(p.rank_points, 0)
+              )::int as total_points,
+              COALESCE((SELECT COUNT(*) FROM attendance a WHERE a.participant_id = p.id AND a.status = 'present'), 0)::int as attendance_count
+            FROM participants p
+            LEFT JOIN groups g ON p.group_id = g.id
+            WHERE p.id = ANY($1::int[])
+          )
+          SELECT * FROM scored
+          ORDER BY total_points DESC, attendance_count DESC, name ASC
+        `, [familyIds]) : { rows: [] };
+
+        const currentChild = ratingsRes.rows.find((row: any) => Number(row.id) === Number(participantId)) || null;
+        res.json({
+          bestAthlete: ratingsRes.rows[0] || null,
+          currentChild,
+          groupTop: ratingsRes.rows,
+          family: familyRes.rows
+        });
+      } catch (e) {
+        console.error("Failed to fetch parent ratings:", e);
+        res.status(500).json({ error: "Failed to fetch ratings" });
+      }
+    });
+
     app.get("/api/parent/schedule", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
       const participantId = await getParentParticipantId(req);
@@ -4423,25 +4781,25 @@ ${content}
       try {
         const pRes = await pool.query("SELECT group_id FROM participants WHERE id = $1", [participantId]);
         if (pRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
-        
+
         const groupId = pRes.rows[0].group_id;
         if (!groupId) return res.json([]);
 
         const gRes = await pool.query("SELECT name, location_id, coach_id FROM groups WHERE id = $1", [groupId]);
         if (gRes.rows.length === 0) return res.json([]);
-        
+
         const { name: groupName, location_id: locId, coach_id: coachId } = gRes.rows[0];
 
         const sRes = await pool.query(`
-          SELECT s.*, c.name as coach_name, l.name as location_name 
-          FROM schedule s 
-          LEFT JOIN coaches c ON s.coach_id = c.id 
-          LEFT JOIN locations l ON s.location_id = l.id 
+          SELECT s.*, c.name as coach_name, l.name as location_name
+          FROM schedule s
+          LEFT JOIN coaches c ON s.coach_id = c.id
+          LEFT JOIN locations l ON s.location_id = l.id
           WHERE (s.group_name ILIKE $1 || '%' OR s.group_name ILIKE '%' || $1 || '%' OR $1 ILIKE '%' || s.group_name || '%')
              OR (s.location_id = $2 AND s.coach_id = $3 AND s.group_name IS NOT NULL)
           ORDER BY s.order_index ASC
         `, [groupName, locId, coachId]);
-        
+
         res.json(sRes.rows);
       } catch (e) {
         console.error("Failed to fetch parent schedule:", e);
@@ -4456,10 +4814,10 @@ ${content}
         if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
         const result = await pool.query(
-          `SELECT id, name as first_name, belt as belt_level, updated_at as belt_updated_at 
-           FROM participants 
+          `SELECT id, name as first_name, belt as belt_level, updated_at as belt_updated_at
+           FROM participants
            WHERE parent_login = (SELECT parent_login FROM participants WHERE id = $1)
-           OR id = $1 
+           OR id = $1
            ORDER BY name ASC`,
           [participantId]
         );
@@ -4475,8 +4833,8 @@ ${content}
         if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
         const result = await pool.query(
-          `SELECT p.id, p.name as first_name, COUNT(a.id) as total_attendance 
-           FROM participants p 
+          `SELECT p.id, p.name as first_name, COUNT(a.id) as total_attendance
+           FROM participants p
            LEFT JOIN attendance a ON p.id = a.participant_id AND a.date >= NOW() - INTERVAL '30 days'
            WHERE p.parent_login = (SELECT parent_login FROM participants WHERE id = $1) OR p.id = $1
            GROUP BY p.id, p.name ORDER BY p.name ASC`,
@@ -4494,7 +4852,7 @@ ${content}
         const { attendance_records } = req.body; // [{participant_id, date, status}]
         for (const record of attendance_records) {
           await pool.query(
-            `INSERT INTO attendance (participant_id, date, status) 
+            `INSERT INTO attendance (participant_id, date, status)
              VALUES ($1, $2, $3)
              ON CONFLICT (participant_id, date) DO UPDATE SET status = $3`,
             [record.participant_id, record.date, record.status]
@@ -4511,7 +4869,7 @@ ${content}
         const { participantId } = req.params;
         const { note, date } = req.body;
         const result = await pool.query(
-          `INSERT INTO attendance (participant_id, date, coach_notes) 
+          `INSERT INTO attendance (participant_id, date, coach_notes)
            VALUES ($1, $2, $3) RETURNING *`,
           [participantId, date, note]
         );
