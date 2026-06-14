@@ -749,7 +749,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
         </div>
 
         <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 flex flex-col items-center justify-center text-center relative overflow-hidden group">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,_rgba(220,38,38,0.1)_0%,_transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
           <div className="w-16 h-16 lg:w-24 lg:h-24 bg-red-600/10 text-red-600 rounded-2xl lg:rounded-3xl flex items-center justify-center mb-6 lg:mb-8 rotate-3 group-hover:rotate-6 transition-transform duration-500">
             <LayoutDashboard size={32} className="lg:size-[48px]" />
           </div>
@@ -951,6 +951,7 @@ export const AdminPage = () => {
   }, [navigate]);
 
   const handleQuickAction = (tab: string, action?: string) => {
+    setInitialAction(null);
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
     // Use a small timeout to ensure the component has mounted before setting initialAction
@@ -1238,7 +1239,7 @@ export const AdminPage = () => {
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'audit_logs' && <AuditLogsViewer />}
       {activeTab === 'leads' && <LeadsViewer />}
-              {activeTab === 'crm' && <CRMFinance role={role} coachId={coachId} />}
+              {activeTab === 'crm' && <CRMFinance role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'coaches' && <CoachesEditor />}
               {activeTab === 'locations' && <LocationsEditor />}
               {activeTab === 'groups' && <GroupsEditor role={role} coachId={coachId} />}
@@ -1275,6 +1276,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   const [compDate, setCompDate] = useState(toDateInputValue());
   const [detailsData, setDetailsData] = useState<{badges: any[], competitions: any[]}>({badges: [], competitions: []});
   const [search, setSearch] = useState('');
+  const [quickActivityMode, setQuickActivityMode] = useState(false);
   const [isAddingPayment, setIsAddingPayment] = useState(false);
   const [newPayment, setNewPayment] = useState({
     participant_id: '',
@@ -1348,23 +1350,24 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
   };
 
   const [isCompLoading, setIsCompLoading] = useState(false);
-  const [initialActionHandled, setInitialActionHandled] = useState(false);
 
   useEffect(() => {
     fetchParticipants();
   }, []);
 
   useEffect(() => {
-    if (initialAction && !initialActionHandled) {
+    if (initialAction) {
       if (initialAction === 'add_points') {
         toast.info('Оберіть учня для нарахування балів або додавання досягнень');
       } else if (initialAction === 'add_activity') {
-        toast.info('Оберіть учня для додавання участі у заході');
+        setQuickActivityMode(true);
+        setCompType('seminar');
+        setCompResult('participation');
+        toast.info('Оберіть учня і натисніть синю кнопку активності в рядку');
       }
-      setInitialActionHandled(true);
       onActionComplete?.();
     }
-  }, [initialAction]);
+  }, [initialAction, onActionComplete]);
 
   useEffect(() => {
     if (showDetails) {
@@ -1559,6 +1562,21 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
         </div>
       </div>
 
+      {quickActivityMode && (
+        <div className="bg-blue-600/10 border border-blue-500/30 rounded-3xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <p className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-1">Швидке додавання заходу</p>
+            <p className="text-sm text-zinc-300 font-medium">Оберіть учня у списку та натисніть синю кнопку активності. Тип за замовчуванням: семінар.</p>
+          </div>
+          <button
+            onClick={() => setQuickActivityMode(false)}
+            className="px-4 py-3 bg-white/5 hover:bg-white/10 rounded-2xl text-xs font-black uppercase tracking-widest text-zinc-300 transition-colors"
+          >
+            Закрити
+          </button>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center p-20">
           <RefreshCw size={48} className="animate-spin text-red-600" />
@@ -1638,8 +1656,11 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                       <Plus size={18} />
                     </button>
                     <button 
-                      onClick={() => setShowCompModal(p)}
-                      className="p-2 text-zinc-500 hover:text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
+                      onClick={() => {
+                        setShowCompModal(p);
+                        setQuickActivityMode(false);
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${quickActivityMode ? 'text-blue-400 bg-blue-500/10 ring-1 ring-blue-500/40' : 'text-zinc-500 hover:text-blue-500 hover:bg-blue-500/10'}`}
                       title="Додати змагання"
                     >
                       <TrendingUp size={18} />
@@ -3769,6 +3790,14 @@ const AttendanceEditor = ({ role, coachId, initialAction, onActionComplete }: { 
     fetchData();
   }, [date]);
 
+  useEffect(() => {
+    if (loading || !initialAction) return;
+    if (initialAction === 'mark_attendance') {
+      toast.info('Оберіть групу або відмічайте учнів у швидкій відмітці');
+      onActionComplete?.();
+    }
+  }, [loading, initialAction, onActionComplete]);
+
   const updateStatus = async (participantId: number, nextStatus: string, silent = false) => {
     const token = localStorage.getItem('admin_token');
     try {
@@ -5579,7 +5608,7 @@ const ParentMessages = ({ role, coachId, initialAction, onActionComplete }: { ro
   );
 };
 
-const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null }) => {
+const CRMFinance = ({ role, coachId, initialAction, onActionComplete }: { role: string, coachId: number | null, initialAction?: string | null, onActionComplete?: () => void }) => {
   const [payments, setPayments] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
   const [leads, setLeads] = useState<any[]>([]);
@@ -5630,6 +5659,23 @@ const CRMFinance = ({ role, coachId }: { role: string, coachId: number | null })
   useEffect(() => {
     fetchData();
   }, [month, year]);
+
+  useEffect(() => {
+    if (loading || !initialAction) return;
+    if (initialAction === 'add_payment') {
+      setNewPayment({
+        participant_id: '',
+        amount: '',
+        type: 'subscription',
+        method: 'cash',
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        notes: ''
+      });
+      setIsAddingPayment(true);
+      onActionComplete?.();
+    }
+  }, [loading, initialAction, onActionComplete]);
 
   const handleAddPayment = async () => {
     if (!newPayment.participant_id || !newPayment.amount) {
