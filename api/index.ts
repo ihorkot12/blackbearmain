@@ -1114,9 +1114,19 @@ async function startServer() {
   // Leads
   app.get("/api/leads", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
+    const user = (req as any).user;
     try {
       // Limit to 100 most recent leads to save bandwidth/quota
-      const result = await pool.query("SELECT * FROM leads ORDER BY created_at DESC LIMIT 100");
+      let query = "SELECT * FROM leads";
+      const params: any[] = [];
+
+      if (user.role === 'coach' && user.coach_id) {
+        query += " WHERE assigned_coach_id = $1";
+        params.push(user.coach_id);
+      }
+
+      query += " ORDER BY created_at DESC LIMIT 100";
+      const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
       if (e?.message?.includes('quota')) {
@@ -1445,14 +1455,34 @@ async function startServer() {
 
   app.put("/api/leads/:id", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, phone, age_group, location, status } = req.body;
+    const { name, phone, age_group, location, status, value, assigned_coach_id, converted_participant_id } = req.body;
     try {
       await pool.query(
-        "UPDATE leads SET name = $1, phone = $2, age_group = $3, location = $4, status = $5 WHERE id = $6",
-        [name, phone, age_group, location, status, req.params.id]
+        `UPDATE leads
+         SET name = $1,
+             phone = $2,
+             age_group = $3,
+             location = $4,
+             status = $5,
+             value = $6,
+             assigned_coach_id = $7,
+             converted_participant_id = $8
+         WHERE id = $9`,
+        [
+          name,
+          phone,
+          age_group,
+          location,
+          status,
+          value === '' || value === undefined ? 0 : value,
+          assigned_coach_id || null,
+          converted_participant_id || null,
+          req.params.id
+        ]
       );
       res.json({ success: true });
     } catch (e) {
+      console.error("Failed to update lead:", e);
       res.status(500).json({ error: "Failed to update lead" });
     }
   });
