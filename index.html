@@ -23,42 +23,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script>
-      (function () {
-        var suppressLeadUntil = 0;
-
-        document.addEventListener('click', function (event) {
-          var target = event.target;
-          if (target && target.closest && target.closest('#cta-button-hero')) {
-            suppressLeadUntil = Date.now() + 1500;
-          }
-        }, true);
-
-        function wrapFbq() {
-          if (!window.fbq || window.fbq.__bbLeadGuard) return;
-
-          var originalFbq = window.fbq;
-          var guardedFbq = function () {
-            var args = Array.prototype.slice.call(arguments);
-            if (args[0] === 'track' && args[1] === 'Lead' && Date.now() < suppressLeadUntil) {
-              return originalFbq('trackCustom', 'LeadIntent', {
-                content_name: 'Hero CTA',
-                location: 'hero'
-              });
-            }
-            return originalFbq.apply(this, args);
-          };
-
-          for (var key in originalFbq) {
-            try { guardedFbq[key] = originalFbq[key]; } catch (e) {}
-          }
-          guardedFbq.__bbLeadGuard = true;
-          window.fbq = guardedFbq;
-        }
-
-        window.setInterval(wrapFbq, 250);
-      })();
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

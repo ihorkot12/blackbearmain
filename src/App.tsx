@@ -464,7 +464,12 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                 variant="primary" 
                 className="w-full sm:w-auto h-[58px] sm:h-[64px] px-6 sm:px-12 text-sm sm:text-lg" 
                 onClick={() => {
-                  if (window.fbq) window.fbq('track', 'Lead');
+                  if (window.fbq) {
+                    window.fbq('trackCustom', 'LeadIntent', {
+                      content_name: 'Hero CTA',
+                      location: 'hero'
+                    });
+                  }
                   document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
                 }}
               >
