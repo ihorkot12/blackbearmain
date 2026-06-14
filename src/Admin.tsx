@@ -30,6 +30,12 @@ const shiftDateInputValue = (value: string, days: number) => {
   return toDateInputValue(date);
 };
 
+const isBcryptHash = (value: unknown) =>
+  typeof value === 'string' && /^\$2[aby]\$/.test(value);
+
+const isMaskedPassword = (value: unknown) =>
+  typeof value === 'string' && /^\*+$/.test(value.trim());
+
 const ChartFrame = ({ className, children }: { className: string; children: React.ReactNode }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [isReady, setIsReady] = useState(false);
@@ -2977,6 +2983,15 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
     try {
       const url = data.id ? `/api/participants/${data.id}` : '/api/participants';
       const method = data.id ? 'PUT' : 'POST';
+      const payload = { ...data };
+
+      if (typeof payload.parent_login === 'string') {
+        payload.parent_login = payload.parent_login.trim();
+      }
+
+      if (data.id && (isBcryptHash(payload.parent_password) || isMaskedPassword(payload.parent_password) || payload.parent_password === '')) {
+        delete payload.parent_password;
+      }
       
       const res = await fetch(url, {
         method,
@@ -2984,12 +2999,15 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
       if (res.ok) {
         setEditingParticipant(null);
         fetchData();
         toast.success(data.id ? 'Дані оновлено' : 'Учасника збережено');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || 'Не вдалося зберегти дані');
       }
     } catch (e) {
       toast.error('Помилка збереження');
@@ -3216,7 +3234,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                             <span className="text-zinc-600 font-black">P:</span>
                             <span className="text-zinc-300 font-mono text-[9px]">
                               {showPasswords[p.id] 
-                                ? (p.parent_password?.startsWith('$2a$') ? '(зашифровано)' : p.parent_password) 
+                                ? (isBcryptHash(p.parent_password) ? '(зашифровано)' : p.parent_password) 
                                 : '••••••'}
                             </span>
                             <button 
@@ -3666,9 +3684,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   <div className="relative">
                     <input 
                       type={showPasswords['editing'] ? 'text' : 'password'} 
-                      value={editingParticipant.parent_password?.startsWith('$2a$') ? '********' : (editingParticipant.parent_password || '')}
+                      value={isBcryptHash(editingParticipant.parent_password) ? '********' : (editingParticipant.parent_password || '')}
                       onChange={e => setEditingParticipant({...editingParticipant, parent_password: e.target.value})}
-                      placeholder={editingParticipant.parent_password?.startsWith('$2a$') ? 'Пароль зашифровано. Введіть новий для зміни.' : 'Введіть пароль...'}
+                      placeholder={isBcryptHash(editingParticipant.parent_password) ? 'Пароль зашифровано. Введіть новий для зміни.' : 'Введіть пароль...'}
                       className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors pr-24 text-sm"
                     />
                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">

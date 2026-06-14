@@ -116,8 +116,7 @@ async function initDb() {
     // Ensure parent_login is not unique to allow multiple children per parent
     try {
       await client.query("ALTER TABLE participants DROP CONSTRAINT IF EXISTS participants_parent_login_key");
-      // Normalize existing parent_login values (remove spaces, dashes, etc.)
-      await client.query("UPDATE participants SET parent_login = REGEXP_REPLACE(parent_login, '[^\\d+]', '', 'g') WHERE parent_login IS NOT NULL AND parent_login ~ '[^\\d+]'");
+      // Keep parent_login untouched: admins/coaches can use custom logins, not only phones.
 
       // Ensure parent_login is set for all participants who have a phone
       await client.query(`
@@ -623,6 +622,10 @@ async function startServer() {
     // Remove all non-digits except +
     return phone.replace(/[^\d+]/g, '');
   };
+
+  const normalizeLogin = (login: unknown) => String(login ?? '').trim();
+  const isMaskedPassword = (value: unknown) =>
+    typeof value === 'string' && /^\*+$/.test(value.trim());
 
   app.use(session({
     secret: SESSION_SECRET,
@@ -2168,46 +2171,51 @@ async function startServer() {
 
     try {
       const { login, password } = req.body;
-      if (!login || !password) {
+      const loginValue = normalizeLogin(login);
+      if (!loginValue || !password) {
         return res.status(400).json({ error: 'Login and password required' });
       }
 
       // Нормалізуємо телефон (видаляємо всі non-digits) для пошуку
-      const normalizedPhone = normalizePhone(login);
+      const normalizedPhone = normalizePhone(loginValue);
       const phoneWithoutPlus = normalizedPhone.replace(/^\+/, '');
       console.log('Normalized phone for login:', normalizedPhone);
 
       if (!pool) return res.status(500).json({ error: 'Database not configured' });
 
-      // Пошук батька по телефону (в participants таблиці)
+      // Пошук батька по логіну або телефону (в participants таблиці)
       let user = null;
-      if (normalizedPhone.length >= 9) {
-        const result = await pool.query(
-          `SELECT id, name, phone, parent_phone, parent_password, parent_login
-           FROM participants
-           WHERE (phone IS NOT NULL OR parent_phone IS NOT NULL) AND (
-             phone LIKE '%' || $1 OR
-             phone LIKE '%' || $2 OR
-             parent_phone LIKE '%' || $1 OR
-             parent_phone LIKE '%' || $2 OR
-              parent_login = $1 OR
-              parent_login = $2 OR
-              parent_login = $3
-            )
-            LIMIT 1`,
-          [normalizedPhone, phoneWithoutPlus, login]
-        );
-        if (result.rows.length > 0) {
-          user = result.rows[0];
-          console.log('Found parent in participants:', user.id);
-        }
+      const parentConditions = ["LOWER(TRIM(parent_login)) = LOWER($1)"];
+      const parentParams: any[] = [loginValue];
+
+      if (normalizedPhone.length >= 7) {
+        parentParams.push(normalizedPhone);
+        parentConditions.push(`REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${parentParams.length}`);
+        parentConditions.push(`REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${parentParams.length}`);
+
+        parentParams.push(phoneWithoutPlus);
+        parentConditions.push(`REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${parentParams.length}`);
+        parentConditions.push(`REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${parentParams.length}`);
+      }
+
+      const result = await pool.query(
+        `SELECT id, name, phone, parent_phone, parent_password, parent_login
+         FROM participants
+         WHERE ${parentConditions.join(' OR ')}
+         ORDER BY id ASC
+         LIMIT 1`,
+        parentParams
+      );
+      if (result.rows.length > 0) {
+        user = result.rows[0];
+        console.log('Found parent in participants:', user.id);
       }
 
       // Якщо батька не знайдено - перевіримо адмінів
       if (!user) {
         const adminResult = await pool.query(
           `SELECT id, name, password as admin_password, role FROM admin_users WHERE login = $1 LIMIT 1`,
-          [login]
+          [loginValue]
         );
         if (adminResult.rows.length > 0) {
           user = { ...adminResult.rows[0], isAdmin: true };
@@ -2919,7 +2927,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text } = req.body;
 
     // Auto-generate credentials if missing
-    const finalLogin = parent_login || phone || `parent_${Math.random().toString(36).substring(2, 8)}`;
+    const finalLogin = normalizeLogin(parent_login) || normalizeLogin(phone) || `parent_${Math.random().toString(36).substring(2, 8)}`;
     const rawPassword = parent_password || Math.random().toString(36).substring(2, 10);
 
     try {
@@ -2956,12 +2964,29 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         }
       }
 
+      if (typeof updateData.parent_login === 'string') {
+        updateData.parent_login = normalizeLogin(updateData.parent_login);
+        if (!updateData.parent_login) {
+          const fallbackLogin = normalizeLogin(updateData.phone);
+          if (fallbackLogin) updateData.parent_login = fallbackLogin;
+          else delete updateData.parent_login;
+        }
+      }
+
       // Get current participant to check parent_login
       const currentRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [req.params.id]);
       if (currentRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
       const oldParentLogin = currentRes.rows[0]?.parent_login;
 
-      // Handle password hashing if provided
+      // Ignore masked/empty password placeholders from the admin UI.
+      if (
+        updateData.parent_password !== undefined &&
+        (normalizeLogin(updateData.parent_password) === '' || isMaskedPassword(updateData.parent_password))
+      ) {
+        delete updateData.parent_password;
+      }
+
+      // Handle password hashing if a real new password was provided.
       if (updateData.parent_password && !isBcryptHash(updateData.parent_password)) {
         updateData.parent_password = await bcrypt.hash(updateData.parent_password, 10);
       }
