@@ -18,6 +18,19 @@ Use Capacitor as the main path. The app shell is already in the repo and points 
 
 Use Median only as a paid fallback if we need iOS publishing without a Mac/Xcode machine or want managed App Store / Google Play help. Do not build a separate native app from scratch now; that would duplicate logic and create two products to maintain.
 
+## Fast iPhone test path
+
+The site is also configured as an installable web app:
+
+- manifest start URL: `/admin`
+- iPhone home-screen title: `Black Bear Admin`
+- iPhone icon: `/apple-touch-icon.png`
+- Android/PWA icon: `/icon-192.png` and `/icon-512.png`
+- standalone display mode
+- iPhone safe-area viewport enabled
+
+On an iPhone, open `https://shin-karate.kyiv.ua/admin` in Safari, tap Share, then Add to Home Screen. This gives an app-like icon immediately while the native IPA/App Store route is prepared.
+
 ## Current preflight status
 
 Checked on Windows:
@@ -83,6 +96,31 @@ npm run mobile:ios
 ```
 
 iOS packaging requires macOS with Xcode. On Windows, use Median or another cloud build service if we want to publish without a Mac.
+
+## GitHub Actions iOS cloud build
+
+Manual workflow:
+
+```text
+.github/workflows/ios-cloud-build.yml
+```
+
+Use `simulator-check` first. It runs on a GitHub macOS runner, builds the web app, syncs Capacitor, and compiles the iOS simulator app without Apple signing.
+
+Use `signed-archive` only after adding Apple Developer / App Store Connect secrets to GitHub:
+
+```text
+APPLE_TEAM_ID
+IOS_DISTRIBUTION_CERTIFICATE_BASE64
+IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
+IOS_PROVISIONING_PROFILE_BASE64
+APP_STORE_CONNECT_KEY_ID
+APP_STORE_CONNECT_ISSUER_ID
+APP_STORE_CONNECT_PRIVATE_KEY
+IOS_BUILD_KEYCHAIN_PASSWORD
+```
+
+The signed workflow exports an IPA and uploads it to TestFlight. Do not commit real Apple keys, certificates, provisioning profiles, passwords, or demo account credentials.
 
 ## Store note
 

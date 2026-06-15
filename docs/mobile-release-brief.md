@@ -46,6 +46,37 @@ Important:
 - Confirm iPhone safe-area works: notch, status bar, home indicator, bottom floating bug button, modal bottom padding.
 ```
 
+## Immediate iPhone web-app install
+
+Before paying for a native wrapper, test the admin as an iPhone home-screen app:
+
+1. Open `https://shin-karate.kyiv.ua/admin` in Safari on iPhone.
+2. Tap Share.
+3. Tap Add to Home Screen.
+4. Keep the name `Black Bear Admin`.
+5. Launch from the new icon and test admin/coach/parent flows.
+
+This uses the same production backend and does not create a second database. It is the quickest no-cost test while IPA/TestFlight signing is being prepared.
+
+## GitHub Actions iOS build path
+
+The repo includes `.github/workflows/ios-cloud-build.yml`.
+
+Run `simulator-check` first to prove the iOS project compiles on GitHub's macOS runner without Apple signing.
+
+Run `signed-archive` only after Apple Developer signing secrets are added in GitHub repository settings. Required secrets:
+
+- `APPLE_TEAM_ID`
+- `IOS_DISTRIBUTION_CERTIFICATE_BASE64`
+- `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD`
+- `IOS_PROVISIONING_PROFILE_BASE64`
+- `APP_STORE_CONNECT_KEY_ID`
+- `APP_STORE_CONNECT_ISSUER_ID`
+- `APP_STORE_CONNECT_PRIVATE_KEY`
+- `IOS_BUILD_KEYCHAIN_PASSWORD`
+
+The signed path exports an IPA and uploads it to TestFlight.
+
 ## App review notes template
 
 Do not commit real passwords here. Put the real demo account only inside App Store Connect / Google Play Console review notes.
