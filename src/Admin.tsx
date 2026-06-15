@@ -806,6 +806,9 @@ export const AdminPage = () => {
   const [coachData, setCoachData] = useState<any>(null);
   const [isInstagramConnected, setIsInstagramConnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isBugReportOpen, setIsBugReportOpen] = useState(false);
+  const [bugReportText, setBugReportText] = useState('');
+  const [isSendingBugReport, setIsSendingBugReport] = useState(false);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -970,6 +973,47 @@ export const AdminPage = () => {
     }
   };
 
+  const handleSubmitBugReport = async () => {
+    const message = bugReportText.trim();
+    if (message.length < 5) {
+      toast.error('Опиши коротко, що саме не працює');
+      return;
+    }
+
+    const token = localStorage.getItem('admin_token');
+    setIsSendingBugReport(true);
+    try {
+      const res = await fetch('/api/bug-report', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          message,
+          page: window.location.href,
+          activeTab,
+          role,
+          userName,
+          userAgent: navigator.userAgent
+        })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to send bug report');
+      }
+
+      toast.success('Баг надіслано');
+      setBugReportText('');
+      setIsBugReportOpen(false);
+    } catch (e) {
+      toast.error('Не вдалося надіслати баг');
+    } finally {
+      setIsSendingBugReport(false);
+    }
+  };
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const menuGroups = [
@@ -1018,6 +1062,78 @@ export const AdminPage = () => {
   return (
     <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
+
+      <button
+        type="button"
+        onClick={() => setIsBugReportOpen(true)}
+        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[80] flex items-center gap-2 rounded-2xl border border-yellow-400/30 bg-yellow-400 px-4 py-3 text-xs font-black uppercase tracking-widest text-black shadow-2xl shadow-yellow-500/20 transition-transform hover:scale-105 active:scale-95"
+        aria-label="Повідомити про баг"
+      >
+        <AlertTriangle size={16} />
+        <span className="hidden sm:inline">Повідомити про баг</span>
+        <span className="sm:hidden">Баг</span>
+      </button>
+
+      <AnimatePresence>
+        {isBugReportOpen && (
+          <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-4 sm:p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsBugReportOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.98 }}
+              className="relative w-full max-w-lg rounded-[2rem] border border-white/10 bg-zinc-950 p-6 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-yellow-400 mb-2">Bug report</p>
+                  <h3 className="text-2xl font-black uppercase tracking-tighter">Повідомити про баг</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsBugReportOpen(false)}
+                  className="w-10 h-10 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+                  aria-label="Закрити"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <textarea
+                value={bugReportText}
+                onChange={(e) => setBugReportText(e.target.value)}
+                placeholder="Що не працює? Наприклад: кнопка оплати не зберігає суму..."
+                className="w-full h-36 rounded-2xl border border-white/10 bg-black p-4 text-sm text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-yellow-400/70"
+                maxLength={1000}
+              />
+
+              <div className="mt-5 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsBugReportOpen(false)}
+                  className="h-12 px-5 rounded-xl border border-white/10 bg-white/5 text-sm font-bold text-zinc-300 hover:bg-white/10 transition-colors"
+                >
+                  Скасувати
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitBugReport}
+                  disabled={isSendingBugReport || bugReportText.trim().length < 5}
+                  className="h-12 px-6 rounded-xl bg-yellow-400 text-sm font-black uppercase tracking-widest text-black transition-all hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {isSendingBugReport ? 'Надсилаю...' : 'Надіслати'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       
       {/* Mobile Header */}
       <div className="lg:hidden h-20 bg-zinc-950 border-b border-white/5 flex items-center justify-between px-6 sticky top-0 z-50 backdrop-blur-xl bg-black/80">

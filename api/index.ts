@@ -4135,6 +4135,56 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     }
   });
 
+  app.post("/api/bug-report", requireAuth, async (req, res) => {
+    const user = (req as any).user || {};
+    const { message, page, activeTab, role, userName, userAgent } = req.body || {};
+    const text = String(message || '').trim();
+
+    if (text.length < 5) {
+      return res.status(400).json({ error: "Message is too short" });
+    }
+
+    const clippedText = text.slice(0, 1000);
+    const actorRole = String(user.role || role || 'unknown').slice(0, 50);
+    const actorName = String(user.name || userName || user.login || 'unknown').slice(0, 120);
+    const tab = String(activeTab || '').slice(0, 80);
+    const currentPage = String(page || '').slice(0, 500);
+    const browser = String(userAgent || '').slice(0, 300);
+
+    try {
+      const telegramText = [
+        '<b>Bug report Black Bear</b>',
+        '',
+        `<b>User:</b> ${escapeTelegramHtml(actorName)} (${escapeTelegramHtml(actorRole)})`,
+        tab ? `<b>Section:</b> ${escapeTelegramHtml(tab)}` : '',
+        currentPage ? `<b>Page:</b> ${escapeTelegramHtml(currentPage)}` : '',
+        '',
+        `<b>Message:</b>\n${escapeTelegramHtml(clippedText)}`,
+        '',
+        browser ? `<b>Browser:</b> ${escapeTelegramHtml(browser)}` : ''
+      ].filter(Boolean).join('\n');
+
+      const sent = await sendTelegramMessage(telegramText);
+      await logAuditAction(
+        user.id || user.coach_id || 0,
+        actorRole,
+        `Bug report: ${clippedText.slice(0, 120)}`,
+        'bug_report',
+        undefined,
+        { page: currentPage, activeTab: tab, telegramSent: sent }
+      );
+
+      if (!sent) {
+        return res.status(502).json({ error: "Telegram notification failed" });
+      }
+
+      res.json({ success: true });
+    } catch (e) {
+      console.error('Failed to send bug report:', e);
+      res.status(500).json({ error: "Failed to send bug report" });
+    }
+  });
+
   // Messaging API
   app.get("/api/messages/:participantId", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
