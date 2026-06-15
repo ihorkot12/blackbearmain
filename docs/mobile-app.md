@@ -12,6 +12,35 @@ https://shin-karate.kyiv.ua/admin
 
 This keeps all admin functions in one place: participants, attendance, payments, achievements, CRM, imports, leads, and settings stay synced with the deployed website.
 
+## Recommended path
+
+Use Capacitor as the main path. The app shell is already in the repo and points to the live admin panel, so the website, admin, parent portal, Telegram notifications, CRM, payments, attendance, achievements, and database stay in one system.
+
+Use Median only as a paid fallback if we need iOS publishing without a Mac/Xcode machine or want managed App Store / Google Play help. Do not build a separate native app from scratch now; that would duplicate logic and create two products to maintain.
+
+## Current preflight status
+
+Checked on Windows:
+
+```text
+OK  Capacitor config
+OK  Android project
+OK  iOS project
+OK  Web build output
+NO  Java runtime
+NO  Java compiler
+NO  Android SDK
+SKIP Xcode
+```
+
+Capacitor sync passed:
+
+```bash
+node_modules\.bin\cap.cmd sync
+```
+
+That means the iOS and Android projects are synced with the latest web build, but local Android builds need JDK 17+ and Android SDK, and local iOS builds require macOS with Xcode.
+
 ## Commands
 
 ```bash
@@ -60,3 +89,19 @@ iOS packaging requires macOS with Xcode. On Windows, use Median or another cloud
 For internal testing, the live web admin shell is the fastest path.
 
 For App Store / Google Play submission, review risk is lower if the app includes native app polish: branded icon, splash screen, offline screen, biometric lock, push notifications, and app-specific navigation. Median can be used later if we want managed builds and publishing support.
+
+## AI Studio commands
+
+Use these exact prompts when asking AI Studio to help with design or mobile polish:
+
+```text
+Ти дизайнер Black Bear Dojo Admin. Не змінюй архітектуру, базу, API, логіку ролей, авторизацію, CRM, платежі, відвідування, рейтинги, досягнення і Telegram-сповіщення. Працюй тільки з UX/UI поліруванням адмінки й мобільної оболонки.
+
+Задача: перевірити адмінку як mobile-first app screen для тренера/адміна. Зберегти чорний/червоний стиль Black Bear, не робити landing page, не додавати зайві тексти. Покращити тільки дрібні речі: читабельність, кнопки, відступи, стани loading/error/empty, щоб усе нормально влазило на iPhone.
+
+Обов'язково не ламати: /admin login, швидкі дії, учасники, групи, відвідування, платежі, рейтинги, досягнення, повідомлення батьків, імпорт учнів, кнопка "Повідомити про баг".
+```
+
+```text
+Підготуй Black Bear Admin як webview mobile app через Capacitor. Зберегти одну базу і живий бекенд https://shin-karate.kyiv.ua. Додаток має відкривати /admin, не дублювати логіку нативно. Перевірити конфіг iOS/Android, app name, app id, splash/background, safe-area на iPhone, viewport, touch targets. Не переписувати сайт з нуля.
+```
