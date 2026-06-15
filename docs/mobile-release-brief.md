@@ -64,6 +64,27 @@ Password: [provide in store console only]
 Please use the demo account only for app review.
 ```
 
+## App Store privacy labels
+
+Fill App Store Connect privacy labels truthfully. The native shell does not add a second database, but the admin web app works with club CRM data through the production backend.
+
+Expected privacy categories to review in App Store Connect:
+
+- Contact Info: parent/lead names and phone numbers
+- User Content: parent-coach messages, notes, achievements
+- Identifiers: admin/coach/parent account identifiers
+- Financial Info: club payment records entered by admins/coaches
+- Usage Data / Diagnostics: only if analytics or error tracking are enabled in production
+
+Purpose:
+
+- App functionality
+- Club administration
+- Parent communication
+- Payment and attendance management
+
+The iOS project sets `ITSAppUsesNonExemptEncryption` to `false`, because the app uses standard HTTPS and does not implement custom non-exempt encryption.
+
 ## Local build status
 
 Capacitor web sync passes.
