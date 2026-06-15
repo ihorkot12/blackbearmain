@@ -1060,13 +1060,13 @@ export const AdminPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
+    <div className="bb-admin-shell min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
 
       <button
         type="button"
         onClick={() => setIsBugReportOpen(true)}
-        className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-[80] flex items-center gap-2 rounded-2xl border border-yellow-400/30 bg-yellow-400 px-4 py-3 text-xs font-black uppercase tracking-widest text-black shadow-2xl shadow-yellow-500/20 transition-transform hover:scale-105 active:scale-95"
+        className="bb-safe-floating-action fixed z-[80] flex items-center gap-2 rounded-2xl border border-yellow-400/30 bg-yellow-400 px-4 py-3 text-xs font-black uppercase tracking-widest text-black shadow-2xl shadow-yellow-500/20 transition-transform hover:scale-105 active:scale-95"
         aria-label="Повідомити про баг"
       >
         <AlertTriangle size={16} />
@@ -1076,7 +1076,7 @@ export const AdminPage = () => {
 
       <AnimatePresence>
         {isBugReportOpen && (
-          <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center p-4 sm:p-6">
+          <div className="bb-safe-modal-pad fixed inset-0 z-[90] flex items-end sm:items-center justify-center">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
