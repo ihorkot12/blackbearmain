@@ -145,6 +145,8 @@ async function initDb() {
         parent_name TEXT,
         phone TEXT,
         parent_phone TEXT,
+        email TEXT,
+        member_type TEXT DEFAULT 'child',
         telegram_chat_id TEXT,
         exam_readiness TEXT DEFAULT 'not_started',
         skill_checklist JSONB DEFAULT '[]',
@@ -180,6 +182,8 @@ async function initDb() {
       );
 
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS email TEXT;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS member_type TEXT DEFAULT 'child';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS exam_readiness TEXT DEFAULT 'not_started';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS skill_checklist JSONB DEFAULT '[]';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0;
@@ -1061,7 +1065,13 @@ async function startServer() {
 
         try {
           if (type === "p") {
-            await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+            const participantRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [id]);
+            const parentLogin = participantRes.rows[0]?.parent_login;
+            if (parentLogin) {
+              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE parent_login = $2", [chatId, parentLogin]);
+            } else {
+              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+            }
           } else if (type === "c") {
             await pool.query("UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
           }
@@ -2431,7 +2441,7 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
       const result = await pool.query(`
-        SELECT p.id, p.name, p.age, p.birthday, p.belt, p.rank_points, p.payment_status, p.status, p.parent_name, p.phone, g.name as group_name
+        SELECT p.id, p.name, p.member_type, p.age, p.birthday, p.email, p.belt, p.rank_points, p.payment_status, p.status, p.parent_name, p.phone, p.parent_phone, p.parent_login, p.telegram_chat_id, g.name as group_name
         FROM participants p
         LEFT JOIN groups g ON p.group_id = g.id
         ORDER BY p.name ASC
@@ -2453,6 +2463,115 @@ async function startServer() {
   });
 
   app.post("/api/register-member", async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const {
+      children,
+      registration_type,
+      parent_name,
+      phone,
+      parent_phone,
+      parent_email,
+      email,
+      password,
+      telegram_opt_in
+    } = req.body;
+
+    const registrationType = registration_type === 'adult' ? 'adult' : 'parent_child';
+    const submittedMembers = Array.isArray(children) ? children : [];
+    const membersToSave = registrationType === 'adult' ? submittedMembers.slice(0, 1) : submittedMembers;
+
+    if (membersToSave.length === 0) {
+      return res.status(400).json({ error: "No member data provided" });
+    }
+
+    const contactPhone = parent_phone || phone;
+    const normalizedPhone = normalizePhone(contactPhone);
+    const parent_login = normalizedPhone || `user_${Math.random().toString(36).substring(2, 8)}`;
+    const rawPassword = password;
+    const contactEmail = String(parent_email || email || '').trim().toLowerCase();
+
+    if (!rawPassword) {
+      return res.status(400).json({ error: "Password is required" });
+    }
+
+    if (!contactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+      return res.status(400).json({ error: "Valid email is required" });
+    }
+
+    const hasMissingName = membersToSave.some((member: any) => {
+      const memberName = String(member?.name || parent_name || '').trim();
+      return !memberName;
+    });
+
+    if (hasMissingName) {
+      return res.status(400).json({ error: "Member name is required" });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+      const results: number[] = [];
+
+      for (const member of membersToSave) {
+        const { age, birthday, group_id, belt } = member;
+        const memberName = String(member.name || parent_name || '').trim();
+        const storedParentName = registrationType === 'adult' ? memberName : parent_name;
+        const storedPhone = registrationType === 'adult' ? contactPhone : (member.phone || phone || null);
+
+        const result = await pool.query(
+          "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_phone, parent_login, parent_password, email, member_type, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id",
+          [
+            memberName,
+            age || null,
+            birthday || null,
+            group_id || null,
+            storedParentName,
+            storedPhone,
+            contactPhone,
+            parent_login,
+            hashedPassword,
+            contactEmail,
+            registrationType === 'adult' ? 'adult' : 'child',
+            belt || 'Білий',
+            'unpaid',
+            'new'
+          ]
+        );
+        results.push(result.rows[0].id);
+      }
+
+      console.log('Member registration saved; Telegram delivery remains limited to important messages.');
+
+      if (results.length > 0) {
+        (req.session as any).participantId = results[0];
+        return req.session.save((err) => {
+          if (err) console.error('Session save error after registration:', err);
+          const botUsername = process.env.TELEGRAM_BOT_USERNAME || 'BlackBearDojoBot';
+          res.json({
+            success: true,
+            count: membersToSave.length,
+            login: parent_login,
+            password: rawPassword,
+            participantIds: results,
+            telegramConnectUrl: telegram_opt_in ? `https://t.me/${botUsername}?start=p_${results[0]}` : null
+          });
+        });
+      }
+
+      res.json({
+        success: true,
+        count: membersToSave.length,
+        login: parent_login,
+        password: rawPassword,
+        participantIds: results,
+        telegramConnectUrl: null
+      });
+    } catch (e) {
+      console.error('Registration failed:', e);
+      res.status(500).json({ error: "Failed to register members" });
+    }
+  });
+
+  app.post("/api/register-member-legacy", async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { children, parent_name, phone, parent_phone, password } = req.body;
 
@@ -2772,6 +2891,14 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           ])),
           phone: normalizedChildPhone,
           parent_phone: normalizedParentPhone,
+          email: cleanText(getRowValue(row, [
+            'email', 'e-mail', 'mail', 'parent_email', 'contact_email',
+            'емейл', 'email батьків', 'пошта', 'електронна пошта'
+          ])).toLowerCase(),
+          member_type: cleanText(getRowValue(row, [
+            'member_type', 'type', 'participant_type', 'registration_type',
+            'тип', 'тип учасника', 'дорослий', 'дитина'
+          ])).toLowerCase().match(/adult|дорос/) ? 'adult' : 'child',
           parent_login: parentLogin,
           has_explicit_login: !!explicitParentLogin,
           parent_password: getImportParentPassword(parentLogin, explicitParentPassword),
@@ -2848,6 +2975,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             parent_name: p.parent_name ?? null,
             phone: p.phone || null,
             parent_phone: p.parent_phone || null,
+            email: p.email || null,
+            member_type: p.member_type || 'child',
             parent_login: p.parent_login,
             parent_password: passwordValue,
             belt: p.belt,
@@ -2946,7 +3075,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text } = req.body;
+    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text } = req.body;
 
     // Auto-generate credentials if missing
     const finalLogin = normalizeLogin(parent_login) || normalizeLogin(phone) || `parent_${Math.random().toString(36).substring(2, 8)}`;
@@ -2958,8 +3087,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         hashedPassword = await bcrypt.hash(rawPassword, 10);
       }
       await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, belt, achievements_text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, belt || 'Білий', achievements_text || '']
+        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, parent_phone || phone || null, email || null, member_type || 'child', belt || 'Білий', achievements_text || '']
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -2980,7 +3109,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const allowedKeys = [
         'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password',
         'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone',
-        'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
+        'parent_phone', 'email', 'member_type', 'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
         'achievements_text'
       ];
 
@@ -3046,8 +3175,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         values
       );
 
-      // If parent credentials changed, sync them for all children of this parent
-      if ((updateData.parent_login || updateData.parent_password) && oldParentLogin) {
+      // If parent account/contact data changed, sync it for all children of this parent.
+      if ((updateData.parent_login || updateData.parent_password || updateData.parent_phone !== undefined || updateData.email !== undefined || updateData.parent_name !== undefined) && oldParentLogin) {
         const syncFields = [];
         const syncValues = [];
         if (updateData.parent_login) {
@@ -3057,6 +3186,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         if (updateData.parent_password) {
           syncFields.push(`parent_password = $${syncValues.length + 1}`);
           syncValues.push(updateData.parent_password);
+        }
+        if (updateData.parent_phone !== undefined) {
+          syncFields.push(`parent_phone = $${syncValues.length + 1}`);
+          syncValues.push(updateData.parent_phone);
+        }
+        if (updateData.email !== undefined) {
+          syncFields.push(`email = $${syncValues.length + 1}`);
+          syncValues.push(updateData.email);
+        }
+        if (updateData.parent_name !== undefined) {
+          syncFields.push(`parent_name = $${syncValues.length + 1}`);
+          syncValues.push(updateData.parent_name);
         }
 
         if (syncFields.length > 0) {

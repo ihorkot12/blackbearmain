@@ -1,245 +1,360 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { 
-  User, 
-  Phone, 
-  Calendar, 
-  Shield, 
-  ChevronRight, 
-  CheckCircle2,
-  Users,
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
+import {
   Award,
-  Send,
+  Calendar,
+  CheckCircle2,
   Info,
-  Trash2,
+  Mail,
   MapPin,
-  Plus
+  Phone,
+  Plus,
+  Send,
+  Shield,
+  Trash2,
+  User,
+  Users
 } from 'lucide-react';
 import { Navbar } from './components/Navbar';
-import { BrandLogo } from './components/BrandLogo';
 import { Button } from './components/Button';
 import { toast } from 'sonner';
 import SEO from './components/SEO';
 
+type RegistrationType = 'parent_child' | 'adult';
+
+type ParticipantDraft = {
+  name: string;
+  age: string;
+  birthday: string;
+  location_id: string;
+  coach_id: string;
+  group_id: string;
+  belt: string;
+};
+
+type RegistrationResult = {
+  login: string;
+  password: string;
+  telegramConnectUrl?: string | null;
+};
+
+const beltOptions = [
+  'Білий',
+  'Оранжевий',
+  'Оранжевий з синьою смужкою',
+  'Синій',
+  'Синій з жовтою смужкою',
+  'Жовтий',
+  'Жовтий з зеленою смужкою',
+  'Зелений',
+  'Зелений з коричневою смужкою',
+  'Коричневий',
+  'Коричневий з чорною смужкою',
+  'Чорний'
+];
+
+const createParticipant = (): ParticipantDraft => ({
+  name: '',
+  age: '',
+  birthday: '',
+  location_id: '',
+  coach_id: '',
+  group_id: '',
+  belt: 'Білий'
+});
+
 export const RegisterMember = () => {
+  const [registrationType, setRegistrationType] = useState<RegistrationType>('parent_child');
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [groups, setGroups] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [coaches, setCoaches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
-  const [parentInfo, setParentInfo] = useState({
+  const [accountInfo, setAccountInfo] = useState({
     parent_name: '',
     parent_phone: '',
+    parent_email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    telegram_opt_in: false
   });
 
-  const [children, setChildren] = useState<any[]>([
-    {
-      name: '',
-      age: '',
-      birthday: '',
-      location_id: '',
-      coach_id: '',
-      group_id: '',
-      belt: 'Білий'
-    }
-  ]);
+  const [participants, setParticipants] = useState<ParticipantDraft[]>([createParticipant()]);
+  const [registrationResult, setRegistrationResult] = useState<RegistrationResult | null>(null);
 
-  const [registrationResult, setRegistrationResult] = useState<{login: string, password: string} | null>(null);
+  const isAdult = registrationType === 'adult';
 
   useEffect(() => {
     fetch('/api/init')
       .then(res => res.json())
       .then(data => {
         if (data && !data.error) {
-          if (data.groups && Array.isArray(data.groups)) {
-            setGroups(data.groups);
-          }
-          if (data.locations && Array.isArray(data.locations)) {
-            setLocations(data.locations);
-          }
-          if (data.coaches && Array.isArray(data.coaches)) {
-            setCoaches(data.coaches);
-          }
+          setGroups(Array.isArray(data.groups) ? data.groups : []);
+          setLocations(Array.isArray(data.locations) ? data.locations : []);
+          setCoaches(Array.isArray(data.coaches) ? data.coaches : []);
         }
       })
-      .catch(() => {})
+      .catch(() => toast.error('Не вдалося завантажити групи. Можна спробувати ще раз.'))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (isAdult && participants.length > 1) {
+      setParticipants([participants[0]]);
+    }
+  }, [isAdult, participants]);
+
+  const copy = useMemo(() => {
+    if (isAdult) {
+      return {
+        title: 'Реєстрація дорослого учасника',
+        subtitle: 'Створіть акаунт для себе. Логіном буде ваш номер телефону, пароль ви задаєте самостійно.',
+        participantHeading: 'Учасник клубу',
+        participantName: 'ПІБ учасника',
+        participantPlaceholder: 'Іванов Іван',
+        contactHeading: 'Контакти для входу',
+        phoneLabel: 'Телефон для входу',
+        emailLabel: 'Email учасника',
+        submit: 'Зареєструватись як учасник'
+      };
+    }
+
+    return {
+      title: 'Реєстрація дитини в клуб',
+      subtitle: 'Батьки створюють один акаунт для себе і можуть додати одну або кілька дітей.',
+      participantHeading: 'Дитина',
+      participantName: 'ПІБ дитини',
+      participantPlaceholder: 'Іванов Іван Іванович',
+      contactHeading: 'Контакти батьків',
+      phoneLabel: 'Телефон батьків для входу',
+      emailLabel: 'Email батьків',
+      submit: 'Зареєструвати дитину'
+    };
+  }, [isAdult]);
+
   const getFilteredGroups = (locationId: string, coachId: string) => {
-    return groups.filter(g => {
-      const matchLocation = !locationId || g.location_id === parseInt(locationId);
-      const matchCoach = !coachId || g.coach_id === parseInt(coachId);
+    return groups.filter(group => {
+      const matchLocation = !locationId || Number(group.location_id) === Number(locationId);
+      const matchCoach = !coachId || Number(group.coach_id) === Number(coachId);
       return matchLocation && matchCoach;
     });
   };
 
-  const addChild = () => {
-    setChildren([...children, {
-      name: '',
-      age: '',
-      birthday: '',
-      location_id: '',
-      coach_id: '',
-      group_id: '',
-      belt: 'Білий'
-    }]);
+  const updateParticipant = (index: number, field: keyof ParticipantDraft, value: string) => {
+    setParticipants(current => current.map((participant, i) => {
+      if (i !== index) return participant;
+      const next = { ...participant, [field]: value };
+      if (field === 'location_id' || field === 'coach_id') {
+        next.group_id = '';
+      }
+      return next;
+    }));
   };
 
-  const removeChild = (index: number) => {
-    if (children.length > 1) {
-      setChildren(children.filter((_, i) => i !== index));
+  const addParticipant = () => {
+    setParticipants(current => [...current, createParticipant()]);
+  };
+
+  const removeParticipant = (index: number) => {
+    setParticipants(current => current.length > 1 ? current.filter((_, i) => i !== index) : current);
+  };
+
+  const switchType = (type: RegistrationType) => {
+    setRegistrationType(type);
+    if (type === 'adult') {
+      setParticipants(current => [current[0] || createParticipant()]);
     }
   };
 
-  const updateChild = (index: number, field: string, value: any) => {
-    const newChildren = [...children];
-    newChildren[index] = { ...newChildren[index], [field]: value };
-    
-    // Reset group if location or coach changes
-    if (field === 'location_id' || field === 'coach_id') {
-      newChildren[index].group_id = '';
+  const copyToClipboard = async (text: string, field: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1800);
+    } catch {
+      toast.error('Не вдалося скопіювати');
     }
-    
-    setChildren(newChildren);
+  };
+
+  const resetForm = () => {
+    setIsSubmitted(false);
+    setRegistrationResult(null);
+    setRegistrationType('parent_child');
+    setParticipants([createParticipant()]);
+    setAccountInfo({
+      parent_name: '',
+      parent_phone: '',
+      parent_email: '',
+      password: '',
+      confirmPassword: '',
+      telegram_opt_in: false
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (parentInfo.password !== parentInfo.confirmPassword) {
+
+    const email = accountInfo.parent_email.trim().toLowerCase();
+    const phone = accountInfo.parent_phone.trim();
+    const members = isAdult ? [participants[0]] : participants;
+
+    if (!phone) {
+      toast.error('Вкажіть телефон для входу');
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Вкажіть коректний email');
+      return;
+    }
+
+    if (accountInfo.password.length < 4) {
+      toast.error('Пароль має бути мінімум 4 символи');
+      return;
+    }
+
+    if (accountInfo.password !== accountInfo.confirmPassword) {
       toast.error('Паролі не співпадають');
+      return;
+    }
+
+    if (!isAdult && !accountInfo.parent_name.trim()) {
+      toast.error('Вкажіть ПІБ одного з батьків');
+      return;
+    }
+
+    if (members.some(member => !member.name.trim())) {
+      toast.error(isAdult ? 'Вкажіть ПІБ учасника' : 'Вкажіть ПІБ кожної дитини');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      const adultName = members[0]?.name.trim();
       const res = await fetch('/api/register-member', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          children,
-          ...parentInfo
+          registration_type: registrationType,
+          children: members.map(member => ({
+            ...member,
+            name: member.name.trim(),
+            age: member.age ? Number(member.age) : null,
+            group_id: member.group_id || null
+          })),
+          parent_name: isAdult ? adultName : accountInfo.parent_name.trim(),
+          parent_phone: phone,
+          parent_email: email,
+          password: accountInfo.password,
+          telegram_opt_in: accountInfo.telegram_opt_in
         })
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        setRegistrationResult({ login: data.login, password: data.password });
-        
-        // Auto-login after registration
-        try {
-          const loginRes = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              login: data.login,
-              password: parentInfo.password
-            })
-          });
-          
-          if (loginRes.ok) {
-            window.location.href = '/parent';
-            return;
-          }
-        } catch (loginErr) {
-          console.error('Auto-login failed', loginErr);
-        }
+      const data = await res.json().catch(() => ({}));
 
-        setIsSubmitted(true);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося зберегти реєстрацію');
+        return;
+      }
+
+      const result = {
+        login: data.login || phone,
+        password: accountInfo.password,
+        telegramConnectUrl: data.telegramConnectUrl
+      };
+      setRegistrationResult(result);
+      setIsSubmitted(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      if (result.telegramConnectUrl) {
+        toast.success('Реєстрацію збережено. Зараз відкриємо Telegram-бот.');
+        setTimeout(() => {
+          window.location.href = result.telegramConnectUrl as string;
+        }, 1100);
+      } else {
+        toast.success('Реєстрацію збережено');
       }
     } catch (err) {
       console.error('Registration failed', err);
+      toast.error('Помилка мережі. Спробуйте ще раз.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-
-  const copyToClipboard = (text: string, field: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (isSubmitted && registrationResult) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
+      <div className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-6 text-center">
+        <SEO title="Реєстрацію завершено" description="Реєстрацію члена клубу Black Bear Dojo завершено." />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           className="max-w-md w-full space-y-8"
         >
-          <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(209,0,0,0.5)]">
+          <div className="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center mx-auto shadow-[0_0_40px_rgba(209,0,0,0.45)]">
             <CheckCircle2 size={48} className="text-white" />
           </div>
+
           <div className="space-y-4">
-            <h2 className="text-4xl font-black uppercase tracking-tighter">Вітаємо в команді!</h2>
+            <h1 className="text-4xl font-black uppercase tracking-tight">Реєстрацію завершено</h1>
             <p className="text-zinc-400">
-              Вашу реєстрацію успішно завершено. Збережіть ці дані для входу в особистий кабінет батьків:
+              Акаунт створено. Логін для входу в кабінет: номер телефону у форматі нижче.
             </p>
           </div>
 
           <div className="bg-zinc-900 border border-white/10 rounded-3xl p-6 space-y-4 text-left">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Логін (номер телефону)</p>
-              <div className="flex items-center justify-between bg-black rounded-xl p-4 border border-white/5">
-                <code className="text-red-500 font-bold">{registrationResult.login}</code>
-                <button 
+              <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін</p>
+              <div className="flex items-center justify-between gap-3 bg-black rounded-2xl p-4 border border-white/5">
+                <code className="text-red-500 font-bold break-all">{registrationResult.login}</code>
+                <button
+                  type="button"
                   onClick={() => copyToClipboard(registrationResult.login, 'login')}
-                  className="text-zinc-500 hover:text-white transition-colors relative"
+                  className="text-zinc-500 hover:text-white transition-colors shrink-0"
+                  aria-label="Скопіювати логін"
                 >
-                  {copiedField === 'login' ? <CheckCircle2 size={16} className="text-green-500" /> : <Info size={16} />}
-                  {copiedField === 'login' && (
-                    <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[8px] px-2 py-1 rounded uppercase font-black">Скопійовано</span>
-                  )}
+                  {copiedField === 'login' ? <CheckCircle2 size={18} className="text-green-500" /> : <Info size={18} />}
                 </button>
               </div>
             </div>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              Пароль той, який ви щойно вказали у формі. Його можна змінити через адміна або тренера.
+            </p>
           </div>
 
-          <div className="pt-8 flex flex-col gap-4">
-            <Button variant="primary" onClick={() => window.location.href = '/login'} showIcon={false}>
+          {registrationResult.telegramConnectUrl && (
+            <div className="bg-red-600/10 border border-red-600/20 rounded-3xl p-5 text-left">
+              <p className="text-sm text-zinc-200 font-bold mb-2">Telegram-підключення</p>
+              <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                Якщо Telegram не відкрився автоматично, натисніть кнопку. Бот підключить цей акаунт до сповіщень.
+              </p>
+              <a
+                href={registrationResult.telegramConnectUrl}
+                className="h-12 px-5 bg-red-600 hover:bg-red-700 rounded-2xl font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2"
+              >
+                <Send size={16} />
+                Відкрити Telegram
+              </a>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4">
+            <Button variant="primary" onClick={() => window.location.href = '/parent'} showIcon={false}>
               Увійти в кабінет
             </Button>
-            <Button 
-              variant="secondary" 
-              onClick={() => {
-                setIsSubmitted(false);
-                setRegistrationResult(null);
-                setChildren([{
-                  name: '',
-                  age: '',
-                  birthday: '',
-                  location_id: '',
-                  coach_id: '',
-                  group_id: '',
-                  belt: 'Білий'
-                }]);
-                setParentInfo({
-                  parent_name: '',
-                  parent_phone: '',
-                  password: '',
-                  confirmPassword: ''
-                });
-              }} 
-              showIcon={false}
-            >
+            <Button variant="secondary" onClick={resetForm} showIcon={false}>
               Нова реєстрація
             </Button>
             <Button variant="secondary" onClick={() => window.location.href = '/'} showIcon={false}>
@@ -253,275 +368,335 @@ export const RegisterMember = () => {
 
   return (
     <div className="min-h-screen bg-black text-white font-sans selection:bg-red-600 selection:text-white">
-      <SEO 
+      <SEO
         title="Реєстрація члена клубу"
-        description="Реєстрація нових учнів у Black Bear Dojo. Станьте частиною нашої команди вже сьогодні!"
+        description="Реєстрація дитини або дорослого учасника Black Bear Dojo з особистим кабінетом."
       />
       <Navbar />
 
-      <main className="pt-32 pb-20 px-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
+      <main className="pt-28 md:pt-32 pb-20 px-4 sm:px-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10 md:mb-14">
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-[0.3em] mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-[0.25em] mb-6"
             >
               <Shield size={12} />
               Реєстрація
             </motion.div>
-            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6">Анкета учня</h1>
-            <p className="text-zinc-400 text-lg max-w-xl mx-auto">
-              Будь ласка, заповніть всі поля для реєстрації вашої дитини в нашому порталі. Ви можете додати декілька дітей одночасно.
-            </p>
+            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight mb-5">{copy.title}</h1>
+            <p className="text-zinc-400 text-base md:text-lg max-w-2xl mx-auto leading-relaxed">{copy.subtitle}</p>
           </div>
 
-          <motion.form 
+          <motion.form
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.15 }}
             onSubmit={handleSubmit}
-            className="space-y-12"
+            className="space-y-8 md:space-y-10"
           >
-            {/* Children Sections */}
-            <div className="space-y-12">
-              {children.map((child, index) => (
-                <motion.div 
+            <section className="grid md:grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => switchType('parent_child')}
+                className={`text-left rounded-3xl border p-6 transition-all ${
+                  !isAdult ? 'bg-red-600/10 border-red-600/60' : 'bg-zinc-900/70 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <Users className={!isAdult ? 'text-red-500' : 'text-zinc-500'} size={22} />
+                  <span className="text-sm font-black uppercase tracking-widest">Батьки + дитина</span>
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Один батьківський акаунт, у якому можна бачити відвідування, оплату, бали й прогрес дітей.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => switchType('adult')}
+                className={`text-left rounded-3xl border p-6 transition-all ${
+                  isAdult ? 'bg-red-600/10 border-red-600/60' : 'bg-zinc-900/70 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-3">
+                  <User className={isAdult ? 'text-red-500' : 'text-zinc-500'} size={22} />
+                  <span className="text-sm font-black uppercase tracking-widest">Дорослий учасник</span>
+                </div>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Акаунт створюється напряму для учасника. Вхід: телефон і пароль.
+                </p>
+              </button>
+            </section>
+
+            <div className="space-y-8">
+              {participants.map((participant, index) => (
+                <motion.section
                   key={index}
-                  initial={{ opacity: 0, x: -20 }}
+                  initial={{ opacity: 0, x: -14 }}
                   animate={{ opacity: 1, x: 0 }}
-                  className="relative bg-zinc-900/50 p-8 md:p-12 rounded-[2.5rem] border border-white/5 backdrop-blur-xl"
+                  className="relative bg-zinc-900/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-white/5 backdrop-blur-xl"
                 >
-                  {children.length > 1 && (
-                    <button 
+                  {!isAdult && participants.length > 1 && (
+                    <button
                       type="button"
-                      onClick={() => removeChild(index)}
-                      className="absolute top-8 right-8 text-zinc-600 hover:text-red-500 transition-colors"
+                      onClick={() => removeParticipant(index)}
+                      className="absolute top-6 right-6 text-zinc-600 hover:text-red-500 transition-colors"
+                      aria-label="Видалити дитину"
                     >
                       <Trash2 size={20} />
                     </button>
                   )}
 
-                  <div className="space-y-12">
-                    {/* Child Info */}
-                    <div className="space-y-8">
-                      <div className="flex items-center gap-3 text-red-500">
-                        <Users size={20} />
-                        <h3 className="text-xs font-black uppercase tracking-[0.2em]">Дитина #{index + 1}</h3>
-                      </div>
-                      
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">ПІБ Дитини</label>
-                          <div className="relative">
-                            <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                            <input 
-                              required
-                              type="text" 
-                              placeholder="Іванов Іван Іванович"
-                              className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                              value={child.name}
-                              onChange={e => updateChild(index, 'name', e.target.value)}
-                            />
-                          </div>
-                        </div>
+                  <div className="space-y-8">
+                    <div className="flex items-center gap-3 text-red-500">
+                      <Users size={20} />
+                      <h2 className="text-xs font-black uppercase tracking-[0.2em]">
+                        {copy.participantHeading}{!isAdult ? ` #${index + 1}` : ''}
+                      </h2>
+                    </div>
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Дата народження</label>
-                          <div className="relative">
-                            <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                            <input 
-                              required
-                              type="date" 
-                              className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                              value={child.birthday}
-                              onChange={e => updateChild(index, 'birthday', e.target.value)}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Вік</label>
-                          <input 
+                    <div className="grid md:grid-cols-2 gap-5 md:gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">{copy.participantName}</label>
+                        <div className="relative">
+                          <User className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <input
                             required
-                            type="number" 
-                            placeholder="Наприклад: 8"
-                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                            value={child.age}
-                            onChange={e => updateChild(index, 'age', e.target.value)}
+                            type="text"
+                            aria-label={copy.participantName}
+                            placeholder={copy.participantPlaceholder}
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                            value={participant.name}
+                            onChange={e => updateParticipant(index, 'name', e.target.value)}
                           />
                         </div>
+                      </div>
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Поточний пояс</label>
-                          <div className="relative">
-                            <Award className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                            <select 
-                              className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                              value={child.belt}
-                              onChange={e => updateChild(index, 'belt', e.target.value)}
-                            >
-                              <option value="Білий">Білий</option>
-                              <option value="Оранжевий">Оранжевий</option>
-                              <option value="Оранжевий з синьою смужкою">Оранжевий з синьою смужкою</option>
-                              <option value="Синій">Синій</option>
-                              <option value="Синій з жовтою смужкою">Синій з жовтою смужкою</option>
-                              <option value="Жовтий">Жовтий</option>
-                              <option value="Жовтий з зеленою смужкою">Жовтий з зеленою смужкою</option>
-                              <option value="Зелений">Зелений</option>
-                              <option value="Зелений з коричневою смужкою">Зелений з коричневою смужкою</option>
-                              <option value="Коричневий">Коричневий</option>
-                              <option value="Коричневий з чорною смужкою">Коричневий з чорною смужкою</option>
-                              <option value="Чорний">Чорний</option>
-                            </select>
-                          </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Дата народження</label>
+                        <div className="relative">
+                          <Calendar className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <input
+                            type="date"
+                            aria-label="Дата народження"
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                            value={participant.birthday}
+                            onChange={e => updateParticipant(index, 'birthday', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Вік</label>
+                        <input
+                          type="number"
+                          aria-label="Вік"
+                          min="3"
+                          max="80"
+                          placeholder={isAdult ? 'Наприклад: 28' : 'Наприклад: 8'}
+                          className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                          value={participant.age}
+                          onChange={e => updateParticipant(index, 'age', e.target.value)}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Поточний пояс</label>
+                        <div className="relative">
+                          <Award className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                          <select
+                            aria-label="Поточний пояс"
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl pl-14 pr-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                            value={participant.belt}
+                            onChange={e => updateParticipant(index, 'belt', e.target.value)}
+                          >
+                            {beltOptions.map(belt => <option key={belt} value={belt}>{belt}</option>)}
+                          </select>
                         </div>
                       </div>
                     </div>
 
-                    {/* Group Selection */}
-                    <div className="space-y-8">
+                    <div className="space-y-6">
                       <div className="flex items-center gap-3 text-red-500">
                         <MapPin size={20} />
                         <h3 className="text-xs font-black uppercase tracking-[0.2em]">Локація та група</h3>
                       </div>
-                      
-                      <div className="grid md:grid-cols-2 gap-6">
+
+                      <div className="grid md:grid-cols-2 gap-5 md:gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Оберіть локацію</label>
-                          <select 
-                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                            value={child.location_id}
-                            onChange={e => updateChild(index, 'location_id', e.target.value)}
+                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Локація</label>
+                          <select
+                            aria-label="Локація"
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                            value={participant.location_id}
+                            onChange={e => updateParticipant(index, 'location_id', e.target.value)}
                           >
-                            <option value="">Всі локації</option>
-                            {locations.map(l => (
-                              <option key={l.id} value={l.id}>{l.name}</option>
+                            <option value="">Поки не обрано</option>
+                            {locations.map(location => (
+                              <option key={location.id} value={location.id}>{location.name}</option>
                             ))}
                           </select>
                         </div>
 
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Оберіть тренера</label>
-                          <select 
-                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                            value={child.coach_id}
-                            onChange={e => updateChild(index, 'coach_id', e.target.value)}
+                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Тренер</label>
+                          <select
+                            aria-label="Тренер"
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                            value={participant.coach_id}
+                            onChange={e => updateParticipant(index, 'coach_id', e.target.value)}
                           >
-                            <option value="">Всі тренери</option>
-                            {coaches.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
+                            <option value="">Поки не обрано</option>
+                            {coaches.map(coach => (
+                              <option key={coach.id} value={coach.id}>{coach.name}</option>
                             ))}
                           </select>
                         </div>
 
                         <div className="md:col-span-2 space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Оберіть групу</label>
-                          <select 
-                            required
-                            className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
-                            value={child.group_id}
-                            onChange={e => updateChild(index, 'group_id', e.target.value)}
+                          <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Група</label>
+                          <select
+                            aria-label="Група"
+                            className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none appearance-none"
+                            value={participant.group_id}
+                            onChange={e => updateParticipant(index, 'group_id', e.target.value)}
                           >
-                            <option value="">Оберіть групу зі списку</option>
-                            {getFilteredGroups(child.location_id, child.coach_id).map(g => (
-                              <option key={g.id} value={g.id}>{g.name} ({g.location_name || 'Локація не вказана'})</option>
+                            <option value="">Адміністратор уточнить групу</option>
+                            {getFilteredGroups(participant.location_id, participant.coach_id).map(group => (
+                              <option key={group.id} value={group.id}>
+                                {group.name}{group.location_name ? ` • ${group.location_name}` : ''}
+                              </option>
                             ))}
                           </select>
                         </div>
                       </div>
                     </div>
                   </div>
-                </motion.div>
+                </motion.section>
               ))}
             </div>
 
-            {/* Add Child Button */}
-            <div className="flex justify-center">
-              <button 
-                type="button"
-                onClick={addChild}
-                className="group flex items-center gap-4 px-8 py-4 bg-zinc-900 hover:bg-zinc-800 border border-white/5 rounded-2xl transition-all"
-              >
-                <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Plus size={20} />
-                </div>
-                <span className="text-xs font-black uppercase tracking-widest">Додати ще одну дитину</span>
-              </button>
-            </div>
+            {!isAdult && (
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={addParticipant}
+                  className="group flex items-center gap-4 px-6 md:px-8 py-4 bg-zinc-900 hover:bg-zinc-800 border border-white/5 rounded-2xl transition-all"
+                >
+                  <span className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
+                    <Plus size={20} />
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-widest">Додати ще одну дитину</span>
+                </button>
+              </div>
+            )}
 
-            {/* Parent Info Section */}
-            <div className="bg-zinc-900/50 p-8 md:p-12 rounded-[2.5rem] border border-white/5 backdrop-blur-xl space-y-8">
+            <section className="bg-zinc-900/60 p-6 md:p-10 rounded-[2rem] md:rounded-[2.5rem] border border-white/5 backdrop-blur-xl space-y-8">
               <div className="flex items-center gap-3 text-red-500">
                 <Phone size={20} />
-                <h3 className="text-xs font-black uppercase tracking-[0.2em]">Контакти батьків</h3>
+                <h2 className="text-xs font-black uppercase tracking-[0.2em]">{copy.contactHeading}</h2>
               </div>
-              
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">ПІБ Батька/Матері</label>
-                  <input 
-                    required
-                    type="text" 
-                    placeholder="Іванов Іван"
-                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                    value={parentInfo.parent_name}
-                    onChange={e => setParentInfo({...parentInfo, parent_name: e.target.value})}
-                  />
-                </div>
+
+              <div className="grid md:grid-cols-2 gap-5 md:gap-6">
+                {!isAdult && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">ПІБ батька/матері</label>
+                    <input
+                      required
+                      type="text"
+                      aria-label="ПІБ батька/матері"
+                      placeholder="Іванов Іван"
+                      className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                      value={accountInfo.parent_name}
+                      onChange={e => setAccountInfo({ ...accountInfo, parent_name: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Номер телефону</label>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">{copy.phoneLabel}</label>
                   <div className="relative">
                     <Phone className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
-                    <input 
+                    <input
                       required
-                      type="tel" 
+                      type="tel"
+                      aria-label={copy.phoneLabel}
                       placeholder="+380..."
-                      className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                      value={parentInfo.parent_phone}
-                      onChange={e => setParentInfo({...parentInfo, parent_phone: e.target.value})}
+                      className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                      value={accountInfo.parent_phone}
+                      onChange={e => setAccountInfo({ ...accountInfo, parent_phone: e.target.value })}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Придумайте пароль</label>
-                  <input 
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">{copy.emailLabel}</label>
+                  <div className="relative">
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-600" size={18} />
+                    <input
+                      required
+                      type="email"
+                      aria-label={copy.emailLabel}
+                      placeholder="name@example.com"
+                      className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-14 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                      value={accountInfo.parent_email}
+                      onChange={e => setAccountInfo({ ...accountInfo, parent_email: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Пароль</label>
+                  <input
                     required
-                    type="password" 
-                    placeholder="••••••••"
-                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                    value={parentInfo.password}
-                    onChange={e => setParentInfo({...parentInfo, password: e.target.value})}
+                    type="password"
+                    aria-label="Пароль"
+                    placeholder="Мінімум 4 символи"
+                    className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                    value={accountInfo.password}
+                    onChange={e => setAccountInfo({ ...accountInfo, password: e.target.value })}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-4">Підтвердіть пароль</label>
-                  <input 
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 ml-3">Підтвердіть пароль</label>
+                  <input
                     required
-                    type="password" 
-                    placeholder="••••••••"
-                    className="w-full h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
-                    value={parentInfo.confirmPassword}
-                    onChange={e => setParentInfo({...parentInfo, confirmPassword: e.target.value})}
+                    type="password"
+                    aria-label="Підтвердіть пароль"
+                    placeholder="Повторіть пароль"
+                    className="w-full h-[60px] md:h-[64px] bg-black border border-white/5 rounded-2xl px-6 text-sm focus:border-red-600 focus:ring-1 focus:ring-red-600 transition-all outline-none"
+                    value={accountInfo.confirmPassword}
+                    onChange={e => setAccountInfo({ ...accountInfo, confirmPassword: e.target.value })}
                   />
                 </div>
               </div>
-            </div>
 
-            <div className="pt-6">
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Реєстрація...' : 'Зареєструватись'}
+              <label className="flex items-start gap-4 p-5 bg-black/70 border border-white/5 rounded-3xl cursor-pointer hover:border-red-600/40 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={accountInfo.telegram_opt_in}
+                  onChange={e => setAccountInfo({ ...accountInfo, telegram_opt_in: e.target.checked })}
+                  className="mt-1 h-5 w-5 accent-red-600"
+                />
+                <span className="text-left">
+                  <span className="block text-sm font-black uppercase tracking-widest text-white">Підключити Telegram-бот</span>
+                  <span className="block text-xs text-zinc-400 leading-relaxed mt-2">
+                    Після реєстрації відкриється наш бот з персональним кодом. У Telegram приходять важливі ручні повідомлення, оголошення та відповіді тренера. Відмітки відвідування й бали не спамлять у бот, вони зберігаються в кабінеті.
+                  </span>
+                </span>
+              </label>
+            </section>
+
+            <div className="pt-2">
+              <Button type="submit" className="w-full min-h-[62px]" disabled={isSubmitting}>
+                {isSubmitting ? 'Зберігаємо...' : copy.submit}
               </Button>
-              <p className="text-center text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-6 flex items-center justify-center gap-2">
+              <p className="text-center text-[10px] text-zinc-500 uppercase font-bold tracking-widest mt-6 flex items-center justify-center gap-2 leading-relaxed">
                 <Info size={12} />
-                Натискаючи кнопку, ви погоджуєтесь на обробку персональних даних
+                Дані потрібні для кабінету, зв’язку з клубом і коректного обліку учасника
               </p>
             </div>
           </motion.form>

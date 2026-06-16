@@ -3085,8 +3085,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         name: '', 
         age: '', 
         group_id: groups[0]?.id || '', 
+        member_type: 'child',
         parent_login: '', 
         parent_password: '',
+        parent_phone: '',
+        email: '',
         payment_status: 'unpaid',
         status: 'active'
       });
@@ -3314,8 +3317,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               age: '', 
               birthday: '',
               group_id: groups[0]?.id || '', 
+              member_type: 'child',
               parent_name: '',
               phone: '',
+              parent_phone: '',
+              email: '',
               belt: 'Білий',
               parent_login: '', 
               parent_password: '',
@@ -3664,6 +3670,17 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                 />
               </div>
+              <div>
+                <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Тип учасника</label>
+                <select
+                  value={editingParticipant.member_type || 'child'}
+                  onChange={e => setEditingParticipant({...editingParticipant, member_type: e.target.value})}
+                  className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                >
+                  <option value="child">Дитина / батьківський акаунт</option>
+                  <option value="adult">Дорослий учасник</option>
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
                   <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Вік</label>
@@ -3733,6 +3750,26 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                     type="text" 
                     value={editingParticipant.phone || ''}
                     onChange={e => setEditingParticipant({...editingParticipant, phone: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 lg:gap-4">
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Телефон акаунта</label>
+                  <input
+                    type="text"
+                    value={editingParticipant.parent_phone || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, parent_phone: e.target.value})}
+                    className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={editingParticipant.email || ''}
+                    onChange={e => setEditingParticipant({...editingParticipant, email: e.target.value})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   />
                 </div>
