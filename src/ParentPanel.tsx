@@ -938,6 +938,7 @@ const ParentPanel = () => {
                             <Clock size={24} />
                           </div>
                           <div>
+                            <div className="text-[9px] text-red-500 font-black uppercase tracking-widest mb-1">{item.group_name || participant?.group_name}</div>
                             <div className="font-bold text-lg">{item.day_of_week}</div>
                             <div className="text-xs text-zinc-500 font-medium">{item.start_time} - {item.end_time}</div>
                           </div>
@@ -1070,6 +1071,7 @@ const ParentPanel = () => {
                       <div>
                         <div className="text-2xl font-black">{item.day_of_week}</div>
                         <div className="text-zinc-500 font-bold">{item.start_time} - {item.end_time}</div>
+                        <div className="text-[10px] text-red-500 font-black uppercase tracking-widest mt-2">{item.group_name || participant?.group_name}</div>
                       </div>
                     </div>
                     <div className="flex flex-col md:items-end">
@@ -1081,6 +1083,12 @@ const ParentPanel = () => {
                     </div>
                   </div>
                 ))}
+                {schedule.length === 0 && (
+                  <div className="p-16 text-center bg-zinc-900/20 rounded-[2rem] border border-dashed border-white/5">
+                    <Clock size={40} className="mx-auto text-zinc-700 mb-4 opacity-40" />
+                    <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Розклад для цієї групи ще не призначено</p>
+                  </div>
+                )}
               </div>
             </div>
           )}

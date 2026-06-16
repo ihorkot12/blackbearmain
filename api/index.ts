@@ -5558,9 +5558,17 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           FROM schedule s
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
-          WHERE (s.group_name ILIKE $1 || '%' OR s.group_name ILIKE '%' || $1 || '%' OR $1 ILIKE '%' || s.group_name || '%')
-             OR (s.location_id = $2 AND s.coach_id = $3 AND s.group_name IS NOT NULL)
-          ORDER BY s.order_index ASC
+          WHERE s.group_name IS NOT NULL
+            AND (
+              LOWER(TRIM(s.group_name)) = LOWER(TRIM($1))
+              OR LOWER(TRIM(s.group_name)) LIKE LOWER(TRIM($1)) || ' %'
+              OR LOWER(TRIM(s.group_name)) LIKE LOWER(TRIM($1)) || '(%'
+              OR LOWER(TRIM($1)) LIKE LOWER(TRIM(s.group_name)) || ' %'
+              OR LOWER(TRIM($1)) LIKE LOWER(TRIM(s.group_name)) || '(%'
+            )
+            AND ($2::int IS NULL OR s.location_id = $2::int)
+            AND ($3::int IS NULL OR s.coach_id = $3::int OR s.coach_id IS NULL)
+          ORDER BY s.order_index ASC, s.start_time ASC
         `, [groupName, locId, coachId]);
 
         res.json(sRes.rows);
