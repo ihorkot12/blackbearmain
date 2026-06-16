@@ -4974,6 +4974,37 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     }
   });
 
+  app.delete("/api/audit-logs/test-artifacts", requireAdmin, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const patterns = [
+      '%ZZZ_TEST%',
+      '%TEST_FAMILY%',
+      '%QA-Codex%',
+      '%TEST Codex%',
+      '%Test Mother%',
+      '%Codex%',
+      '%Тестовий семінар запуску%',
+      '%Тестова дисципліна%'
+    ];
+    try {
+      const result = await pool.query(
+        `DELETE FROM audit_logs
+         WHERE COALESCE(action, '') ILIKE ANY($1::text[])
+            OR COALESCE(details::text, '') ILIKE ANY($1::text[])
+         RETURNING id, action`,
+        [patterns]
+      );
+      res.json({
+        success: true,
+        deleted: result.rowCount || 0,
+        ids: result.rows.map(row => row.id)
+      });
+    } catch (e) {
+      console.error('Failed to clear test audit logs:', e);
+      res.status(500).json({ error: "Failed to clear test logs" });
+    }
+  });
+
   // Ratings and Birthdays
   app.get("/api/ratings", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
