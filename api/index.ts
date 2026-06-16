@@ -181,6 +181,23 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS participant_accesses (
+        id SERIAL PRIMARY KEY,
+        participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+        access_type TEXT DEFAULT 'guardian',
+        name TEXT,
+        phone TEXT,
+        login TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        email TEXT,
+        can_login BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_participant_accesses_participant_id ON participant_accesses(participant_id);
+      CREATE INDEX IF NOT EXISTS idx_participant_accesses_login ON participant_accesses(LOWER(login));
+
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS email TEXT;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS member_type TEXT DEFAULT 'child';
@@ -630,6 +647,34 @@ async function startServer() {
   const normalizeLogin = (login: unknown) => String(login ?? '').trim();
   const isMaskedPassword = (value: unknown) =>
     typeof value === 'string' && /^\*+$/.test(value.trim());
+  const findBlockingPrimaryCredential = async (login: string, participantId: number) => {
+    const normalizedPhone = normalizePhone(login);
+    const phoneWithoutPlus = normalizedPhone.replace(/^\+/, '');
+    const params: any[] = [login, participantId];
+    const conditions = ["LOWER(TRIM(COALESCE(parent_login, ''))) = LOWER(TRIM($1))"];
+
+    if (normalizedPhone.length >= 7) {
+      params.push(normalizedPhone);
+      conditions.push(`(
+        REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length}
+        OR (id != $2 AND REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length})
+        OR (id != $2 AND REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length})
+      )`);
+
+      params.push(phoneWithoutPlus);
+      conditions.push(`(
+        REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length}
+        OR (id != $2 AND REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length})
+        OR (id != $2 AND REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length})
+      )`);
+    }
+
+    const result = await pool.query(
+      `SELECT id, name FROM participants WHERE ${conditions.join(' OR ')} LIMIT 1`,
+      params
+    );
+    return result.rows[0] || null;
+  };
 
   app.use(session({
     secret: SESSION_SECRET,
@@ -2217,33 +2262,73 @@ async function startServer() {
 
       // Пошук батька по логіну або телефону (в participants таблиці)
       let user = null;
-      const parentConditions = ["LOWER(TRIM(parent_login)) = LOWER($1)"];
-      const parentParams: any[] = [loginValue];
-
-      if (normalizedPhone.length >= 7) {
-        parentParams.push(normalizedPhone);
-        parentConditions.push(`REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${parentParams.length}`);
-        parentConditions.push(`REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${parentParams.length}`);
-
-        parentParams.push(phoneWithoutPlus);
-        parentConditions.push(`REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${parentParams.length}`);
-        parentConditions.push(`REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${parentParams.length}`);
-      }
-
       const result = await pool.query(
         `SELECT id, name, phone, parent_phone, parent_password, parent_login
          FROM participants
-         WHERE ${parentConditions.join(' OR ')}
+         WHERE LOWER(TRIM(parent_login)) = LOWER($1)
          ORDER BY id ASC
          LIMIT 1`,
-        parentParams
+        [loginValue]
       );
       if (result.rows.length > 0) {
         user = result.rows[0];
-        console.log('Found parent in participants:', user.id);
+        console.log('Found parent by primary login:', user.id);
       }
 
       // Якщо батька не знайдено - перевіримо адмінів
+      if (!user) {
+        const accessConditions = ["LOWER(TRIM(pa.login)) = LOWER($1)"];
+        const accessParams: any[] = [loginValue];
+
+        if (normalizedPhone.length >= 7) {
+          accessParams.push(normalizedPhone);
+          accessConditions.push(`REGEXP_REPLACE(COALESCE(pa.phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${accessParams.length}`);
+
+          accessParams.push(phoneWithoutPlus);
+          accessConditions.push(`REGEXP_REPLACE(COALESCE(pa.phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${accessParams.length}`);
+          accessConditions.push(`REGEXP_REPLACE(COALESCE(pa.login, ''), '[^\\d]', '', 'g') LIKE '%' || $${accessParams.length}`);
+        }
+
+        const accessResult = await pool.query(
+          `SELECT p.id, p.name, p.phone, p.parent_phone, p.parent_login,
+                  pa.password_hash as parent_password,
+                  pa.id as access_id,
+                  pa.name as access_name,
+                  pa.access_type
+           FROM participant_accesses pa
+           JOIN participants p ON p.id = pa.participant_id
+           WHERE pa.can_login = TRUE
+           AND (${accessConditions.join(' OR ')})
+           ORDER BY pa.id ASC
+           LIMIT 1`,
+          accessParams
+        );
+
+        if (accessResult.rows.length > 0) {
+          user = accessResult.rows[0];
+          console.log('Found family access for participant:', user.id);
+        }
+      }
+
+      if (!user && normalizedPhone.length >= 7) {
+        const phoneResult = await pool.query(
+          `SELECT id, name, phone, parent_phone, parent_password, parent_login
+           FROM participants
+           WHERE REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $1
+              OR REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $1
+              OR REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d]', '', 'g') LIKE '%' || $2
+              OR REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d]', '', 'g') LIKE '%' || $2
+           ORDER BY id ASC
+           LIMIT 1`,
+          [normalizedPhone, phoneWithoutPlus]
+        );
+
+        if (phoneResult.rows.length > 0) {
+          user = phoneResult.rows[0];
+          console.log('Found parent by phone fallback:', user.id);
+        }
+      }
+
       if (!user) {
         const adminResult = await pool.query(
           `SELECT id, name, password as admin_password, role FROM admin_users WHERE login = $1 LIMIT 1`,
@@ -2287,8 +2372,10 @@ async function startServer() {
         console.log('Parent login successful:', user.id);
         (req.session as any).userId = user.id;
         (req.session as any).participantId = user.id;
+        (req.session as any).parentAccessId = user.access_id || null;
+        (req.session as any).parentAccessType = user.access_type || 'primary';
         (req.session as any).role = 'parent';
-        (req.session as any).userName = user.name;
+        (req.session as any).userName = user.access_name || user.name;
 
         return req.session.save((err) => {
           if (err) {
@@ -2298,7 +2385,7 @@ async function startServer() {
           res.json({
             success: true,
             role: 'parent',
-            name: user.name,
+            name: user.access_name || user.name,
             participantId: user.id,
             token: `${user.id}-parent`,
             redirect: '/parent'
@@ -3082,6 +3169,16 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const rawPassword = parent_password || Math.random().toString(36).substring(2, 10);
 
     try {
+      const accessDuplicate = await pool.query(
+        `SELECT id FROM participant_accesses
+         WHERE LOWER(TRIM(login)) = LOWER(TRIM($1))
+         LIMIT 1`,
+        [finalLogin]
+      );
+      if (accessDuplicate.rows.length > 0) {
+        return res.status(409).json({ error: "This login is already used by a family access" });
+      }
+
       let hashedPassword = rawPassword;
       if (!isBcryptHash(hashedPassword)) {
         hashedPassword = await bcrypt.hash(rawPassword, 10);
@@ -3133,6 +3230,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       const currentRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [req.params.id]);
       if (currentRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
       const oldParentLogin = currentRes.rows[0]?.parent_login;
+
+      if (updateData.parent_login && normalizeLogin(updateData.parent_login) !== normalizeLogin(oldParentLogin)) {
+        const accessDuplicate = await pool.query(
+          `SELECT id FROM participant_accesses
+           WHERE LOWER(TRIM(login)) = LOWER(TRIM($1))
+           LIMIT 1`,
+          [updateData.parent_login]
+        );
+        if (accessDuplicate.rows.length > 0) {
+          return res.status(409).json({ error: "This login is already used by a family access" });
+        }
+      }
 
       // Ignore masked/empty password placeholders from the admin UI.
       if (
@@ -3213,6 +3322,204 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     } catch (e) {
       console.error('Update participant failed:', e);
       res.status(500).json({ error: "Failed to update participant" });
+    }
+  });
+
+  app.get("/api/participants/:id/accesses", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const user = (req as any).user;
+      const participantId = Number(req.params.id);
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const result = await pool.query(
+        `SELECT id, participant_id, access_type, name, phone, login, email, can_login, created_at, updated_at
+         FROM participant_accesses
+         WHERE participant_id = $1
+         ORDER BY id ASC`,
+        [participantId]
+      );
+      res.json(result.rows);
+    } catch (e) {
+      console.error("Failed to fetch participant accesses:", e);
+      res.status(500).json({ error: "Failed to fetch accesses" });
+    }
+  });
+
+  app.post("/api/participants/:id/accesses", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const user = (req as any).user;
+      const participantId = Number(req.params.id);
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const { access_type, name, phone, login, password, email, can_login } = req.body;
+      const finalLogin = normalizeLogin(login) || normalizePhone(phone || '');
+      if (!finalLogin) {
+        return res.status(400).json({ error: "Login or phone is required" });
+      }
+      if (!password || String(password).length < 4) {
+        return res.status(400).json({ error: "Password must be at least 4 characters" });
+      }
+
+      const primaryConflict = await findBlockingPrimaryCredential(finalLogin, participantId);
+      if (primaryConflict) {
+        return res.status(409).json({ error: "This phone/login is already used as a primary parent login" });
+      }
+
+      const duplicate = await pool.query(
+        `SELECT id FROM participant_accesses
+         WHERE LOWER(TRIM(login)) = LOWER(TRIM($1))
+         LIMIT 1`,
+        [finalLogin]
+      );
+      if (duplicate.rows.length > 0) {
+        return res.status(409).json({ error: "This login is already connected to a child account" });
+      }
+
+      const hashedPassword = await bcrypt.hash(String(password), 10);
+      const result = await pool.query(
+        `INSERT INTO participant_accesses (participant_id, access_type, name, phone, login, password_hash, email, can_login)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, participant_id, access_type, name, phone, login, email, can_login, created_at, updated_at`,
+        [
+          participantId,
+          access_type || 'guardian',
+          name || '',
+          phone || finalLogin,
+          finalLogin,
+          hashedPassword,
+          email || null,
+          can_login !== false
+        ]
+      );
+
+      await logAuditAction(user?.id || null, user?.role || 'admin', `Додано сімейний доступ: ${name || finalLogin}`, 'participant_access', participantId, {
+        access_type: access_type || 'guardian',
+        login: finalLogin
+      });
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error("Failed to create participant access:", e);
+      res.status(500).json({ error: "Failed to create access" });
+    }
+  });
+
+  app.put("/api/participants/:id/accesses/:accessId", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const user = (req as any).user;
+      const participantId = Number(req.params.id);
+      const accessId = Number(req.params.accessId);
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const existing = await pool.query(
+        "SELECT id FROM participant_accesses WHERE id = $1 AND participant_id = $2",
+        [accessId, participantId]
+      );
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ error: "Access not found" });
+      }
+
+      const { access_type, name, phone, login, password, email, can_login } = req.body;
+      const finalLogin = normalizeLogin(login) || normalizePhone(phone || '');
+      if (!finalLogin) {
+        return res.status(400).json({ error: "Login or phone is required" });
+      }
+
+      const primaryConflict = await findBlockingPrimaryCredential(finalLogin, participantId);
+      if (primaryConflict) {
+        return res.status(409).json({ error: "This phone/login is already used as a primary parent login" });
+      }
+
+      const duplicate = await pool.query(
+        `SELECT id FROM participant_accesses
+         WHERE LOWER(TRIM(login)) = LOWER(TRIM($1)) AND id != $2
+         LIMIT 1`,
+        [finalLogin, accessId]
+      );
+      if (duplicate.rows.length > 0) {
+        return res.status(409).json({ error: "This login is already connected to a child account" });
+      }
+
+      const fields = [
+        'access_type = $1',
+        'name = $2',
+        'phone = $3',
+        'login = $4',
+        'email = $5',
+        'can_login = $6',
+        'updated_at = CURRENT_TIMESTAMP'
+      ];
+      const values: any[] = [
+        access_type || 'guardian',
+        name || '',
+        phone || finalLogin,
+        finalLogin,
+        email || null,
+        can_login !== false
+      ];
+
+      if (password && !isMaskedPassword(password)) {
+        if (String(password).length < 4) {
+          return res.status(400).json({ error: "Password must be at least 4 characters" });
+        }
+        values.push(await bcrypt.hash(String(password), 10));
+        fields.push(`password_hash = $${values.length}`);
+      }
+
+      values.push(accessId, participantId);
+      const result = await pool.query(
+        `UPDATE participant_accesses
+         SET ${fields.join(', ')}
+         WHERE id = $${values.length - 1} AND participant_id = $${values.length}
+         RETURNING id, participant_id, access_type, name, phone, login, email, can_login, created_at, updated_at`,
+        values
+      );
+
+      await logAuditAction(user?.id || null, user?.role || 'admin', `Оновлено сімейний доступ: ${name || finalLogin}`, 'participant_access', participantId, {
+        access_id: accessId,
+        access_type: access_type || 'guardian',
+        login: finalLogin
+      });
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error("Failed to update participant access:", e);
+      res.status(500).json({ error: "Failed to update access" });
+    }
+  });
+
+  app.delete("/api/participants/:id/accesses/:accessId", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const user = (req as any).user;
+      const participantId = Number(req.params.id);
+      const accessId = Number(req.params.accessId);
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const result = await pool.query(
+        "DELETE FROM participant_accesses WHERE id = $1 AND participant_id = $2 RETURNING id, login, name",
+        [accessId, participantId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Access not found" });
+      }
+
+      await logAuditAction(user?.id || null, user?.role || 'admin', `Видалено сімейний доступ: ${result.rows[0].name || result.rows[0].login}`, 'participant_access', participantId, {
+        access_id: accessId
+      });
+      res.json({ success: true });
+    } catch (e) {
+      console.error("Failed to delete participant access:", e);
+      res.status(500).json({ error: "Failed to delete access" });
     }
   });
 
@@ -4127,10 +4434,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const user = (req as any).user;
     try {
+      let result;
       if (user.role === 'admin') {
-        await pool.query("DELETE FROM notifications");
+        result = await pool.query("DELETE FROM notifications");
       } else if (user.role === 'coach' && user.coach_id) {
-        await pool.query(`
+        result = await pool.query(`
           DELETE FROM notifications
           WHERE participant_id IN (
             SELECT p.id FROM participants p
@@ -4138,8 +4446,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             WHERE g.coach_id = $1
           )
         `, [user.coach_id]);
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
       }
-      res.json({ success: true });
+      res.json({ success: true, deleted: result?.rowCount || 0 });
     } catch (e) {
       res.status(500).json({ error: "Failed to clear notifications" });
     }
@@ -4152,6 +4462,32 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  app.delete("/api/messages", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    try {
+      let result;
+      if (user.role === 'admin') {
+        result = await pool.query("DELETE FROM messages");
+      } else if (user.role === 'coach' && user.coach_id) {
+        result = await pool.query(`
+          DELETE FROM messages
+          WHERE participant_id IN (
+            SELECT p.id FROM participants p
+            JOIN groups g ON p.group_id = g.id
+            WHERE g.coach_id = $1
+          )
+        `, [user.coach_id]);
+      } else {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      res.json({ success: true, deleted: result?.rowCount || 0 });
+    } catch (e) {
+      console.error("Failed to clear messages:", e);
+      res.status(500).json({ error: "Failed to clear messages" });
     }
   });
 
@@ -4624,6 +4960,17 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     } catch (e) {
       console.error('Failed to fetch audit logs:', e);
       res.status(500).json({ error: "Failed to fetch logs" });
+    }
+  });
+
+  app.delete("/api/audit-logs", requireAdmin, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await pool.query("DELETE FROM audit_logs");
+      res.json({ success: true, deleted: result.rowCount || 0 });
+    } catch (e) {
+      console.error('Failed to clear audit logs:', e);
+      res.status(500).json({ error: "Failed to clear logs" });
     }
   });
 

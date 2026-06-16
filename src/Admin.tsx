@@ -3055,6 +3055,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   const [notifyTarget, setNotifyTarget] = useState<{id: number, name: string} | null>(null);
   const [notifyMessage, setNotifyMessage] = useState('');
   const [isSendingNotify, setIsSendingNotify] = useState(false);
+  const [familyAccesses, setFamilyAccesses] = useState<any[]>([]);
+  const [accessDraft, setAccessDraft] = useState<any | null>(null);
+  const [accessLoading, setAccessLoading] = useState(false);
 
   const fetchData = async () => {
     const token = localStorage.getItem('admin_token');
@@ -3076,6 +3079,32 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
   useEffect(() => {
     fetchData();
   }, []);
+
+  const fetchFamilyAccesses = async (participantId: number) => {
+    const token = localStorage.getItem('admin_token');
+    setAccessLoading(true);
+    try {
+      const res = await fetch(`/api/participants/${participantId}/accesses`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setFamilyAccesses(Array.isArray(data) ? data : []);
+    } catch (e) {
+      setFamilyAccesses([]);
+      toast.error('Не вдалося завантажити сімейні доступи');
+    } finally {
+      setAccessLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (editingParticipant?.id) {
+      fetchFamilyAccesses(editingParticipant.id);
+    } else {
+      setFamilyAccesses([]);
+      setAccessDraft(null);
+    }
+  }, [editingParticipant?.id]);
 
   useEffect(() => {
     if (loading) return;
@@ -3178,6 +3207,74 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
     }
     setIsDeleting(false);
     setConfirmDelete(null);
+  };
+
+  const createEmptyAccess = (type = 'guardian') => ({
+    access_type: type,
+    name: '',
+    phone: '',
+    login: '',
+    password: '',
+    email: '',
+    can_login: true
+  });
+
+  const generateAccessPassword = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+  const handleSaveAccess = async () => {
+    if (!editingParticipant?.id || !accessDraft) return;
+    const token = localStorage.getItem('admin_token');
+    const isExisting = !!accessDraft.id;
+    const payload = { ...accessDraft };
+    if (isExisting && (!payload.password || isMaskedPassword(payload.password))) {
+      delete payload.password;
+    }
+
+    try {
+      const res = await fetch(
+        isExisting
+          ? `/api/participants/${editingParticipant.id}/accesses/${accessDraft.id}`
+          : `/api/participants/${editingParticipant.id}/accesses`,
+        {
+          method: isExisting ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося зберегти доступ');
+        return;
+      }
+      toast.success(isExisting ? 'Доступ оновлено' : 'Доступ додано');
+      setAccessDraft(null);
+      fetchFamilyAccesses(editingParticipant.id);
+    } catch (e) {
+      toast.error('Помилка збереження доступу');
+    }
+  };
+
+  const handleDeleteAccess = async (accessId: number) => {
+    if (!editingParticipant?.id) return;
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch(`/api/participants/${editingParticipant.id}/accesses/${accessId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Не вдалося видалити доступ');
+        return;
+      }
+      toast.success('Доступ видалено');
+      fetchFamilyAccesses(editingParticipant.id);
+    } catch (e) {
+      toast.error('Помилка видалення доступу');
+    }
   };
 
   const handleImport = async () => {
@@ -3895,6 +3992,196 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </div>
                 </div>
               </div>
+              {editingParticipant.id && (
+                <div className="bg-black/40 border border-white/5 rounded-[2rem] p-4 lg:p-6 space-y-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-black uppercase tracking-widest text-white">Доступи до кабінету дитини</h4>
+                      <p className="text-[10px] text-zinc-500 mt-1 leading-relaxed">
+                        Додайте окремий телефон і пароль для тата, мами або дитини. Вони зайдуть у цей самий кабінет.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        ['father', 'Тато'],
+                        ['mother', 'Мама'],
+                        ['child', 'Дитина']
+                      ].map(([type, label]) => (
+                        <button
+                          key={type}
+                          type="button"
+                          onClick={() => setAccessDraft({ ...createEmptyAccess(type), password: generateAccessPassword() })}
+                          className="px-3 py-2 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest transition-colors"
+                        >
+                          + {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {accessLoading ? (
+                    <div className="py-6 text-center text-zinc-500 text-xs font-bold">Завантаження...</div>
+                  ) : familyAccesses.length === 0 ? (
+                    <div className="py-6 text-center text-zinc-500 text-xs font-bold border border-dashed border-white/10 rounded-2xl">
+                      Додаткових доступів ще немає
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {familyAccesses.map(access => (
+                        <div key={access.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-zinc-900 border border-white/5 rounded-2xl p-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs font-black uppercase text-white truncate">{access.name || access.login}</span>
+                              <span className={`text-[8px] px-2 py-0.5 rounded-full font-black uppercase ${
+                                access.can_login ? 'bg-green-500/10 text-green-500' : 'bg-zinc-700 text-zinc-400'
+                              }`}>
+                                {access.can_login ? 'Активний' : 'Вимкнено'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-mono break-all">
+                              {access.login} {access.phone ? `• ${access.phone}` : ''}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setAccessDraft({ ...access, password: '' })}
+                              className="p-2 text-zinc-500 hover:text-white hover:bg-white/10 rounded-xl transition-colors"
+                              title="Редагувати доступ"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAccess(access.id)}
+                              className="p-2 text-zinc-500 hover:text-red-500 hover:bg-red-600/10 rounded-xl transition-colors"
+                              title="Видалити доступ"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {accessDraft && (
+                    <div className="bg-zinc-950 border border-white/10 rounded-2xl p-4 space-y-4">
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Хто це</label>
+                          <select
+                            value={accessDraft.access_type || 'guardian'}
+                            onChange={e => setAccessDraft({ ...accessDraft, access_type: e.target.value })}
+                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                          >
+                            <option value="father">Тато</option>
+                            <option value="mother">Мама</option>
+                            <option value="child">Дитина</option>
+                            <option value="guardian">Інший член сім'ї</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Ім'я</label>
+                          <input
+                            type="text"
+                            value={accessDraft.name || ''}
+                            onChange={e => setAccessDraft({ ...accessDraft, name: e.target.value })}
+                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Телефон</label>
+                          <input
+                            type="text"
+                            value={accessDraft.phone || ''}
+                            onChange={e => setAccessDraft({ ...accessDraft, phone: e.target.value, login: accessDraft.login || e.target.value })}
+                            placeholder="+380..."
+                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Логін</label>
+                          <input
+                            type="text"
+                            value={accessDraft.login || ''}
+                            onChange={e => setAccessDraft({ ...accessDraft, login: e.target.value })}
+                            placeholder="Телефон або логін"
+                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Email</label>
+                          <input
+                            type="email"
+                            value={accessDraft.email || ''}
+                            onChange={e => setAccessDraft({ ...accessDraft, email: e.target.value })}
+                            className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пароль</label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords['access'] ? 'text' : 'password'}
+                              value={accessDraft.password || ''}
+                              onChange={e => setAccessDraft({ ...accessDraft, password: e.target.value })}
+                              placeholder={accessDraft.id ? 'Порожньо = не змінювати' : 'Мінімум 4 символи'}
+                              className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 pr-20 text-white outline-none focus:border-red-600 transition-colors text-sm"
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setAccessDraft({ ...accessDraft, password: generateAccessPassword() });
+                                  setShowPasswords(prev => ({ ...prev, access: true }));
+                                }}
+                                className="p-2 text-zinc-500 hover:text-red-500 transition-colors"
+                              >
+                                <Plus size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowPasswords(prev => ({ ...prev, access: !prev.access }))}
+                                className="p-2 text-zinc-500 hover:text-white transition-colors"
+                              >
+                                {showPasswords['access'] ? <EyeOff size={14} /> : <Eye size={14} />}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <label className="flex items-center gap-3 text-xs text-zinc-300">
+                        <input
+                          type="checkbox"
+                          checked={accessDraft.can_login !== false}
+                          onChange={e => setAccessDraft({ ...accessDraft, can_login: e.target.checked })}
+                          className="accent-red-600"
+                        />
+                        Дозволити вхід у кабінет
+                      </label>
+
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setAccessDraft(null)}
+                          className="flex-1 py-3 rounded-2xl font-bold border border-white/10 hover:bg-white/5 transition-colors uppercase tracking-widest text-[9px]"
+                        >
+                          Скасувати
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveAccess}
+                          className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-2xl font-black uppercase tracking-widest text-[9px] transition-all"
+                        >
+                          Зберегти доступ
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex gap-3 lg:gap-4 pt-4 lg:pt-6">
                 <button 
                   onClick={() => setEditingParticipant(null)}
@@ -5569,6 +5856,7 @@ const ParentMessages = ({ role, coachId, initialAction, onActionComplete }: { ro
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isClearingMessages, setIsClearingMessages] = useState(false);
 
   useEffect(() => {
     fetchParticipants();
@@ -5655,11 +5943,43 @@ const ParentMessages = ({ role, coachId, initialAction, onActionComplete }: { ro
     }
   };
 
+  const handleClearMessages = async () => {
+    if (!window.confirm('Очистити журнал повідомлень для доступних вам учнів?')) return;
+    const token = localStorage.getItem('admin_token');
+    setIsClearingMessages(true);
+    try {
+      const res = await fetch('/api/messages', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося очистити повідомлення');
+        return;
+      }
+      setMessages([]);
+      toast.success(`Повідомлення очищено${data.deleted !== undefined ? `: ${data.deleted}` : ''}`);
+    } catch (e) {
+      toast.error('Помилка очищення повідомлень');
+    } finally {
+      setIsClearingMessages(false);
+    }
+  };
+
   return (
     <div className="grid lg:grid-cols-4 gap-8 h-[calc(100vh-200px)]">
       <div className="lg:col-span-1 bg-zinc-900/50 rounded-[2.5rem] border border-white/5 flex flex-col overflow-hidden">
-        <div className="p-6 border-b border-white/5">
+        <div className="p-6 border-b border-white/5 space-y-4">
           <h3 className="text-lg font-black uppercase tracking-tight">Чати з батьками</h3>
+          <button
+            type="button"
+            onClick={handleClearMessages}
+            disabled={isClearingMessages}
+            className="w-full h-11 rounded-2xl bg-white/5 hover:bg-red-600/10 text-zinc-400 hover:text-red-500 border border-white/5 transition-all flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-widest disabled:opacity-50"
+          >
+            <Trash2 size={14} />
+            Очистити журнал
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
           {loading ? (
@@ -5990,7 +6310,7 @@ const CRMFinance = ({ role, coachId, initialAction, onActionComplete }: { role: 
             <Bell size={18} />
             {sendingPaymentReminders ? 'Створюю...' : 'Нагадати оплату'}
           </button>
-          <button 
+          <button
             onClick={() => setIsAddingAnnouncement(true)}
             className="bg-zinc-800 hover:bg-zinc-700 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all flex items-center gap-3"
           >
@@ -6597,6 +6917,7 @@ const RegistrationManager = ({ onEdit }: { onEdit?: (id: number) => void }) => {
 const AuditLogsViewer = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [clearingTarget, setClearingTarget] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLogs();
@@ -6618,6 +6939,29 @@ const AuditLogsViewer = () => {
     }
   };
 
+  const clearJournal = async (target: string, endpoint: string, label: string, afterClear?: () => void) => {
+    if (!window.confirm(`Очистити ${label}? Цю дію неможливо скасувати.`)) return;
+    const token = localStorage.getItem('admin_token');
+    setClearingTarget(target);
+    try {
+      const res = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || `Не вдалося очистити ${label}`);
+        return;
+      }
+      afterClear?.();
+      toast.success(`${label} очищено${data.deleted !== undefined ? `: ${data.deleted}` : ''}`);
+    } catch (e) {
+      toast.error(`Помилка очищення: ${label}`);
+    } finally {
+      setClearingTarget(null);
+    }
+  };
+
   const getActionColor = (action: string) => {
     if (action.includes('оплату')) return 'text-green-500 bg-green-500/10';
     if (action.includes('відвідування')) return 'text-blue-500 bg-blue-500/10';
@@ -6635,13 +6979,39 @@ const AuditLogsViewer = () => {
           </h1>
           <p className="text-zinc-500 font-medium text-lg">Історія всіх ключових дій адміністрації та тренерів</p>
         </div>
-        <button 
-          onClick={fetchLogs}
-          className="h-14 px-8 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs"
-        >
-          <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-          Оновити
-        </button>
+        <div className="flex flex-wrap gap-3">
+          <button
+            onClick={fetchLogs}
+            className="h-14 px-6 bg-white/5 hover:bg-white/10 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs"
+          >
+            <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
+            Оновити
+          </button>
+          <button
+            onClick={() => clearJournal('notifications', '/api/notifications', 'сповіщення')}
+            disabled={clearingTarget !== null}
+            className="h-14 px-6 bg-white/5 hover:bg-red-600/10 text-zinc-300 hover:text-red-500 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs disabled:opacity-50"
+          >
+            <Bell size={18} />
+            Сповіщення
+          </button>
+          <button
+            onClick={() => clearJournal('messages', '/api/messages', 'журнал повідомлень')}
+            disabled={clearingTarget !== null}
+            className="h-14 px-6 bg-white/5 hover:bg-red-600/10 text-zinc-300 hover:text-red-500 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs disabled:opacity-50"
+          >
+            <MessageSquare size={18} />
+            Чати
+          </button>
+          <button
+            onClick={() => clearJournal('audit', '/api/audit-logs', 'журнал подій', () => setLogs([]))}
+            disabled={clearingTarget !== null}
+            className="h-14 px-6 bg-red-600/10 hover:bg-red-600/20 text-red-500 rounded-2xl flex items-center gap-3 transition-all font-black uppercase tracking-widest text-xs disabled:opacity-50"
+          >
+            <Trash2 size={18} />
+            Події
+          </button>
+        </div>
       </div>
 
       <div className="bg-zinc-900/50 border border-white/5 rounded-[2.5rem] overflow-hidden">
