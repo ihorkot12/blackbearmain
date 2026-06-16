@@ -21,7 +21,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Users,
-  Bell
+  Bell,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
@@ -90,6 +92,15 @@ const ParentPanel = () => {
   const [coachMessage, setCoachMessage] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
+  const [familyAccesses, setFamilyAccesses] = useState<any[]>([]);
+  const [familyAccessDraft, setFamilyAccessDraft] = useState({
+    access_type: 'mother',
+    name: '',
+    phone: '',
+    email: '',
+    password: ''
+  });
+  const [isSavingFamilyAccess, setIsSavingFamilyAccess] = useState(false);
 
   useEffect(() => {
     fetch('/api/telegram/bot-info')
@@ -101,10 +112,80 @@ const ParentPanel = () => {
   useEffect(() => {
     if (participant?.id) {
       fetchMessages();
+      fetchFamilyAccesses();
       const interval = setInterval(fetchMessages, 5000);
       return () => clearInterval(interval);
     }
   }, [participant?.id]);
+
+  const fetchFamilyAccesses = async () => {
+    if (!participant?.id) return;
+    try {
+      const res = await parentFetch(`/api/participants/${participant.id}/accesses`);
+      if (res.ok) {
+        const data = await res.json();
+        setFamilyAccesses(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch family accesses');
+    }
+  };
+
+  const handleAddFamilyAccess = async () => {
+    if (!participant?.id) return;
+    const phone = familyAccessDraft.phone.trim();
+    const name = familyAccessDraft.name.trim();
+    if (!name || !phone || familyAccessDraft.password.length < 4) {
+      toast.error('Вкажіть імʼя, телефон і пароль мінімум 4 символи');
+      return;
+    }
+
+    setIsSavingFamilyAccess(true);
+    try {
+      const res = await parentFetch(`/api/participants/${participant.id}/accesses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...familyAccessDraft,
+          name,
+          phone,
+          login: phone,
+          can_login: true
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося додати доступ');
+        return;
+      }
+      setFamilyAccessDraft({ access_type: 'mother', name: '', phone: '', email: '', password: '' });
+      setFamilyAccesses(current => [...current, data]);
+      toast.success('Додатковий вхід додано');
+    } catch (e) {
+      toast.error('Помилка мережі');
+    } finally {
+      setIsSavingFamilyAccess(false);
+    }
+  };
+
+  const handleDeleteFamilyAccess = async (accessId: number) => {
+    if (!participant?.id) return;
+    if (!window.confirm('Видалити цей додатковий вхід до кабінету?')) return;
+    try {
+      const res = await parentFetch(`/api/participants/${participant.id}/accesses/${accessId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || 'Не вдалося видалити доступ');
+        return;
+      }
+      setFamilyAccesses(current => current.filter(access => access.id !== accessId));
+      toast.success('Доступ видалено');
+    } catch (e) {
+      toast.error('Помилка мережі');
+    }
+  };
 
   const fetchMessages = async () => {
     try {
@@ -666,6 +747,105 @@ const ParentPanel = () => {
                   </div>
                 ))}
               </div>
+
+              <section className="bg-zinc-900/50 p-6 md:p-8 rounded-[3rem] border border-white/5 space-y-8">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-black uppercase tracking-tight mb-2">Доступи до кабінету</h2>
+                    <p className="text-sm text-zinc-500 max-w-2xl">
+                      Додайте другий номер для мами, тата або самої дитини. Всі входять у той самий кабінет і бачать однакові дані по дитині.
+                    </p>
+                  </div>
+                  <div className="px-4 py-2 rounded-2xl bg-black/40 border border-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-400">
+                    {familyAccesses.length} додатково
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {familyAccesses.length > 0 ? familyAccesses.map(access => (
+                    <div key={access.id} className="bg-black/40 border border-white/5 rounded-3xl p-5 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="px-2 py-1 rounded-lg bg-red-600/10 text-red-500 text-[9px] font-black uppercase tracking-widest">
+                            {access.access_type === 'father' ? 'Тато' : access.access_type === 'mother' ? 'Мама' : access.access_type === 'child' ? 'Дитина' : 'Сімʼя'}
+                          </span>
+                          {!access.can_login && (
+                            <span className="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-500 text-[9px] font-black uppercase tracking-widest">вимкнено</span>
+                          )}
+                        </div>
+                        <div className="font-black text-white truncate">{access.name || 'Без імені'}</div>
+                        <div className="text-xs text-zinc-500 mt-1 break-all">{access.login || access.phone}</div>
+                        {access.email && <div className="text-xs text-zinc-600 mt-1 break-all">{access.email}</div>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteFamilyAccess(access.id)}
+                        className="w-10 h-10 rounded-xl bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-600/10 transition-colors flex items-center justify-center shrink-0"
+                        aria-label="Видалити доступ"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  )) : (
+                    <div className="md:col-span-2 p-8 rounded-3xl border border-dashed border-white/10 text-center text-zinc-500 text-sm">
+                      Додаткових входів ще немає. Основний вхід батьків вже працює.
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-black/30 border border-white/5 rounded-3xl p-5 md:p-6 space-y-5">
+                  <div className="grid md:grid-cols-5 gap-4">
+                    <select
+                      value={familyAccessDraft.access_type}
+                      onChange={e => setFamilyAccessDraft({ ...familyAccessDraft, access_type: e.target.value })}
+                      className="h-12 bg-black border border-white/10 rounded-2xl px-4 text-sm outline-none focus:border-red-600"
+                      aria-label="Тип доступу"
+                    >
+                      <option value="mother">Мама</option>
+                      <option value="father">Тато</option>
+                      <option value="child">Дитина</option>
+                      <option value="guardian">Інший член сімʼї</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={familyAccessDraft.name}
+                      onChange={e => setFamilyAccessDraft({ ...familyAccessDraft, name: e.target.value })}
+                      placeholder="Імʼя"
+                      className="h-12 bg-black border border-white/10 rounded-2xl px-4 text-sm outline-none focus:border-red-600"
+                    />
+                    <input
+                      type="tel"
+                      value={familyAccessDraft.phone}
+                      onChange={e => setFamilyAccessDraft({ ...familyAccessDraft, phone: e.target.value })}
+                      placeholder="+380..."
+                      className="h-12 bg-black border border-white/10 rounded-2xl px-4 text-sm outline-none focus:border-red-600"
+                    />
+                    <input
+                      type="email"
+                      value={familyAccessDraft.email}
+                      onChange={e => setFamilyAccessDraft({ ...familyAccessDraft, email: e.target.value })}
+                      placeholder="email, якщо є"
+                      className="h-12 bg-black border border-white/10 rounded-2xl px-4 text-sm outline-none focus:border-red-600"
+                    />
+                    <input
+                      type="password"
+                      value={familyAccessDraft.password}
+                      onChange={e => setFamilyAccessDraft({ ...familyAccessDraft, password: e.target.value })}
+                      placeholder="Пароль"
+                      className="h-12 bg-black border border-white/10 rounded-2xl px-4 text-sm outline-none focus:border-red-600"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddFamilyAccess}
+                    disabled={isSavingFamilyAccess}
+                    className="w-full md:w-auto px-6 py-4 bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:text-zinc-400 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                  >
+                    <Plus size={18} />
+                    {isSavingFamilyAccess ? 'Додаємо...' : 'Додати вхід'}
+                  </button>
+                </div>
+              </section>
             </div>
           )}
 
