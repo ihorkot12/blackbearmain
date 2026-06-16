@@ -1,0 +1,49 @@
+{
+  "app_name": "Black Bear Admin",
+  "bundle_id": "ua.kyiv.shinkarate.admin",
+  "app_type": "webview_admin_app",
+  "start_url": "https://shin-karate.kyiv.ua/admin",
+  "allowed_domains": [
+    "shin-karate.kyiv.ua"
+  ],
+  "privacy_policy_url": "https://shin-karate.kyiv.ua/privacy",
+  "support_url": "https://shin-karate.kyiv.ua/",
+  "theme": {
+    "background_color": "#050505",
+    "status_bar_style": "black-translucent",
+    "primary_brand_color": "#dc0000",
+    "orientation": "portrait"
+  },
+  "assets": {
+    "ios_home_screen_icon": "public/apple-touch-icon.png",
+    "android_pwa_icon": "public/icon-192.png",
+    "store_icon_source": "public/icon-512.png"
+  },
+  "native_shell_rules": {
+    "keep_existing_backend": true,
+    "do_not_create_second_database": true,
+    "do_not_rebuild_crm_natively": true,
+    "open_admin_by_default": true,
+    "preserve_current_login_and_roles": true
+  },
+  "core_flows_to_test": [
+    "admin login",
+    "coach login",
+    "parent login",
+    "participants",
+    "groups and locations",
+    "attendance",
+    "payments",
+    "rankings",
+    "achievements",
+    "parent messages",
+    "bug report button"
+  ],
+  "app_store_privacy_labels_to_review": [
+    "Contact Info",
+    "User Content",
+    "Identifiers",
+    "Financial Info",
+    "Usage Data / Diagnostics only if analytics or error tracking is enabled"
+  ]
+}

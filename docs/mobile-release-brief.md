@@ -5,8 +5,14 @@
 - App name: Black Bear Admin
 - Bundle ID / App ID: `ua.kyiv.shinkarate.admin`
 - Primary URL: `https://shin-karate.kyiv.ua/admin`
+- Privacy policy URL: `https://shin-karate.kyiv.ua/privacy`
 - Production domain: `shin-karate.kyiv.ua`
 - App type: private/club admin app shell for iOS and Android
+
+## Release package files
+
+- `docs/median-app-config.json` contains copy-ready Median/App Studio configuration.
+- `docs/app-store-submission-pack.md` contains store listing text, review notes template, privacy labels, and final signing/publishing steps.
 
 ## Product scope
 
