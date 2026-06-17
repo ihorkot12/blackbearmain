@@ -35,6 +35,48 @@ const clampProgress = (value: unknown) => {
   return Math.min(100, Math.max(0, numericValue));
 };
 
+const getSkillLabel = (value: unknown): string => {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+  if (!value || typeof value !== 'object') return '';
+
+  const record = value as Record<string, unknown>;
+  const directLabel = record.name || record.title || record.label || record.skill || record.text;
+  if (typeof directLabel === 'string') return directLabel.trim();
+
+  return Object.values(record)
+    .filter(item => ['string', 'number', 'boolean'].includes(typeof item))
+    .map(item => String(item).trim())
+    .filter(Boolean)
+    .join(' ');
+};
+
+const normalizeSkillChecklist = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map(getSkillLabel).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    const raw = value.trim();
+    if (!raw) return [];
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed !== raw) return normalizeSkillChecklist(parsed);
+    } catch {
+      // Plain comma/newline separated checklist from older records.
+    }
+
+    return raw
+      .split(/[,\n]/)
+      .map(item => item.trim())
+      .filter(Boolean);
+  }
+
+  const label = getSkillLabel(value);
+  return label ? [label] : [];
+};
+
 const getParentAuthHeaders = () => {
   const token = localStorage.getItem('parent_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -344,6 +386,7 @@ const ParentPanel = () => {
   const currentRank = ratingsSummary?.currentChild?.rank_position;
   const currentPoints = ratingsSummary?.currentChild?.total_points ?? participant?.rank_points ?? 0;
   const totalAchievements = badges.length + events.length;
+  const currentSkillChecklist = normalizeSkillChecklist(participant?.skill_checklist);
 
   if (loading) {
     return (
@@ -1215,11 +1258,8 @@ const ParentPanel = () => {
                     <div className="mt-10">
                       <div className="text-[10px] text-zinc-500 font-black uppercase tracking-widest mb-6 px-2">Чек-лист навичок</div>
                       <div className="grid sm:grid-cols-2 gap-3">
-                        {(Array.isArray(participant?.skill_checklist) 
-                          ? participant.skill_checklist 
-                          : (participant?.skill_checklist || '').split(',')
-                        ).map((skill: string, i: number) => (
-                          skill && typeof skill === 'string' && skill.trim() && (
+                        {currentSkillChecklist.map((skill: string, i: number) => (
+                          skill.trim() && (
                             <div key={i} className="flex items-center gap-4 bg-white/[0.03] p-4 rounded-2xl border border-white/5">
                               <div className="w-6 h-6 rounded-lg bg-green-500/20 flex items-center justify-center">
                                 <ShieldCheck size={14} className="text-green-500" />
@@ -1228,7 +1268,7 @@ const ParentPanel = () => {
                             </div>
                           )
                         ))}
-                        {(!participant?.skill_checklist || (typeof participant.skill_checklist === 'string' && participant.skill_checklist.trim() === '') || (Array.isArray(participant.skill_checklist) && participant.skill_checklist.length === 0)) && (
+                        {currentSkillChecklist.length === 0 && (
                           <div className="col-span-2 text-center p-8 text-zinc-500 italic text-sm">Чек-лист поки порожній</div>
                         )}
                       </div>
