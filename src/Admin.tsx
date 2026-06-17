@@ -68,8 +68,11 @@ const scheduleMatchesDay = (dayText: string | null | undefined, dateValue: strin
 const scheduleMatchesGroup = (entry: any, group: any) => {
   const entryGroup = normalizeScheduleText(entry?.group_name);
   const groupName = normalizeScheduleText(group?.name);
-  if (entryGroup && groupName && (entryGroup.includes(groupName) || groupName.includes(entryGroup))) return true;
+  if (entryGroup && groupName) {
+    return entryGroup.includes(groupName) || groupName.includes(entryGroup);
+  }
   return Boolean(
+    !entryGroup &&
     group?.location_id &&
     entry?.location_id &&
     Number(group.location_id) === Number(entry.location_id) &&
