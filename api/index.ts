@@ -20,6 +20,15 @@ dotenv.config();
 const isBcryptHash = (value: unknown): value is string =>
   typeof value === 'string' && /^\$2[aby]\$/.test(value);
 
+const normalizeBeltName = (belt: unknown) => {
+  const value = String(belt || '').trim();
+  if (!value) return 'Білий';
+
+  return value
+    .replace(/\s+з[і]?\s+(синьою|жовтою|зеленою|коричневою|золотою|чорною)\s+смужкою/gi, ' зі сріблястою смужкою')
+    .replace(/\s+зі\s+смужкою/gi, ' зі сріблястою смужкою');
+};
+
 // Session secret - MUST be stable on Vercel
 const SESSION_SECRET = process.env.SESSION_SECRET || 'black-bear-default-secret-change-me';
 
@@ -416,6 +425,16 @@ async function initDb() {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS value DECIMAL(10, 2) DEFAULT 0;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS assigned_coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS converted_participant_id INTEGER REFERENCES participants(id) ON DELETE SET NULL;
+    `);
+
+    await client.query(`
+      UPDATE participants
+      SET belt = REGEXP_REPLACE(belt, '\\s+з(і)?\\s+(синьою|жовтою|зеленою|коричневою|золотою|чорною)\\s+смужкою', ' зі сріблястою смужкою', 'gi')
+      WHERE belt ~* '\\s+з(і)?\\s+(синьою|жовтою|зеленою|коричневою|золотою|чорною)\\s+смужкою';
+
+      UPDATE participants
+      SET belt = REGEXP_REPLACE(belt, '\\s+зі\\s+смужкою', ' зі сріблястою смужкою', 'gi')
+      WHERE belt ~* '\\s+зі\\s+смужкою';
     `);
 
     // Seed initial admin if empty
@@ -2618,7 +2637,7 @@ async function startServer() {
             hashedPassword,
             contactEmail,
             registrationType === 'adult' ? 'adult' : 'child',
-            belt || 'Білий',
+            normalizeBeltName(belt),
             'unpaid',
             'new'
           ]
@@ -2684,7 +2703,7 @@ async function startServer() {
         const { name, age, birthday, group_id, belt } = child;
         const result = await pool.query(
           "INSERT INTO participants (name, age, birthday, group_id, parent_name, phone, parent_phone, parent_login, parent_password, belt, payment_status, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
-          [name, age, birthday || null, group_id || null, parent_name, phone, contactPhone, parent_login, hashedPassword, belt || 'Білий', 'unpaid', 'new']
+          [name, age, birthday || null, group_id || null, parent_name, phone, contactPhone, parent_login, hashedPassword, normalizeBeltName(belt), 'unpaid', 'new']
         );
         results.push(result.rows[0].id);
       }
@@ -2990,7 +3009,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           has_explicit_login: !!explicitParentLogin,
           parent_password: getImportParentPassword(parentLogin, explicitParentPassword),
           has_explicit_password: !!explicitParentPassword,
-          belt: cleanText(getRowValue(row, ['belt', 'пояс'])) || 'Білий',
+          belt: normalizeBeltName(cleanText(getRowValue(row, ['belt', 'пояс']))),
           payment_status: normalizePaymentStatus(getRowValue(row, ['payment_status', 'payment', 'оплата', 'статус оплати'])),
           status: normalizeStatus(getRowValue(row, ['status', 'статус'])),
           telegram_chat_id: cleanText(getRowValue(row, ['telegram_chat_id', 'telegram chat id', 'chat_id', 'telegram id', 'тг id'])),
@@ -3185,7 +3204,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
       await pool.query(
         "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, parent_phone || phone || null, email || null, member_type || 'child', belt || 'Білий', achievements_text || '']
+        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, parent_phone || phone || null, email || null, member_type || 'child', normalizeBeltName(belt), achievements_text || '']
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -3224,6 +3243,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           if (fallbackLogin) updateData.parent_login = fallbackLogin;
           else delete updateData.parent_login;
         }
+      }
+
+      if (updateData.belt !== undefined) {
+        updateData.belt = normalizeBeltName(updateData.belt);
       }
 
       // Get current participant to check parent_login
@@ -3566,13 +3589,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
       await pool.query(
         "UPDATE participants SET belt = $1, rank_points = $2 WHERE id = $3",
-        [belt, rank_points, req.params.id]
+        [normalizeBeltName(belt), rank_points, req.params.id]
       );
 
       const coachId = (req as any).user?.id || null;
       const userRole = (req as any).user?.role || 'coach';
 
-      logAuditAction(coachId, userRole, `Зміна рангу: ${belt}, Бали: ${rank_points}`, 'participant', parseInt(req.params.id));
+      logAuditAction(coachId, userRole, `Зміна рангу: ${normalizeBeltName(belt)}, Бали: ${rank_points}`, 'participant', parseInt(req.params.id));
 
       res.json({ success: true });
     } catch (e) {

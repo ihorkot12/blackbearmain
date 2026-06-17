@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 import { SMMModule } from './components/SMMModule';
+import { BELT_OPTIONS, getBeltColorClass, hasSilverStripe, normalizeBeltName } from './belts';
 
 const toDateInputValue = (date = new Date()) => {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -1533,7 +1534,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ belt, rank_points: points })
+        body: JSON.stringify({ belt: normalizeBeltName(belt), rank_points: points })
       });
       if (res.ok) {
         toast.success('Рейтинг оновлено');
@@ -1651,14 +1652,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
     }
   };
 
-  const belts = [
-    'Білий', 'Оранжевий', 'Оранжевий з синьою смужкою', 
-    'Синій', 'Синій з жовтою смужкою', 
-    'Жовтий', 'Жовтий з зеленою смужкою', 
-    'Зелений', 'Зелений з коричневою смужкою', 
-    'Коричневий', 'Коричневий з золотою смужкою', 
-    'Чорний'
-  ];
+  const belts = BELT_OPTIONS;
 
   const skillsList = ['Ката 1', 'Кіхон', 'Куміте', 'Фізпідготовка', 'Дисципліна', 'Теорія'];
 
@@ -1729,16 +1723,10 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                 <td className="p-6 text-sm text-zinc-500">{p.group_name}</td>
                 <td className="p-6">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-8 rounded-full ${
-                      p.belt?.includes('Білий') ? 'bg-white' :
-                      p.belt?.includes('Оранжевий') ? 'bg-orange-500' :
-                      p.belt?.includes('Синій') ? 'bg-blue-600' :
-                      p.belt?.includes('Жовтий') ? 'bg-yellow-400' :
-                      p.belt?.includes('Зелений') ? 'bg-green-600' :
-                      p.belt?.includes('Коричневий') ? 'bg-amber-800' :
-                      p.belt?.includes('Чорний') ? 'bg-zinc-950 border border-white/20' : 'bg-zinc-700'
-                    }`} />
-                    <span className="font-bold text-sm">{p.belt || 'Білий'}</span>
+                    <div className={`relative w-3 h-8 rounded-full overflow-hidden ${getBeltColorClass(p.belt)}`}>
+                      {hasSilverStripe(p.belt) && <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 bg-zinc-200 shadow-[0_0_8px_rgba(255,255,255,0.8)]" />}
+                    </div>
+                    <span className="font-bold text-sm">{normalizeBeltName(p.belt)}</span>
                   </div>
                 </td>
                 <td className="p-6 font-mono text-red-500 font-bold">{p.rank_points || 0}</td>
@@ -1960,7 +1948,7 @@ const RankManagement = ({ initialAction, onActionComplete }: { initialAction?: s
                 <div>
                   <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Пояс</label>
                   <select 
-                    value={editingRank.belt}
+                    value={normalizeBeltName(editingRank.belt)}
                     onChange={e => setEditingRank({...editingRank, belt: e.target.value})}
                     className="w-full bg-black border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-red-600/50 transition-all"
                   >
@@ -3166,6 +3154,8 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         payload.parent_login = payload.parent_login.trim();
       }
 
+      payload.belt = normalizeBeltName(payload.belt);
+
       if (data.id && (isBcryptHash(payload.parent_password) || isMaskedPassword(payload.parent_password) || payload.parent_password === '')) {
         delete payload.parent_password;
       }
@@ -3812,22 +3802,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                 <div>
                   <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Пояс</label>
                   <select 
-                    value={editingParticipant.belt || 'Білий'}
+                    value={normalizeBeltName(editingParticipant.belt)}
                     onChange={e => setEditingParticipant({...editingParticipant, belt: e.target.value})}
                     className="w-full bg-zinc-900 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-red-600 transition-colors text-sm"
                   >
-                    <option value="Білий">Білий</option>
-                    <option value="Оранжевий">Оранжевий</option>
-                    <option value="Оранжевий з синьою смужкою">Оранжевий з синьою смужкою</option>
-                    <option value="Синій">Синій</option>
-                    <option value="Синій з жовтою смужкою">Синій з жовтою смужкою</option>
-                    <option value="Жовтий">Жовтий</option>
-                    <option value="Жовтий з зеленою смужкою">Жовтий з зеленою смужкою</option>
-                    <option value="Зелений">Зелений</option>
-                    <option value="Зелений з коричневою смужкою">Зелений з коричневою смужкою</option>
-                    <option value="Коричневий">Коричневий</option>
-                    <option value="Коричневий з чорною смужкою">Коричневий з чорною смужкою</option>
-                    <option value="Чорний">Чорний</option>
+                    {BELT_OPTIONS.map(belt => <option key={belt} value={belt}>{belt}</option>)}
                   </select>
                 </div>
               </div>

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
+import { normalizeBeltName } from './belts';
 
 const clampProgress = (value: unknown) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -386,7 +387,7 @@ const ParentPanel = () => {
                     {participant?.group_name}
                   </span>
                   <span className="px-4 py-1.5 bg-red-600/20 rounded-full text-xs font-bold text-red-500 border border-red-600/20">
-                    {participant?.belt} пояс
+                    {normalizeBeltName(participant?.belt)} пояс
                   </span>
                 </div>
               </div>
@@ -571,7 +572,7 @@ const ParentPanel = () => {
               </div>
               <div className="bg-black/40 p-3 rounded-xl border border-white/5">
                 <div className="text-[8px] text-zinc-500 uppercase font-black mb-1">Пояс</div>
-                <div className="text-sm font-bold text-zinc-300">{participant?.belt || 'Білий'}</div>
+                <div className="text-sm font-bold text-zinc-300">{normalizeBeltName(participant?.belt)}</div>
               </div>
             </div>
 
@@ -703,7 +704,7 @@ const ParentPanel = () => {
                           {child.group_name}
                         </span>
                         <span className="px-4 py-1.5 bg-red-600/10 rounded-full text-[10px] font-black uppercase tracking-widest text-red-500 border border-red-600/10">
-                          {child.belt} пояс
+                          {normalizeBeltName(child.belt)} пояс
                         </span>
                       </div>
                       
@@ -967,7 +968,7 @@ const ParentPanel = () => {
                       {beltProgress?.map((child) => (
                         <div key={child.id} className="border-l-4 border-orange-500/50 pl-4">
                           <p className="font-bold text-white">{child.first_name}</p>
-                          <p className="text-sm text-zinc-400">Поточний пояс: <span className="font-black text-orange-500 uppercase tracking-widest text-xs">{child.belt_level || 'Не вказано'}</span></p>
+                          <p className="text-sm text-zinc-400">Поточний пояс: <span className="font-black text-orange-500 uppercase tracking-widest text-xs">{normalizeBeltName(child.belt_level)}</span></p>
                           <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Оновлено: {child.belt_updated_at ? new Date(child.belt_updated_at).toLocaleDateString('uk-UA') : 'Ніколи'}</p>
                         </div>
                       ))}
@@ -1143,7 +1144,7 @@ const ParentPanel = () => {
                       <div className="absolute inset-0 border-4 border-red-600/20 rounded-full border-t-red-600 animate-[spin_3s_linear_infinite]" />
                       <Trophy size={64} className="text-red-600" />
                     </div>
-                    <div className="text-3xl font-black mb-2">{participant?.belt} Пояс</div>
+                    <div className="text-3xl font-black mb-2">{normalizeBeltName(participant?.belt)} Пояс</div>
                     <div className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{participant?.rank_points} балів рейтингу</div>
                   </div>
                 </div>

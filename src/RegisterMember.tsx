@@ -19,6 +19,7 @@ import { Navbar } from './components/Navbar';
 import { Button } from './components/Button';
 import { toast } from 'sonner';
 import SEO from './components/SEO';
+import { BELT_OPTIONS } from './belts';
 
 type RegistrationType = 'parent_child' | 'adult';
 
@@ -37,21 +38,6 @@ type RegistrationResult = {
   password: string;
   telegramConnectUrl?: string | null;
 };
-
-const beltOptions = [
-  'Білий',
-  'Оранжевий',
-  'Оранжевий з синьою смужкою',
-  'Синій',
-  'Синій з жовтою смужкою',
-  'Жовтий',
-  'Жовтий з зеленою смужкою',
-  'Зелений',
-  'Зелений з коричневою смужкою',
-  'Коричневий',
-  'Коричневий з чорною смужкою',
-  'Чорний'
-];
 
 const createParticipant = (): ParticipantDraft => ({
   name: '',
@@ -512,7 +498,7 @@ export const RegisterMember = () => {
                             value={participant.belt}
                             onChange={e => updateParticipant(index, 'belt', e.target.value)}
                           >
-                            {beltOptions.map(belt => <option key={belt} value={belt}>{belt}</option>)}
+                            {BELT_OPTIONS.map(belt => <option key={belt} value={belt}>{belt}</option>)}
                           </select>
                         </div>
                       </div>
