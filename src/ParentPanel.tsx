@@ -581,7 +581,7 @@ const ParentPanel = () => {
                     setActiveTab(item.id);
                     setIsMobileMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
+                  className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${
                     activeTab === item.id 
                     ? 'bg-red-600 text-white shadow-[0_10px_20px_rgba(220,38,38,0.2)]' 
                     : 'text-zinc-500 hover:text-white hover:bg-white/5'
@@ -593,7 +593,7 @@ const ParentPanel = () => {
               ))}
               <button 
                 onClick={handleLogout}
-                className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold mt-8"
+                className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold mt-8 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-2xl"
               >
                 <LogOut size={20} />
                 Вийти
@@ -604,16 +604,16 @@ const ParentPanel = () => {
       </AnimatePresence>
 
       {/* Sidebar / Mobile Nav */}
-      <div className="fixed top-0 left-0 bottom-0 w-80 bg-zinc-950 border-r border-white/5 z-50 hidden lg:flex flex-col p-8 overflow-hidden">
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-8">
+      <div className="fixed top-0 left-0 bottom-0 w-80 bg-zinc-950 border-r border-white/5 z-50 hidden lg:flex flex-col px-6 py-7 overflow-hidden">
+        <div className="mb-6 shrink-0">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.3)]">
               <ShieldCheck className="text-white" size={24} />
             </div>
             <span className="text-xl font-black uppercase tracking-tighter">Black Bear <span className="text-zinc-600">Dojo</span></span>
           </div>
           
-          <div className="p-6 bg-white/[0.03] rounded-3xl border border-white/5 mb-8">
+          <div className="p-5 bg-white/[0.03] rounded-[2rem] border border-white/5">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 bg-red-600/20 text-red-600 rounded-2xl flex items-center justify-center font-black text-xl">
                 {participant?.name?.[0]}
@@ -657,7 +657,7 @@ const ParentPanel = () => {
           </div>
         </div>
 
-        <nav className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 custom-scrollbar">
+        <nav className="bb-parent-sidebar-nav space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
           {[
             { id: 'overview', label: 'Огляд', icon: LayoutDashboard },
             { id: 'family', label: 'Сім\'я', icon: Users },
@@ -674,7 +674,7 @@ const ParentPanel = () => {
               key={item.id}
               id={`parent-nav-${item.id}`}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
+              className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-2xl font-bold transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${
                 activeTab === item.id 
                 ? 'bg-red-600 text-white shadow-[0_10px_20px_rgba(220,38,38,0.2)]' 
                 : 'text-zinc-500 hover:text-white hover:bg-white/5'
@@ -686,19 +686,19 @@ const ParentPanel = () => {
           ))}
         </nav>
 
-        <div className="mt-auto pt-8 border-t border-white/5 space-y-4">
+        <div className="mt-5 pt-5 border-t border-white/5 space-y-3 shrink-0">
           <button 
             id="child-mode-button"
             onClick={() => setIsChildMode(true)}
-            className="w-full flex items-center gap-4 px-6 py-4 bg-red-600/10 text-red-500 rounded-2xl font-bold hover:bg-red-600/20 transition-all border border-red-600/20"
+            className="w-full flex items-center gap-4 px-5 py-3.5 bg-red-600/10 text-red-500 rounded-2xl font-bold hover:bg-red-600/20 transition-all border border-red-600/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
           >
             <Trophy size={20} />
-            Дитячий режим
+            Режим спортсмена
           </button>
           <button 
             id="parent-logout-button"
             onClick={handleLogout}
-            className="w-full flex items-center gap-4 px-6 py-4 text-zinc-500 hover:text-red-500 transition-colors font-bold"
+            className="w-full flex items-center gap-4 px-5 py-3.5 text-zinc-500 hover:text-red-500 transition-colors font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-2xl"
           >
             <LogOut size={20} />
             Вийти
