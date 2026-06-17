@@ -4693,7 +4693,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       await client.query('BEGIN');
 
       const participantIds = new Set<number>();
-      let finalGroupId: number | null = Number.isFinite(Number(group_id)) ? Number(group_id) : null;
+      const parsedGroupId = (group_id === null || group_id === undefined || group_id === '') ? NaN : Number(group_id);
+      let finalGroupId: number | null = Number.isFinite(parsedGroupId) && parsedGroupId > 0 ? parsedGroupId : null;
       let finalCoachId: number | null = user.role === 'coach' ? Number(user.coach_id) : null;
 
       if (finalGroupId) {
