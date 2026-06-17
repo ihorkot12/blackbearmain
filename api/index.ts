@@ -769,19 +769,19 @@ async function startServer() {
     const normalizedPhone = normalizePhone(login);
     const phoneWithoutPlus = normalizedPhone.replace(/^\+/, '');
     const params: any[] = [login, participantId];
-    const conditions = ["LOWER(TRIM(COALESCE(parent_login, ''))) = LOWER(TRIM($1))"];
+    const conditions = ["(id != $2 AND LOWER(TRIM(COALESCE(parent_login, ''))) = LOWER(TRIM($1)))"];
 
     if (normalizedPhone.length >= 7) {
       params.push(normalizedPhone);
       conditions.push(`(
-        REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length}
+        (id != $2 AND REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length})
         OR (id != $2 AND REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length})
         OR (id != $2 AND REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d+]', '', 'g') LIKE '%' || $${params.length})
       )`);
 
       params.push(phoneWithoutPlus);
       conditions.push(`(
-        REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length}
+        (id != $2 AND REGEXP_REPLACE(COALESCE(parent_login, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length})
         OR (id != $2 AND REGEXP_REPLACE(COALESCE(parent_phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length})
         OR (id != $2 AND REGEXP_REPLACE(COALESCE(phone, ''), '[^\\d]', '', 'g') LIKE '%' || $${params.length})
       )`);
