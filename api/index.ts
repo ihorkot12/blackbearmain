@@ -1114,6 +1114,11 @@ async function startServer() {
       .filter((item: any) => item.name && item.target);
   };
 
+  const ensureNotificationReferenceColumns = async (db: any) => {
+    await db.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_type TEXT");
+    await db.query("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id TEXT");
+  };
+
   const homeworkBlocks: Record<string, any[]> = {
     technique: [
       { name: 'Стійка + прямий удар', target: 'Зенкуцу-дачі, оі-цукі, повернення в захист', sets: 3, reps: '10 разів на кожну сторону', rest: '30 сек', note: 'Не гнати швидкість. Спочатку рівна спина і стабільні стопи.' },
@@ -4695,6 +4700,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      await ensureNotificationReferenceColumns(client);
 
       const participantIds = new Set<number>();
       const parsedGroupId = (group_id === null || group_id === undefined || group_id === '') ? NaN : Number(group_id);
@@ -4811,6 +4817,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      await ensureNotificationReferenceColumns(client);
+
       const currentRes = await client.query(`
         SELECT hap.*, ha.title, p.name as participant_name, g.coach_id
         FROM homework_assignment_participants hap
@@ -6188,6 +6196,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
     try {
+      await ensureNotificationReferenceColumns(pool);
       const result = await pool.query(
         "SELECT * FROM notifications WHERE participant_id = $1 ORDER BY created_at DESC LIMIT 20",
         [participantId]
