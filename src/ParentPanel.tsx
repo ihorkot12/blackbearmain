@@ -560,7 +560,7 @@ const ParentPanel = () => {
             initial={{ opacity: 0, x: -100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="fixed inset-0 z-[55] bg-zinc-950 lg:hidden p-8 pt-24"
+            className="fixed inset-0 z-[55] bg-zinc-950 lg:hidden p-8 pt-24 overflow-y-auto"
           >
             <div className="space-y-2">
               {[
@@ -604,7 +604,7 @@ const ParentPanel = () => {
       </AnimatePresence>
 
       {/* Sidebar / Mobile Nav */}
-      <div className="fixed top-0 left-0 bottom-0 w-80 bg-zinc-950 border-r border-white/5 z-50 hidden lg:flex flex-col p-8">
+      <div className="fixed top-0 left-0 bottom-0 w-80 bg-zinc-950 border-r border-white/5 z-50 hidden lg:flex flex-col p-8 overflow-hidden">
         <div className="mb-12">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.3)]">
@@ -657,7 +657,7 @@ const ParentPanel = () => {
           </div>
         </div>
 
-        <nav className="space-y-2 flex-1">
+        <nav className="space-y-2 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 custom-scrollbar">
           {[
             { id: 'overview', label: 'Огляд', icon: LayoutDashboard },
             { id: 'family', label: 'Сім\'я', icon: Users },
