@@ -3603,6 +3603,71 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     }
   });
 
+  app.post("/api/participants/:id/points", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+
+    const user = (req as any).user;
+    const participantId = Number(req.params.id);
+    const pointValue = Math.trunc(Number(req.body.points));
+    const date = normalizeDate(req.body.date);
+    const note = String(req.body.note || '').trim();
+    const rawReason = String(req.body.reason || 'coach_bonus').trim();
+    const allowedReasons = new Set(['coach_bonus', 'discipline', 'technique', 'progress', 'seminar_bonus', 'manual_adjustment']);
+    const reason = allowedReasons.has(rawReason) ? rawReason : 'coach_bonus';
+
+    if (!Number.isFinite(participantId)) {
+      return res.status(400).json({ error: "Invalid participant id" });
+    }
+    if (!Number.isFinite(pointValue) || pointValue === 0 || Math.abs(pointValue) > 50) {
+      return res.status(400).json({ error: "Points must be between -50 and 50 and not zero" });
+    }
+
+    try {
+      if (!(await canAccessParticipant(user, participantId))) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      await pool.query("BEGIN");
+
+      await pool.query(
+        "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+        [participantId, pointValue, reason, date]
+      );
+
+      const updated = await pool.query(
+        "UPDATE participants SET rank_points = GREATEST(0, COALESCE(rank_points, 0) + $1) WHERE id = $2 RETURNING id, rank_points",
+        [pointValue, participantId]
+      );
+
+      if (updated.rows.length === 0) {
+        await pool.query("ROLLBACK");
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      if (note) {
+        await pool.query(
+          `INSERT INTO coach_notes (participant_id, coach_id, content, visibility)
+           VALUES ($1, $2, $3, 'parent')`,
+          [participantId, user?.coach_id || null, note]
+        );
+      }
+
+      await pool.query("COMMIT");
+
+      await logAuditAction(user?.id || null, user?.role || 'coach', `Додано бали: ${pointValue}`, 'participant', participantId, {
+        reason,
+        date,
+        has_note: Boolean(note)
+      });
+
+      res.json({ success: true, rank_points: updated.rows[0].rank_points });
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      console.error("Failed to add participant points:", e);
+      res.status(500).json({ error: "Failed to add points" });
+    }
+  });
+
   // Badges (Achievements)
   app.get("/api/badges", requireAuth, async (req, res) => {
     if (!pool) return res.json([]);
@@ -5478,6 +5543,32 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
     });
 
+    app.get("/api/parent/coach-notes", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = await getParentParticipantId(req);
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (familyIds.length === 0) return res.json([]);
+
+        const result = await pool.query(`
+          SELECT cn.*, p.name as participant_name, c.name as coach_name
+          FROM coach_notes cn
+          JOIN participants p ON cn.participant_id = p.id
+          LEFT JOIN coaches c ON cn.coach_id = c.id
+          WHERE cn.participant_id = ANY($1::int[])
+          AND cn.visibility IN ('parent', 'public')
+          ORDER BY cn.created_at DESC
+          LIMIT 30
+        `, [familyIds]);
+        res.json(result.rows);
+      } catch (e) {
+        console.error("Failed to fetch parent coach notes:", e);
+        res.status(500).json({ error: "Failed to fetch coach notes" });
+      }
+    });
+
     app.get("/api/parent/ratings", async (req, res) => {
       if (!pool) return res.status(500).json({ error: "Database not configured" });
       const participantId = await getParentParticipantId(req);
@@ -5695,11 +5786,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           }
         }
         const result = await pool.query(
-          `INSERT INTO attendance (participant_id, date, coach_notes)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (participant_id, date) DO UPDATE SET coach_notes = $3
+          `INSERT INTO coach_notes (participant_id, coach_id, content, visibility)
+           VALUES ($1, $2, $3, 'parent')
            RETURNING *`,
-          [participantId, date, note]
+          [participantId, user?.coach_id || null, note]
         );
         res.json(result.rows[0]);
       } catch (error: any) {

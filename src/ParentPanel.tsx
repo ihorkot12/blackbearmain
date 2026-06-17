@@ -61,6 +61,11 @@ const pointReasonLabel = (reason?: string) => {
   if (!reason) return 'Бали';
   if (reason === 'attendance') return 'Відвідування';
   if (reason === 'attendance_removal') return 'Корекція відвідування';
+  if (reason === 'coach_bonus') return 'Бали від тренера';
+  if (reason === 'discipline') return 'Дисципліна';
+  if (reason === 'technique') return 'Техніка';
+  if (reason === 'progress') return 'Прогрес';
+  if (reason === 'manual_adjustment') return 'Корекція балів';
   if (reason === 'badge') return 'Досягнення';
   if (reason.startsWith('seminar')) return 'Семінар';
   if (reason.startsWith('certification')) return 'Атестація';
@@ -76,6 +81,7 @@ const ParentPanel = () => {
   const [badges, setBadges] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [pointsLog, setPointsLog] = useState<any[]>([]);
+  const [coachNotes, setCoachNotes] = useState<any[]>([]);
   const [ratingsSummary, setRatingsSummary] = useState<any>(null);
   const [schedule, setSchedule] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -247,12 +253,13 @@ const ParentPanel = () => {
   const fetchData = async (isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
-      const [pRes, aRes, bRes, eventRes, pointsRes, ratingsRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
+      const [pRes, aRes, bRes, eventRes, pointsRes, notesRes, ratingsRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
         parentFetch('/api/parent/me'),
         parentFetch('/api/parent/attendance'),
         parentFetch('/api/parent/badges'),
         parentFetch('/api/parent/events'),
         parentFetch('/api/parent/points-log'),
+        parentFetch('/api/parent/coach-notes'),
         parentFetch('/api/parent/ratings'),
         parentFetch('/api/parent/schedule'),
         parentFetch('/api/parent/children'),
@@ -273,6 +280,7 @@ const ParentPanel = () => {
       const bData = bRes.ok ? await bRes.json() : [];
       const eventData = eventRes.ok ? await eventRes.json() : [];
       const pointsData = pointsRes.ok ? await pointsRes.json() : [];
+      const notesData = notesRes.ok ? await notesRes.json() : [];
       const ratingsData = ratingsRes.ok ? await ratingsRes.json() : null;
       const sData = sRes.ok ? await sRes.json() : [];
       const cData = cRes.ok ? await cRes.json() : [];
@@ -285,6 +293,7 @@ const ParentPanel = () => {
       setBadges(bData);
       setEvents(Array.isArray(eventData) ? eventData : []);
       setPointsLog(Array.isArray(pointsData) ? pointsData : []);
+      setCoachNotes(Array.isArray(notesData) ? notesData : []);
       setRatingsSummary(ratingsData && !ratingsData.error ? ratingsData : null);
       setSchedule(sData);
       setChildren(cData);
@@ -1013,6 +1022,31 @@ const ParentPanel = () => {
                     >
                       Надіслати повідомлення
                     </button>
+                  </div>
+
+                  <div className="bg-zinc-900/50 rounded-[2.5rem] shadow-sm p-8 border border-white/5 border-t-4 border-red-600">
+                    <div className="flex items-center gap-3 mb-6">
+                      <MessageSquare className="text-red-600" size={24} />
+                      <h3 className="text-xl font-black uppercase tracking-tight">Нотатки тренера</h3>
+                    </div>
+                    <div className="space-y-4">
+                      {coachNotes.length > 0 ? coachNotes.slice(0, 5).map(note => (
+                        <div key={note.id} className="rounded-2xl border border-white/5 bg-black/30 p-4">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-red-500">{note.participant_name}</span>
+                            {note.coach_name && <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-600">{note.coach_name}</span>}
+                          </div>
+                          <p className="text-sm text-zinc-300 leading-relaxed">{note.content}</p>
+                          <p className="mt-3 text-[9px] font-bold uppercase tracking-widest text-zinc-600">
+                            {new Date(note.created_at).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      )) : (
+                        <div className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">
+                          Нотаток поки немає
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </section>
               </div>

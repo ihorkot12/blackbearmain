@@ -31,6 +31,62 @@ const shiftDateInputValue = (value: string, days: number) => {
   return toDateInputValue(date);
 };
 
+const weekdayLabels = ['Нд', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+const getWeekdayLabelFromInput = (value: string) => {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return weekdayLabels[date.getDay()] || '';
+};
+
+const normalizeScheduleText = (value?: string | null) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[().,;:|/\\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const scheduleMatchesDay = (dayText: string | null | undefined, dateValue: string) => {
+  const normalized = normalizeScheduleText(dayText);
+  if (!normalized) return false;
+  if (normalized.includes('щодня') || normalized.includes('daily')) return true;
+
+  const label = getWeekdayLabelFromInput(dateValue).toLowerCase();
+  const variants: Record<string, string[]> = {
+    'пн': ['пн', 'понед'],
+    'вт': ['вт', 'вівт', 'втор'],
+    'ср': ['ср', 'серед'],
+    'чт': ['чт', 'четв'],
+    'пт': ['пт', 'пʼят', "п'ят", 'пят', 'пятн'],
+    'сб': ['сб', 'суб'],
+    'нд': ['нд', 'нед', 'неді']
+  };
+
+  return (variants[label] || [label]).some(token => normalized.includes(token));
+};
+
+const scheduleMatchesGroup = (entry: any, group: any) => {
+  const entryGroup = normalizeScheduleText(entry?.group_name);
+  const groupName = normalizeScheduleText(group?.name);
+  if (entryGroup && groupName && (entryGroup.includes(groupName) || groupName.includes(entryGroup))) return true;
+  return Boolean(
+    group?.location_id &&
+    entry?.location_id &&
+    Number(group.location_id) === Number(entry.location_id) &&
+    group?.coach_id &&
+    entry?.coach_id &&
+    Number(group.coach_id) === Number(entry.coach_id)
+  );
+};
+
+const attendanceStatusLabel = (status?: string) => {
+  if (status === 'present') return 'Присутній';
+  if (status === 'late') return 'Запізнився';
+  if (status === 'excused') return 'Поважна';
+  if (status === 'absent') return 'Відсутній';
+  return 'Не відмічено';
+};
+
 const isBcryptHash = (value: unknown) =>
   typeof value === 'string' && /^\$2[aby]\$/.test(value);
 
@@ -670,7 +726,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
               Ризик відтоку
             </h3>
             <button 
-              onClick={() => onQuickAction('attendance')}
+              onClick={() => onQuickAction('today')}
               className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
             >
               Відвідуваність →
@@ -766,7 +822,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             </button>
             <button
               type="button"
-              onClick={() => onQuickAction('attendance', 'mark_attendance')}
+              onClick={() => onQuickAction('today')}
               className="px-4 lg:px-6 py-3 lg:py-4 bg-white/5 text-white rounded-xl lg:rounded-2xl font-black uppercase tracking-widest text-[8px] lg:text-[10px] hover:bg-white/10 transition-all border border-white/5"
             >
               Відмітити
@@ -949,7 +1005,7 @@ export const AdminPage = () => {
         
         // If coach and activeTab is restricted, switch to first allowed tab
         if (data.role === 'coach' && ['leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
-          setActiveTab('attendance');
+          setActiveTab('today');
         }
       } catch (e) {
         localStorage.removeItem('admin_token');
@@ -1022,6 +1078,7 @@ export const AdminPage = () => {
       title: 'Операційка',
       items: [
         { id: 'dashboard', label: 'Дашборд', icon: LayoutDashboard, roles: ['admin', 'coach'] },
+        { id: 'today', label: 'Сьогодні', icon: Zap, roles: ['admin', 'coach'] },
         { id: 'attendance', label: 'Відвідуваність', icon: Calendar, roles: ['admin', 'coach'] },
         { id: 'notifications', label: 'Сповіщення', icon: Bell, roles: ['admin'] },
         { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
@@ -1372,6 +1429,7 @@ export const AdminPage = () => {
               {activeTab === 'schedule' && <ScheduleEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'participants' && <ParticipantsEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} role={role} coachId={coachId} />}
               {activeTab === 'registrations' && <RegistrationManager onEdit={(id) => handleQuickAction('participants', `edit:${id}`)} />}
+              {activeTab === 'today' && <TodayTraining role={role} coachId={coachId} />}
               {activeTab === 'attendance' && <AttendanceEditor role={role} coachId={coachId} initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'notifications' && <NotificationsViewer />}
               {activeTab === 'rating' && <RatingEditor />}
@@ -4179,6 +4237,411 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+const TodayTraining = ({ role, coachId }: { role: string, coachId: number | null }) => {
+  const [participants, setParticipants] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [schedule, setSchedule] = useState<any[]>([]);
+  const [attendance, setAttendance] = useState<Record<number, string>>({});
+  const [date, setDate] = useState(toDateInputValue());
+  const [selectedGroupId, setSelectedGroupId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [savingAttendance, setSavingAttendance] = useState<number | null>(null);
+  const [savingPoints, setSavingPoints] = useState<number | null>(null);
+  const [pointDrafts, setPointDrafts] = useState<Record<number, { points: string, note: string }>>({});
+
+  const fetchData = async () => {
+    const token = localStorage.getItem('admin_token');
+    setLoading(true);
+    try {
+      const [pRes, gRes, sRes, aRes] = await Promise.all([
+        fetch('/api/participants', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/groups', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch('/api/admin/schedule', { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`/api/attendance/${date}`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
+
+      const [pData, gData, sData, aData] = await Promise.all([
+        pRes.ok ? pRes.json() : [],
+        gRes.ok ? gRes.json() : [],
+        sRes.ok ? sRes.json() : [],
+        aRes.ok ? aRes.json() : []
+      ]);
+
+      setParticipants(Array.isArray(pData) ? pData : []);
+      setGroups(Array.isArray(gData) ? gData : []);
+      setSchedule(Array.isArray(sData) ? sData : []);
+
+      const attMap: Record<number, string> = {};
+      if (Array.isArray(aData)) {
+        aData.forEach((item: any) => {
+          attMap[Number(item.participant_id)] = item.status;
+        });
+      }
+      setAttendance(attMap);
+    } catch (e) {
+      console.error('Today training fetch failed', e);
+      toast.error('Не вдалося завантажити тренування');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [date]);
+
+  const groupsWithSchedule = useMemo(() => {
+    return groups.map(group => ({
+      ...group,
+      todayEntries: schedule
+        .filter(entry => scheduleMatchesDay(entry.day_of_week, date) && scheduleMatchesGroup(entry, group))
+        .sort((a, b) => String(a.start_time || '').localeCompare(String(b.start_time || '')))
+    }));
+  }, [groups, schedule, date]);
+
+  const todayGroups = groupsWithSchedule.filter(group => group.todayEntries.length > 0);
+  const groupOptions = todayGroups.length > 0 ? todayGroups : groupsWithSchedule;
+
+  useEffect(() => {
+    if (groupOptions.length === 0) return;
+    const selectedExists = groupOptions.some(group => String(group.id) === selectedGroupId);
+    if (!selectedExists) setSelectedGroupId(String(groupOptions[0].id));
+  }, [groupOptions, selectedGroupId]);
+
+  const selectedGroup = groupsWithSchedule.find(group => String(group.id) === selectedGroupId) || null;
+  const groupParticipants = participants
+    .filter(participant => String(participant.group_id || '') === selectedGroupId)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'uk'));
+  const selectedSchedule = selectedGroup?.todayEntries || [];
+  const presentCount = groupParticipants.filter(p => attendance[p.id] === 'present').length;
+  const absentCount = groupParticipants.filter(p => attendance[p.id] === 'absent').length;
+  const markedCount = groupParticipants.filter(p => Boolean(attendance[p.id])).length;
+  const unmarkedCount = Math.max(0, groupParticipants.length - markedCount);
+  const attendancePercent = groupParticipants.length ? Math.round((presentCount / groupParticipants.length) * 100) : 0;
+
+  const setDraft = (participantId: number, patch: Partial<{ points: string, note: string }>) => {
+    setPointDrafts(current => ({
+      ...current,
+      [participantId]: {
+        points: current[participantId]?.points ?? '2',
+        note: current[participantId]?.note ?? '',
+        ...patch
+      }
+    }));
+  };
+
+  const updateStatus = async (participantId: number, nextStatus: string) => {
+    const token = localStorage.getItem('admin_token');
+    const previousStatus = attendance[participantId];
+    setAttendance(current => ({ ...current, [participantId]: nextStatus }));
+    setSavingAttendance(participantId);
+
+    try {
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ participant_id: participantId, date, status: nextStatus })
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Attendance update failed');
+      }
+
+      const delta = nextStatus === 'present' && previousStatus !== 'present'
+        ? 1
+        : previousStatus === 'present' && nextStatus !== 'present'
+          ? -1
+          : 0;
+
+      if (delta !== 0) {
+        setParticipants(current => current.map(participant => {
+          if (Number(participant.id) !== Number(participantId)) return participant;
+          return {
+            ...participant,
+            rank_points: Math.max(0, Number(participant.rank_points || 0) + delta)
+          };
+        }));
+      }
+
+      toast.success(attendanceStatusLabel(nextStatus));
+    } catch (e) {
+      setAttendance(current => {
+        const next = { ...current };
+        if (previousStatus) next[participantId] = previousStatus;
+        else delete next[participantId];
+        return next;
+      });
+      toast.error('Не вдалося оновити відвідування');
+    } finally {
+      setSavingAttendance(null);
+    }
+  };
+
+  const addPoints = async (participantId: number) => {
+    const draft = pointDrafts[participantId] || { points: '2', note: '' };
+    const points = Math.trunc(Number(draft.points));
+    if (!Number.isFinite(points) || points === 0 || Math.abs(points) > 50) {
+      toast.error('Вкажіть бали від -50 до 50');
+      return;
+    }
+
+    const token = localStorage.getItem('admin_token');
+    setSavingPoints(participantId);
+    try {
+      const res = await fetch(`/api/participants/${participantId}/points`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          points,
+          note: draft.note.trim(),
+          reason: 'coach_bonus',
+          date
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Points update failed');
+
+      setParticipants(current => current.map(participant => (
+        Number(participant.id) === Number(participantId)
+          ? { ...participant, rank_points: data.rank_points }
+          : participant
+      )));
+      setPointDrafts(current => ({
+        ...current,
+        [participantId]: { points: '2', note: '' }
+      }));
+      toast.success('Бали додано');
+    } catch (e) {
+      toast.error('Не вдалося додати бали');
+    } finally {
+      setSavingPoints(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <RefreshCw className="animate-spin text-red-600" size={48} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 lg:space-y-8 pb-16">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6">
+        <div>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <span className="px-3 py-1.5 rounded-xl bg-red-600/10 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-600/20">
+              {getWeekdayLabelFromInput(date)}
+            </span>
+            <span className="px-3 py-1.5 rounded-xl bg-white/5 text-zinc-400 text-[10px] font-black uppercase tracking-widest border border-white/5">
+              {role === 'coach' ? 'Тренер' : 'Адмін'} {coachId ? `#${coachId}` : ''}
+            </span>
+          </div>
+          <h2 className="text-3xl lg:text-5xl font-black uppercase tracking-tighter mb-3">Тренування сьогодні</h2>
+          <p className="text-zinc-500 font-medium text-sm lg:text-base">
+            {selectedGroup?.name || 'Оберіть групу'} {selectedSchedule.length > 0 ? `- ${selectedSchedule.map(item => `${item.start_time}${item.end_time ? `-${item.end_time}` : ''}`).join(', ')}` : ''}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+          <div className="flex items-center gap-2 bg-zinc-900 p-2 rounded-2xl border border-white/5">
+            <button onClick={() => setDate(shiftDateInputValue(date, -1))} className="p-2 hover:bg-white/5 rounded-xl transition-colors" aria-label="Попередній день">
+              <ChevronLeft size={18} />
+            </button>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-transparent text-white font-bold outline-none px-2 text-xs" />
+            <button onClick={() => setDate(shiftDateInputValue(date, 1))} className="p-2 hover:bg-white/5 rounded-xl transition-colors" aria-label="Наступний день">
+              <ChevronRight size={18} />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={fetchData}
+            className="h-12 px-4 rounded-2xl bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest"
+          >
+            <RefreshCw size={16} />
+            Оновити
+          </button>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-4 gap-3 lg:gap-4">
+        {[
+          { label: 'У групі', value: groupParticipants.length, icon: Users, color: 'text-zinc-100' },
+          { label: 'Присутні', value: presentCount, icon: CheckCircle2, color: 'text-green-500' },
+          { label: 'Відсутні', value: absentCount, icon: XCircle, color: 'text-red-500' },
+          { label: 'Відмітка', value: `${attendancePercent}%`, icon: Activity, color: 'text-yellow-400' }
+        ].map(item => (
+          <div key={item.label} className="bg-zinc-900/40 border border-white/5 rounded-[1.5rem] p-5 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">{item.label}</p>
+              <p className={`text-2xl font-black ${item.color}`}>{item.value}</p>
+            </div>
+            <div className="w-11 h-11 rounded-2xl bg-white/5 flex items-center justify-center text-zinc-500">
+              <item.icon size={20} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+        {groupOptions.map(group => (
+          <button
+            key={group.id}
+            type="button"
+            onClick={() => setSelectedGroupId(String(group.id))}
+            className={`shrink-0 min-w-[220px] text-left rounded-[1.5rem] border p-4 transition-all ${
+              String(group.id) === selectedGroupId
+                ? 'bg-red-600 text-white border-red-500 shadow-lg shadow-red-600/20'
+                : 'bg-zinc-900/40 border-white/5 text-zinc-400 hover:text-white hover:border-white/15'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <span className="font-black uppercase tracking-tight text-sm truncate">{group.name}</span>
+              {group.todayEntries.length > 0 && <Clock size={16} className="shrink-0 opacity-70" />}
+            </div>
+            <div className="text-[10px] font-black uppercase tracking-widest opacity-70">
+              {group.todayEntries.length > 0
+                ? group.todayEntries.map((entry: any) => entry.start_time).join(', ')
+                : 'Без заняття сьогодні'}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {unmarkedCount > 0 && (
+        <div className="rounded-3xl border border-yellow-400/20 bg-yellow-400/10 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 text-yellow-300">
+            <AlertCircle size={20} />
+            <span className="text-xs font-black uppercase tracking-widest">{unmarkedCount} ще не відмічено</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => groupParticipants.forEach(participant => updateStatus(participant.id, 'present'))}
+            className="px-5 py-3 rounded-2xl bg-yellow-400 text-black text-[10px] font-black uppercase tracking-widest hover:bg-yellow-300 transition-colors"
+          >
+            Всі присутні
+          </button>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {groupParticipants.map(participant => {
+          const status = attendance[participant.id];
+          const isPresent = status === 'present';
+          const isAbsent = status === 'absent';
+          const draft = pointDrafts[participant.id] || { points: '2', note: '' };
+
+          return (
+            <div key={participant.id} className="rounded-[2rem] border border-white/5 bg-zinc-900/35 p-5 lg:p-6">
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_auto] gap-5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-3 mb-3">
+                    <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight truncate">{participant.name}</h3>
+                    <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest ${
+                      participant.payment_status === 'paid'
+                        ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                        : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                    }`}>
+                      {participant.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                    </span>
+                    <span className="px-3 py-1 rounded-xl bg-white/5 text-zinc-400 border border-white/5 text-[9px] font-black uppercase tracking-widest">
+                      {attendanceStatusLabel(status)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+                    <span>{normalizeBeltName(participant.belt)}</span>
+                    <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                    <span>{participant.rank_points || 0} балів</span>
+                    {participant.parent_name && (
+                      <>
+                        <span className="w-1 h-1 rounded-full bg-zinc-700" />
+                        <span>{participant.parent_name}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 lg:w-[260px]">
+                  <button
+                    type="button"
+                    onClick={() => updateStatus(participant.id, 'present')}
+                    disabled={savingAttendance === participant.id}
+                    className={`h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                      isPresent
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/20'
+                        : 'bg-white/5 text-zinc-400 hover:bg-green-600/15 hover:text-green-400 border border-white/5'
+                    } disabled:opacity-50`}
+                  >
+                    <CheckCircle2 size={16} />
+                    Є
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => updateStatus(participant.id, 'absent')}
+                    disabled={savingAttendance === participant.id}
+                    className={`h-12 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                      isAbsent
+                        ? 'bg-red-600 text-white shadow-lg shadow-red-600/20'
+                        : 'bg-white/5 text-zinc-400 hover:bg-red-600/15 hover:text-red-400 border border-white/5'
+                    } disabled:opacity-50`}
+                  >
+                    <XCircle size={16} />
+                    Нема
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-5 grid md:grid-cols-[88px_minmax(0,1fr)_auto] gap-3">
+                <input
+                  type="number"
+                  min="-50"
+                  max="50"
+                  value={draft.points}
+                  onChange={e => setDraft(participant.id, { points: e.target.value })}
+                  className="h-12 rounded-2xl bg-black border border-white/10 px-4 text-sm font-black text-white outline-none focus:border-red-600"
+                  aria-label="Бали"
+                />
+                <input
+                  type="text"
+                  value={draft.note}
+                  onChange={e => setDraft(participant.id, { note: e.target.value })}
+                  placeholder="Коротка нотатка для батьків, якщо потрібно"
+                  className="h-12 rounded-2xl bg-black border border-white/10 px-4 text-sm text-white outline-none focus:border-red-600 placeholder:text-zinc-700"
+                />
+                <button
+                  type="button"
+                  onClick={() => addPoints(participant.id)}
+                  disabled={savingPoints === participant.id}
+                  className="h-12 px-5 rounded-2xl bg-red-600 hover:bg-red-700 disabled:bg-zinc-700 disabled:text-zinc-400 text-white text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                >
+                  <Zap size={16} />
+                  Додати
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {groupParticipants.length === 0 && (
+          <div className="p-16 text-center bg-zinc-900/20 rounded-[2rem] border border-dashed border-white/5">
+            <Users size={40} className="mx-auto text-zinc-700 mb-4 opacity-40" />
+            <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">У цій групі поки немає учнів</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
