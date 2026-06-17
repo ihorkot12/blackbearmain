@@ -4768,26 +4768,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     } catch (e) {
       await client.query('ROLLBACK');
       console.error("Failed to create homework:", e);
-      console.error("Failed to create homework detail:", JSON.stringify({
-        message: (e as any)?.message,
-        code: (e as any)?.code,
-        detail: (e as any)?.detail,
-        table: (e as any)?.table,
-        column: (e as any)?.column,
-        constraint: (e as any)?.constraint
-      }));
-      const debugPayload = {
-        message: (e as any)?.message,
-        code: (e as any)?.code,
-        detail: (e as any)?.detail,
-        table: (e as any)?.table,
-        column: (e as any)?.column,
-        constraint: (e as any)?.constraint
-      };
-      res.status(500).json({
-        error: "Failed to create homework",
-        ...((req.headers['x-codex-debug'] === '1') ? { debug: debugPayload } : {})
-      });
+      res.status(500).json({ error: "Failed to create homework" });
     } finally {
       client.release();
     }
