@@ -164,6 +164,7 @@ const ParentPanel = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const [homeworkFocusTarget, setHomeworkFocusTarget] = useState<{ id?: number | null; title?: string; nonce: number } | null>(null);
   const [isChildMode, setIsChildMode] = useState(false);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -413,6 +414,31 @@ const ParentPanel = () => {
     if (!participant) return;
     const token = `p_${participant.id}`;
     window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
+  };
+
+  const isHomeworkNotification = (notification: any) =>
+    ['homework', 'homework_review'].includes(String(notification?.type || ''));
+
+  const extractHomeworkTitle = (message?: string) => {
+    const text = String(message || '');
+    const quoted = text.match(/"([^"]+)"/);
+    if (quoted?.[1]) return quoted[1];
+    return text
+      .replace(/^Нове домашнє завдання:\s*/i, '')
+      .replace(/^Домашнє завдання\s*/i, '')
+      .replace(/^Тренер залишив правки до ДЗ\s*/i, '')
+      .trim();
+  };
+
+  const handleNotificationClick = (notification: any) => {
+    if (!isHomeworkNotification(notification)) return;
+    const referenceId = Number(notification.reference_id || 0);
+    setHomeworkFocusTarget({
+      id: Number.isFinite(referenceId) && referenceId > 0 ? referenceId : null,
+      title: extractHomeworkTitle(notification.message),
+      nonce: Date.now()
+    });
+    setActiveTab('homework');
   };
 
   const bestAthlete = ratingsSummary?.bestAthlete;
@@ -1181,7 +1207,12 @@ const ParentPanel = () => {
                 </div>
                 <div className="grid md:grid-cols-2 gap-6">
                   {notifications.slice(0, 4).map((n, i) => (
-                    <div key={i} className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-4">
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleNotificationClick(n)}
+                      className={`w-full bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${isHomeworkNotification(n) ? 'hover:bg-white/[0.04] cursor-pointer' : 'cursor-default'}`}
+                    >
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                         n.type === 'attendance' ? 'bg-orange-500/10 text-orange-500' :
                         n.type === 'payment' ? 'bg-green-500/10 text-green-500' :
@@ -1199,7 +1230,7 @@ const ParentPanel = () => {
                           {new Date(n.created_at).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                   {notifications.length === 0 && (
                     <div className="col-span-2 p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-xs">
@@ -1470,7 +1501,7 @@ const ParentPanel = () => {
           )}
 
           {activeTab === 'homework' && (
-            <HomeworkParentDiary participantId={participant?.id} />
+            <HomeworkParentDiary participantId={participant?.id} focusTarget={homeworkFocusTarget} />
           )}
 
           {activeTab === 'payments' && (
@@ -1536,12 +1567,14 @@ const ParentPanel = () => {
               <h2 className="text-4xl font-black uppercase tracking-tighter">Ваші <span className="text-red-600">сповіщення</span></h2>
               <div className="space-y-4">
                 {notifications.length > 0 ? notifications.map((n, i) => (
-                  <motion.div 
+                  <motion.button
+                    type="button"
                     key={i}
+                    onClick={() => handleNotificationClick(n)}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.05 }}
-                    className="bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-6 group hover:bg-white/[0.02] transition-colors"
+                    className={`w-full bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-6 group text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${isHomeworkNotification(n) ? 'hover:bg-white/[0.04] cursor-pointer' : 'cursor-default'}`}
                   >
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
                       n.type === 'attendance' ? 'bg-orange-500/10 text-orange-500' :
@@ -1573,7 +1606,7 @@ const ParentPanel = () => {
                       </div>
                       <p className="text-zinc-300 text-sm leading-relaxed">{n.message}</p>
                     </div>
-                  </motion.div>
+                  </motion.button>
                 )) : (
                   <div className="p-20 text-center bg-zinc-900/20 rounded-[3rem] border border-dashed border-white/5">
                     <AlertCircle size={48} className="mx-auto text-zinc-700 mb-4 opacity-20" />

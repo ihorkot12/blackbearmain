@@ -246,9 +246,13 @@ async function initDb() {
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
         type TEXT NOT NULL, -- 'absence', 'payment', 'event', 'achievement'
         message TEXT NOT NULL,
+        reference_type TEXT,
+        reference_id TEXT,
         is_read BOOLEAN DEFAULT FALSE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_type TEXT;
+      ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id TEXT;
 
       CREATE TABLE IF NOT EXISTS participant_accesses (
         id SERIAL PRIMARY KEY,
@@ -4748,7 +4752,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       const assignment = assignmentRes.rows[0];
       for (const participantId of finalParticipantIds) {
-        await client.query(`
+        const assignmentParticipantRes = await client.query(`
           INSERT INTO homework_assignment_participants (assignment_id, participant_id)
           SELECT $1, $2
           WHERE NOT EXISTS (
@@ -4756,10 +4760,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             FROM homework_assignment_participants
             WHERE assignment_id = $1 AND participant_id = $2
           )
+          RETURNING id
         `, [assignment.id, participantId]);
+        const assignmentParticipantId = assignmentParticipantRes.rows[0]?.id;
         await client.query(
-          "INSERT INTO notifications (participant_id, type, message) VALUES ($1, 'homework', $2)",
-          [participantId, `Нове домашнє завдання: ${assignment.title}`]
+          "INSERT INTO notifications (participant_id, type, message, reference_type, reference_id) VALUES ($1, 'homework', $2, 'homework', $3)",
+          [participantId, `Нове домашнє завдання: ${assignment.title}`, assignmentParticipantId ? String(assignmentParticipantId) : String(assignment.id)]
         );
       }
 
@@ -4850,17 +4856,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       }
 
       await client.query(
-        "INSERT INTO notifications (participant_id, type, message) VALUES ($1, 'homework_review', $2)",
+        "INSERT INTO notifications (participant_id, type, message, reference_type, reference_id) VALUES ($1, 'homework_review', $2, 'homework', $3)",
         [
           current.participant_id,
           status === 'approved'
             ? `Домашнє завдання "${current.title}" перевірено. ${nextPoints > 0 ? `+${nextPoints} балів.` : ''}`
-            : `Тренер залишив правки до ДЗ "${current.title}".`
+            : `Тренер залишив правки до ДЗ "${current.title}".`,
+          String(current.id)
         ]
       );
 
       await client.query('COMMIT');
-      res.json({ success: true });
+      res.json({ success: true, status, points_awarded: status === 'approved' ? nextPoints : 0 });
     } catch (e) {
       await client.query('ROLLBACK');
       console.error("Failed to review homework:", e);

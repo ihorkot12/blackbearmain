@@ -193,6 +193,7 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [reviewDrafts, setReviewDrafts] = useState<Record<number, { coach_feedback: string; points_awarded: number }>>({});
 
   const filteredParticipants = useMemo(() => {
@@ -291,6 +292,7 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const reviewSubmission = async (submission: HomeworkItem, status: 'approved' | 'needs_work') => {
     if (!submission.id) return;
     const draft = reviewDrafts[submission.id] || { coach_feedback: '', points_awarded: status === 'approved' ? 5 : 0 };
+    setReviewingId(submission.id);
     try {
       const res = await adminRequest(`/api/homework/submissions/${submission.id}/review`, {
         method: 'PATCH',
@@ -303,9 +305,17 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
         return;
       }
       toast.success(status === 'approved' ? 'ДЗ зараховано' : 'Відправлено на доопрацювання');
+      setSubmissions(current => current.filter(item => item.id !== submission.id));
+      setReviewDrafts(current => {
+        const next = { ...current };
+        delete next[submission.id || 0];
+        return next;
+      });
       fetchData();
     } catch {
       toast.error('Помилка перевірки');
+    } finally {
+      setReviewingId(null);
     }
   };
 
@@ -504,9 +514,10 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
         <div className="rounded-[2rem] border border-white/10 bg-zinc-950 p-6">
           <h3 className="mb-5 text-2xl font-black uppercase text-white">Перевірка щоденників</h3>
           <div className="space-y-4">
-            {submissions.slice(0, 12).map(item => {
+            {submitted.slice(0, 12).map(item => {
               const exercises = normalizeExercises(item.exercises);
               const draft = reviewDrafts[item.id || 0] || { coach_feedback: item.coach_feedback || '', points_awarded: item.status === 'approved' ? Number(item.points_awarded || 0) : 5 };
+              const isReviewing = reviewingId === item.id;
               return (
                 <div key={item.id} className="rounded-2xl border border-white/5 bg-white/[0.03] p-5">
                   <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -548,19 +559,19 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
                     />
                   </div>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    <button type="button" onClick={() => reviewSubmission(item, 'approved')} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-black uppercase text-black">
-                      <Award size={16} />
+                    <button type="button" onClick={() => reviewSubmission(item, 'approved')} disabled={isReviewing} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 text-sm font-black uppercase text-black disabled:opacity-50">
+                      {isReviewing ? <Loader2 className="animate-spin" size={16} /> : <Award size={16} />}
                       Зарахувати
                     </button>
-                    <button type="button" onClick={() => reviewSubmission(item, 'needs_work')} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-400 text-sm font-black uppercase text-black">
-                      <MessageSquareText size={16} />
+                    <button type="button" onClick={() => reviewSubmission(item, 'needs_work')} disabled={isReviewing} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-amber-400 text-sm font-black uppercase text-black disabled:opacity-50">
+                      {isReviewing ? <Loader2 className="animate-spin" size={16} /> : <MessageSquareText size={16} />}
                       На правки
                     </button>
                   </div>
                 </div>
               );
             })}
-            {!isLoading && submissions.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-zinc-500">Щоденників ще немає</div>}
+            {!isLoading && submitted.length === 0 && <div className="rounded-2xl border border-dashed border-white/10 p-10 text-center text-sm text-zinc-500">Щоденників на перевірку немає</div>}
           </div>
         </div>
       </section>
@@ -568,7 +579,13 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   );
 };
 
-export const HomeworkParentDiary = ({ participantId }: { participantId?: number | null }) => {
+type HomeworkFocusTarget = {
+  id?: number | null;
+  title?: string;
+  nonce?: number;
+} | null;
+
+export const HomeworkParentDiary = ({ participantId, focusTarget }: { participantId?: number | null; focusTarget?: HomeworkFocusTarget }) => {
   const [items, setItems] = useState<HomeworkItem[]>([]);
   const [drafts, setDrafts] = useState<Record<number, HomeworkDraft>>({});
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -595,6 +612,28 @@ export const HomeworkParentDiary = ({ participantId }: { participantId?: number 
     };
   };
 
+  const resolveFocusedHomeworkId = (list: HomeworkItem[]) => {
+    const targetId = Number(focusTarget?.id || 0);
+    if (Number.isFinite(targetId) && targetId > 0) {
+      const byParticipantAssignment = list.find(item => Number(item.assignment_participant_id) === targetId);
+      if (byParticipantAssignment?.assignment_participant_id) return byParticipantAssignment.assignment_participant_id;
+
+      const byAssignment = list.find(item => Number(item.assignment_id) === targetId);
+      if (byAssignment?.assignment_participant_id) return byAssignment.assignment_participant_id;
+    }
+
+    const targetTitle = String(focusTarget?.title || '').trim().toLowerCase();
+    if (targetTitle) {
+      const byTitle = list.find(item => {
+        const itemTitle = String(item.title || '').toLowerCase();
+        return itemTitle.includes(targetTitle) || targetTitle.includes(itemTitle);
+      });
+      if (byTitle?.assignment_participant_id) return byTitle.assignment_participant_id;
+    }
+
+    return null;
+  };
+
   const fetchHomework = async () => {
     setIsLoading(true);
     try {
@@ -607,7 +646,9 @@ export const HomeworkParentDiary = ({ participantId }: { participantId?: number 
         if (item.assignment_participant_id) nextDrafts[item.assignment_participant_id] = buildDraft(item);
       });
       setDrafts(nextDrafts);
-      if (!expandedId && nextItems[0]?.assignment_participant_id) setExpandedId(nextItems[0].assignment_participant_id);
+      const focusedId = resolveFocusedHomeworkId(nextItems);
+      if (focusedId) setExpandedId(focusedId);
+      else if (!expandedId && nextItems[0]?.assignment_participant_id) setExpandedId(nextItems[0].assignment_participant_id);
     } catch {
       toast.error('Не вдалося завантажити домашні завдання');
     } finally {
@@ -618,6 +659,15 @@ export const HomeworkParentDiary = ({ participantId }: { participantId?: number 
   useEffect(() => {
     fetchHomework();
   }, [participantId]);
+
+  useEffect(() => {
+    const focusedId = resolveFocusedHomeworkId(items);
+    if (!focusedId) return;
+    setExpandedId(focusedId);
+    window.setTimeout(() => {
+      document.getElementById(`homework-item-${focusedId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  }, [focusTarget?.nonce]);
 
   const updateEntry = (itemId: number, entryIndex: number, field: string, value: any) => {
     setDrafts(current => {
@@ -698,7 +748,7 @@ export const HomeworkParentDiary = ({ participantId }: { participantId?: number 
             const exercises = normalizeExercises(item.exercises);
             const expanded = expandedId === id;
             return (
-              <div key={id} className="overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950">
+              <div id={`homework-item-${id}`} key={id} className="overflow-hidden rounded-[2rem] border border-white/10 bg-zinc-950">
                 <button type="button" onClick={() => setExpandedId(expanded ? null : id)} className="flex w-full flex-col gap-4 p-5 text-left md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
