@@ -22,12 +22,14 @@ import {
   AlertCircle,
   Users,
   Bell,
+  BookOpen,
   Plus,
   Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 import { normalizeBeltName } from './belts';
+import KarateManual from './KarateManual';
 
 const clampProgress = (value: unknown) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -565,6 +567,7 @@ const ParentPanel = () => {
                 { id: 'schedule', label: 'Розклад', icon: Clock },
                 { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
                 { id: 'progress', label: 'Прогрес', icon: Trophy },
+                { id: 'manual', label: 'Методичка', icon: BookOpen },
                 { id: 'payments', label: 'Оплата', icon: CreditCard },
                 { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
                 { id: 'messages', label: 'Повідомлення', icon: MessageSquare },
@@ -658,6 +661,7 @@ const ParentPanel = () => {
             { id: 'schedule', label: 'Розклад', icon: Clock },
             { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
             { id: 'progress', label: 'Прогрес', icon: Trophy },
+            { id: 'manual', label: 'Методичка', icon: BookOpen },
             { id: 'payments', label: 'Оплата', icon: CreditCard },
             { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
             { id: 'messages', label: 'Повідомлення', icon: MessageSquare },
@@ -709,6 +713,7 @@ const ParentPanel = () => {
                activeTab === 'schedule' ? 'Розклад' :
                activeTab === 'attendance' ? 'Відвідуваність' :
                activeTab === 'progress' ? 'Прогрес' :
+               activeTab === 'manual' ? 'Методичка' :
                activeTab === 'payments' ? 'Оплата' :
                activeTab === 'notifications' ? 'Сповіщення' : 'Повідомлення'}
             </div>
@@ -1396,6 +1401,10 @@ const ParentPanel = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'manual' && (
+            <KarateManual audience="parent" currentBelt={normalizeBeltName(participant?.belt)} />
           )}
 
           {activeTab === 'payments' && (

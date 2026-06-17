@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 import { SMMModule } from './components/SMMModule';
 import { BELT_OPTIONS, getBeltColorClass, hasSilverStripe, normalizeBeltName } from './belts';
+import KarateManual from './KarateManual';
 
 const toDateInputValue = (date = new Date()) => {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -1086,6 +1087,7 @@ export const AdminPage = () => {
         { id: 'notifications', label: 'Сповіщення', icon: Bell, roles: ['admin'] },
         { id: 'rating', label: 'Рейтинг', icon: Trophy, roles: ['admin', 'coach'] },
         { id: 'rank_management', label: 'Пояси та Досягнення', icon: Award, roles: ['admin', 'coach'] },
+        { id: 'manual', label: 'Методичка', icon: Book, roles: ['admin', 'coach'] },
         { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
         { id: 'registrations', label: 'Реєстрації', icon: UserPlus, roles: ['admin', 'coach'] },
         { id: 'groups', label: 'Групи', icon: Users, roles: ['admin', 'coach'] },
@@ -1438,6 +1440,7 @@ export const AdminPage = () => {
               {activeTab === 'notifications' && <NotificationsViewer />}
               {activeTab === 'rating' && <RatingEditor />}
               {activeTab === 'rank_management' && <RankManagement initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
+              {activeTab === 'manual' && <KarateManual audience={role === 'coach' ? 'coach' : 'admin'} />}
               {activeTab === 'settings' && <SettingsEditor />}
               {activeTab === 'admin_users' && <AdminUsersEditor />}
             </motion.div>
