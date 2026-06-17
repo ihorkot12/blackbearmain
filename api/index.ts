@@ -4062,10 +4062,14 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       // 2. Churn Risk (14+ days since last attendance)
       const churnResult = await pool.query(`
-        SELECT id, name, coach_id
-        FROM participants
-        WHERE status = 'active'
-        AND (last_attendance_date < CURRENT_DATE - INTERVAL '14 days' OR (last_attendance_date IS NULL AND created_at < CURRENT_TIMESTAMP - INTERVAL '14 days'))
+        SELECT p.id, p.name, g.coach_id
+        FROM participants p
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE p.status = 'active'
+        AND (
+          p.last_attendance_date < CURRENT_DATE - INTERVAL '14 days'
+          OR (p.last_attendance_date IS NULL AND p.created_at < CURRENT_TIMESTAMP - INTERVAL '14 days')
+        )
       `);
 
       for (const row of churnResult.rows) {
