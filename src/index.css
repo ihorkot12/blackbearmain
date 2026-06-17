@@ -32,8 +32,79 @@
 }
 
 @layer utilities {
+  @keyframes bb-fade-up {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 12px, 0) scale(0.995);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
   .bb-admin-shell {
     padding-top: var(--bb-safe-top);
+  }
+
+  .bb-motion-surface {
+    --bb-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .bb-motion-page > * {
+    animation: bb-fade-up 420ms var(--bb-motion-ease, ease-out) both;
+  }
+
+  .bb-motion-page > *:nth-child(2) {
+    animation-delay: 45ms;
+  }
+
+  .bb-motion-page > *:nth-child(3) {
+    animation-delay: 90ms;
+  }
+
+  .bb-motion-page > *:nth-child(4) {
+    animation-delay: 135ms;
+  }
+
+  .bb-motion-surface :is(button, a[href], [role="button"], input, select, textarea) {
+    transition-duration: 220ms;
+    transition-timing-function: var(--bb-motion-ease, ease-out);
+  }
+
+  .bb-motion-surface :is(button, a[href], [role="button"]) {
+    transition-property: color, background-color, border-color, opacity, box-shadow, filter, translate, scale;
+  }
+
+  .bb-motion-surface :is(input, select, textarea) {
+    transition-property: color, background-color, border-color, box-shadow;
+  }
+
+  .bb-motion-surface :is(button, a[href], input, select, textarea):focus-visible {
+    outline: 2px solid rgba(220, 38, 38, 0.65);
+    outline-offset: 3px;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .bb-motion-surface :is(button:not(:disabled), a[href], [role="button"]):hover {
+      translate: 0 -1px;
+      filter: brightness(1.06);
+    }
+
+    .bb-motion-surface :is(button:not(:disabled), a[href], [role="button"]):active {
+      translate: 0 0;
+      scale: 0.985;
+    }
+
+    .bb-motion-surface .group {
+      transition-property: color, background-color, border-color, opacity, box-shadow, filter, translate;
+      transition-duration: 260ms;
+      transition-timing-function: var(--bb-motion-ease, ease-out);
+    }
+
+    .bb-motion-surface .group:hover {
+      translate: 0 -2px;
+    }
   }
 
   .bb-safe-floating-action {
@@ -61,6 +132,28 @@
   @media (min-width: 1024px) {
     .bb-admin-shell {
       padding-top: 0;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bb-motion-page > * {
+      animation: none !important;
+    }
+
+    .bb-motion-surface *,
+    .bb-motion-surface *::before,
+    .bb-motion-surface *::after {
+      transition-duration: 1ms !important;
+      animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+
+    .bb-motion-surface :is(button, a[href], [role="button"]),
+    .bb-motion-surface .group {
+      translate: none !important;
+      scale: 1 !important;
+      filter: none !important;
     }
   }
 }

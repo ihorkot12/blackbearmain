@@ -656,7 +656,7 @@ const ParentPanel = () => {
       </div>
 
       {/* Main Content */}
-      <main className="lg:pl-80 min-h-screen pt-20 lg:pt-0">
+      <main className="bb-motion-surface lg:pl-80 min-h-screen pt-20 lg:pt-0">
         {/* Desktop Header */}
         <div className="hidden lg:flex fixed top-0 left-80 right-0 h-20 bg-black/50 backdrop-blur-md border-b border-white/5 z-40 items-center justify-between px-12">
           <div className="flex items-center gap-4">
@@ -691,7 +691,15 @@ const ParentPanel = () => {
           </div>
         </div>
 
-        <div className="p-8 lg:p-12 lg:pt-32 max-w-6xl mx-auto">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+            className="bb-motion-page p-8 lg:p-12 lg:pt-32 max-w-6xl mx-auto"
+          >
           {activeTab === 'family' && (
             <div className="space-y-12">
               <header>
@@ -1538,7 +1546,8 @@ const ParentPanel = () => {
           )}
 
           {/* BELT PROGRESS SECTION REMOVED FROM HERE */}
-        </div>
+          </motion.div>
+        </AnimatePresence>
       </main>
     </div>
   );

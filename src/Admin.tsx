@@ -1121,7 +1121,7 @@ export const AdminPage = () => {
   );
 
   return (
-    <div className="bb-admin-shell min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
+    <div className="bb-admin-shell bb-motion-surface min-h-screen bg-[#050505] text-zinc-100 flex flex-col lg:flex-row font-sans selection:bg-red-600/30">
       <Toaster position="top-right" theme="dark" richColors />
 
       <button
@@ -1417,7 +1417,8 @@ export const AdminPage = () => {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+              className="bb-motion-page"
             >
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
               {activeTab === 'smm' && <SMMModule />}
