@@ -956,26 +956,81 @@ async function startServer() {
     if (meRes.rows.length === 0) return [];
 
     const { parent_login, parent_phone, phone } = meRes.rows[0];
-    const normalizedPhone = normalizePhone(parent_phone || phone || "").replace(/\D/g, "");
-    const params: any[] = [participantId];
-    const filters = [`p.id = $${params.length}`];
-
-    if (parent_login) {
-      params.push(parent_login);
-      filters.push(`p.parent_login = $${params.length}`);
-    }
-
-    if (normalizedPhone) {
-      params.push(normalizedPhone);
-      filters.push(`REGEXP_REPLACE(COALESCE(p.parent_phone, ''), '[^\\d]', '', 'g') = $${params.length}`);
-      filters.push(`REGEXP_REPLACE(COALESCE(p.phone, ''), '[^\\d]', '', 'g') = $${params.length}`);
-      filters.push(`REGEXP_REPLACE(COALESCE(p.parent_login, ''), '[^\\d]', '', 'g') = $${params.length}`);
-    }
-
-    const result = await pool.query(
-      `SELECT DISTINCT p.id FROM participants p WHERE ${filters.join(' OR ')}`,
-      params
+    const accessRes = await pool.query(
+      "SELECT login, phone FROM participant_accesses WHERE participant_id = $1 AND can_login = TRUE",
+      [participantId]
     );
+
+    const loginIdentifiers = new Set<string>();
+    const phoneIdentifiers = new Set<string>();
+
+    const addLogin = (value: unknown) => {
+      const normalized = normalizeLogin(value);
+      if (normalized) {
+        loginIdentifiers.add(normalized.toLowerCase());
+      }
+    };
+
+    const addPhone = (value: unknown) => {
+      const normalizedPhone = normalizePhone(String(value || '')).replace(/\D/g, '');
+      if (normalizedPhone) {
+        phoneIdentifiers.add(normalizedPhone);
+      }
+    };
+
+    addLogin(parent_login);
+    addPhone(parent_phone);
+    addPhone(phone);
+    accessRes.rows.forEach((access: any) => {
+      addLogin(access.login);
+      addPhone(access.phone);
+      addPhone(access.login);
+    });
+
+    const loginParams = Array.from(loginIdentifiers);
+    const phoneParams = Array.from(phoneIdentifiers);
+
+    const queryParams: any[] = [participantId];
+    const clauses: string[] = [];
+
+    if (loginParams.length > 0) {
+      queryParams.push(loginParams);
+      clauses.push(`
+        (LOWER(TRIM(COALESCE(p.parent_login, ''))) = ANY($${queryParams.length}::text[])
+         OR EXISTS (
+           SELECT 1
+           FROM participant_accesses pa
+           WHERE pa.participant_id = p.id
+             AND LOWER(TRIM(COALESCE(pa.login, ''))) = ANY($${queryParams.length}::text[])
+         )
+      `);
+    }
+
+    if (phoneParams.length > 0) {
+      queryParams.push(phoneParams);
+      clauses.push(`
+        (
+          REGEXP_REPLACE(COALESCE(p.parent_phone, ''), '[^\\d]', '', 'g') = ANY($${queryParams.length}::text[])
+          OR REGEXP_REPLACE(COALESCE(p.phone, ''), '[^\\d]', '', 'g') = ANY($${queryParams.length}::text[])
+          OR REGEXP_REPLACE(COALESCE(p.parent_login, ''), '[^\\d]', '', 'g') = ANY($${queryParams.length}::text[])
+          OR EXISTS (
+            SELECT 1
+            FROM participant_accesses pa
+            WHERE pa.participant_id = p.id
+              AND (
+                REGEXP_REPLACE(COALESCE(pa.phone, ''), '[^\\d]', '', 'g') = ANY($${queryParams.length}::text[])
+                OR REGEXP_REPLACE(COALESCE(pa.login, ''), '[^\\d]', '', 'g') = ANY($${queryParams.length}::text[])
+              )
+          )
+        )
+      `);
+    }
+
+    const whereClause = clauses.length > 0
+      ? `SELECT DISTINCT p.id FROM participants p WHERE p.id = $1 OR (${clauses.join(' OR ')})`
+      : `SELECT DISTINCT p.id FROM participants p WHERE p.id = $1`;
+
+    const result = await pool.query(whereClause, queryParams);
     return result.rows.map((row: any) => Number(row.id)).filter((id: number) => Number.isFinite(id));
   };
 
@@ -6232,13 +6287,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
 
       try {
-        const meRes = await pool.query("SELECT parent_login, parent_phone, phone FROM participants WHERE id = $1", [participantId]);
-        if (meRes.rows.length === 0) return res.status(404).json({ error: "Participant not found" });
+        const familyIds = await getParentFamilyParticipantIds(participantId);
+        if (!familyIds.includes(participantId)) {
+          return res.status(404).json({ error: "Participant not found" });
+        }
 
-        const { parent_login, parent_phone, phone } = meRes.rows[0];
-        const normalizedPhone = normalizePhone(parent_phone || phone || "").replace(/\D/g, "");
-
-        let query = `
+        const childrenRes = await pool.query(`
           SELECT
             p.id, p.name, p.age, p.belt, p.rank_points, p.payment_status, p.streak, p.exam_readiness,
             g.name as group_name,
@@ -6246,23 +6300,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             (SELECT COUNT(*) FROM attendance WHERE participant_id = p.id AND status = 'present') as total_attendance
           FROM participants p
           LEFT JOIN groups g ON p.group_id = g.id
-          WHERE 1=0
-        `;
-        const params = [];
-
-        if (parent_login) {
-          params.push(parent_login);
-          query += ` OR p.parent_login = $${params.length}`;
-        }
-
-        if (normalizedPhone) {
-          params.push(normalizedPhone);
-          query += ` OR REGEXP_REPLACE(p.parent_phone, '[^\\d]', '', 'g') = $${params.length}`;
-          query += ` OR REGEXP_REPLACE(p.phone, '[^\\d]', '', 'g') = $${params.length}`;
-          query += ` OR p.parent_login = $${params.length}`;
-        }
-
-        const childrenRes = await pool.query(query, params);
+          WHERE p.id = ANY($1::int[])
+          ORDER BY p.name ASC
+        `, [familyIds]);
         res.json(childrenRes.rows);
       } catch (e) {
         console.error('Fetch children error:', e);
@@ -6522,7 +6562,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         const { name: groupName, location_id: locId, coach_id: coachId } = gRes.rows[0];
 
         const sRes = await pool.query(`
-          SELECT s.*, c.name as coach_name, l.name as location_name
+          SELECT s.*, c.name as coach_name, l.name as location_name, l.address as location_address, l.map_link as location_map_link
           FROM schedule s
           LEFT JOIN coaches c ON s.coach_id = c.id
           LEFT JOIN locations l ON s.location_id = l.id
