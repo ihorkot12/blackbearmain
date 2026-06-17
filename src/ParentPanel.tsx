@@ -81,6 +81,35 @@ const normalizeSkillChecklist = (value: unknown): string[] => {
   return label ? [label] : [];
 };
 
+const BELT_FLOW = [
+  'Білий',
+  'Оранжевий',
+  'Оранжевий зі смужкою',
+  'Синій',
+  'Синій зі сріблястою смужкою',
+  'Жовтий',
+  'Жовтий зі смужкою',
+  'Зелений',
+  'Зелений зі смужкою',
+  'Коричневий',
+  'Коричневий зі смужкою',
+  'Чорний'
+];
+
+const getNextBeltName = (belt?: string) => {
+  const current = normalizeBeltName(belt);
+  const currentIndex = BELT_FLOW.findIndex(item => item.toLowerCase() === current.toLowerCase());
+  if (currentIndex >= 0 && currentIndex < BELT_FLOW.length - 1) return BELT_FLOW[currentIndex + 1];
+  if (currentIndex === BELT_FLOW.length - 1) return 'підтвердження рівня';
+  return 'наступний пояс';
+};
+
+const formatTrainingTime = (entry?: any) => {
+  if (!entry) return 'Розклад ще не призначено';
+  const time = [entry.start_time, entry.end_time].filter(Boolean).join(' - ');
+  return [entry.day_of_week, time].filter(Boolean).join(', ');
+};
+
 const getParentAuthHeaders = () => {
   const token = localStorage.getItem('parent_token');
   return token ? { Authorization: `Bearer ${token}` } : {};
@@ -391,6 +420,20 @@ const ParentPanel = () => {
   const currentPoints = ratingsSummary?.currentChild?.total_points ?? participant?.rank_points ?? 0;
   const totalAchievements = badges.length + events.length;
   const currentSkillChecklist = normalizeSkillChecklist(participant?.skill_checklist);
+  const isAdultMember = participant?.member_type === 'adult';
+  const nextTraining = schedule?.[0];
+  const nextTrainingText = formatTrainingTime(nextTraining);
+  const nextTrainingMeta = [
+    nextTraining?.group_name || participant?.group_name,
+    nextTraining?.location_name,
+    nextTraining?.coach_name ? `тренер: ${nextTraining.coach_name}` : ''
+  ].filter(Boolean).join(' • ');
+  const nextBeltName = getNextBeltName(participant?.belt);
+  const examReadiness = clampProgress(participant?.exam_readiness);
+  const remainingReadiness = Math.max(0, 100 - examReadiness);
+  const athleteBadges = badges.length > 0
+    ? badges.slice(0, 4).map((badge: any) => badge.name || badge.title || badge.type || 'Відзнака')
+    : currentSkillChecklist.slice(0, 4);
 
   if (loading) {
     return (
@@ -405,19 +448,19 @@ const ParentPanel = () => {
       <div className="min-h-screen bg-zinc-950 text-white font-sans selection:bg-red-600/30 overflow-x-hidden">
         <Toaster position="top-right" theme="dark" richColors />
         
-        {/* Child Mode Header */}
+        {/* Athlete Mode Header */}
         <div className="fixed top-0 left-0 right-0 h-20 bg-zinc-900 border-b border-white/5 z-50 flex items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center shadow-[0_0_20px_rgba(220,38,38,0.4)]">
               <Trophy className="text-white" size={20} />
             </div>
-            <span className="text-lg font-black uppercase tracking-tighter">Шлях <span className="text-red-600">Воїна</span></span>
+            <span className="text-lg font-black uppercase tracking-tighter">Режим <span className="text-red-600">спортсмена</span></span>
           </div>
           <button 
             onClick={() => setIsChildMode(false)}
             className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-xl text-xs font-black uppercase tracking-widest transition-all border border-white/5"
           >
-            Батьківський режим
+            {isAdultMember ? 'Мій кабінет' : 'Кабінет батьків'}
           </button>
         </div>
 
@@ -440,7 +483,7 @@ const ParentPanel = () => {
                 <h1 className="text-4xl font-black uppercase tracking-tighter mb-2">{participant?.name}</h1>
                 <div className="flex flex-wrap justify-center md:justify-start gap-3">
                   <span className="px-4 py-1.5 bg-white/5 rounded-full text-xs font-bold text-zinc-400 border border-white/5">
-                    {participant?.group_name}
+                    {participant?.group_name || 'Групу не призначено'}
                   </span>
                   <span className="px-4 py-1.5 bg-red-600/20 rounded-full text-xs font-bold text-red-500 border border-red-600/20">
                     {normalizeBeltName(participant?.belt)} пояс
@@ -450,14 +493,14 @@ const ParentPanel = () => {
 
               <div className="flex gap-4">
                 <div className="text-center bg-white/5 p-4 rounded-3xl border border-white/5 min-w-[100px]">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Streak</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Серія</div>
                   <div className="text-2xl font-black text-orange-500 flex items-center justify-center gap-1">
                     <Flame size={20} />
                     {participant?.streak || 0}
                   </div>
                 </div>
                 <div className="text-center bg-white/5 p-4 rounded-3xl border border-white/5 min-w-[100px]">
-                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Points</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-1">Бали</div>
                   <div className="text-2xl font-black text-yellow-500 flex items-center justify-center gap-1">
                     <Star size={20} />
                     {participant?.rank_points || 0}
@@ -477,18 +520,20 @@ const ParentPanel = () => {
             <div className="bg-zinc-900/50 p-8 rounded-[3rem] border border-white/5">
               <div className="flex justify-between items-end mb-4">
                 <div>
-                  <div className="text-4xl font-black text-white mb-1">{clampProgress(participant?.exam_readiness)}%</div>
+                  <div className="text-4xl font-black text-white mb-1">{examReadiness}%</div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Готовність до іспиту</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-zinc-300 mb-1">Наступний: Жовтий</div>
-                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Залишилось 20%</div>
+                  <div className="text-sm font-bold text-zinc-300 mb-1">Наступний: {nextBeltName}</div>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+                    {remainingReadiness === 0 ? 'Готово до атестації' : `Залишилось ${remainingReadiness}%`}
+                  </div>
                 </div>
               </div>
               <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
                 <motion.div 
                   initial={{ width: 0 }}
-                  animate={{ width: `${clampProgress(participant?.exam_readiness)}%` }}
+                  animate={{ width: `${examReadiness}%` }}
                   className="h-full bg-gradient-to-r from-red-600 to-orange-500 rounded-full shadow-[0_0_15px_rgba(220,38,38,0.5)]"
                 />
               </div>
@@ -497,27 +542,39 @@ const ParentPanel = () => {
 
           {/* Badges Grid */}
           <section className="space-y-6">
-            <h2 className="text-2xl font-black uppercase tracking-tight px-2">Мої Нагороди</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {['Дисципліна', 'Техніка', 'Сила', 'Швидкість'].map((badge, i) => (
-                <div key={i} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-white/5 flex flex-col items-center text-center group hover:bg-white/5 transition-all cursor-pointer">
-                  <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                    <Award className={i < 2 ? "text-yellow-500" : "text-zinc-700"} size={32} />
+            <h2 className="text-2xl font-black uppercase tracking-tight px-2">Мої відзнаки</h2>
+            {athleteBadges.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {athleteBadges.map((badge, i) => (
+                  <div key={`${badge}-${i}`} className="bg-zinc-900/30 p-6 rounded-[2.5rem] border border-white/5 flex flex-col items-center text-center group hover:bg-white/5 transition-all cursor-pointer">
+                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                      <Award className="text-yellow-500" size={32} />
+                    </div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-white">{badge}</div>
                   </div>
-                  <div className={`text-[10px] font-black uppercase tracking-widest ${i < 2 ? "text-white" : "text-zinc-600"}`}>{badge}</div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-zinc-900/30 p-8 rounded-[2.5rem] border border-dashed border-white/10 text-center">
+                <Award className="mx-auto text-zinc-700 mb-4" size={36} />
+                <div className="text-xs font-black uppercase tracking-widest text-zinc-500">
+                  Відзнаки зʼявляться після оцінок тренера або подій
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </section>
 
           {/* Next Class Alert */}
-          <section className="bg-red-600 p-8 rounded-[3rem] shadow-2xl shadow-red-600/20 flex items-center justify-between">
+          <section className={`${nextTraining ? 'bg-red-600 shadow-red-600/20' : 'bg-zinc-900 border border-white/5'} p-8 rounded-[3rem] shadow-2xl flex items-center justify-between gap-6`}>
             <div>
               <div className="text-[10px] font-black uppercase tracking-widest text-white/60 mb-1">Наступне тренування</div>
-              <div className="text-2xl font-black text-white">Сьогодні о 18:00</div>
+              <div className="text-2xl font-black text-white">{nextTrainingText}</div>
+              {nextTrainingMeta && (
+                <div className="text-xs font-bold text-white/70 mt-2">{nextTrainingMeta}</div>
+              )}
             </div>
             <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center">
-              <Zap className="text-white" size={32} />
+              {nextTraining ? <Zap className="text-white" size={32} /> : <Clock className="text-zinc-500" size={32} />}
             </div>
           </section>
         </main>
@@ -1254,7 +1311,7 @@ const ParentPanel = () => {
                       </div>
                       <div className="text-right">
                         <div className="text-xs font-bold text-red-500 mb-1">Наступний рівень</div>
-                        <div className="text-sm font-black uppercase tracking-widest text-zinc-300">Жовтий пояс</div>
+                        <div className="text-sm font-black uppercase tracking-widest text-zinc-300">{nextBeltName}</div>
                       </div>
                     </div>
                     <div className="h-4 bg-white/5 rounded-full overflow-hidden border border-white/5 p-1">
