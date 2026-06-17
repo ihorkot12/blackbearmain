@@ -10,7 +10,7 @@ import helmet from 'helmet';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
-import * as xlsx from 'xlsx';
+import ExcelJS from 'exceljs';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
 const { Pool } = pkg;
@@ -29,8 +29,68 @@ const normalizeBeltName = (belt: unknown) => {
     .replace(/\s+зі\s+смужкою/gi, ' зі сріблястою смужкою');
 };
 
-// Session secret - MUST be stable on Vercel
-const SESSION_SECRET = process.env.SESSION_SECRET || 'black-bear-default-secret-change-me';
+// Session secret - MUST be stable on Vercel. Prefer an explicit secret, but
+// fall back to DATABASE_URL-derived entropy instead of a public hard-coded key.
+const SESSION_SECRET =
+  process.env.SESSION_SECRET ||
+  process.env.AUTH_TOKEN_SECRET ||
+  (process.env.DATABASE_URL
+    ? crypto.createHash('sha256').update(`black-bear-session:${process.env.DATABASE_URL}`).digest('hex')
+    : 'black-bear-local-dev-secret');
+
+if (!process.env.SESSION_SECRET && !process.env.AUTH_TOKEN_SECRET && process.env.DATABASE_URL) {
+  console.warn('SESSION_SECRET/AUTH_TOKEN_SECRET is not set; using a DATABASE_URL-derived fallback.');
+}
+
+type AuthTokenRole = 'admin' | 'coach' | 'parent';
+type AuthTokenPayload = {
+  sub: string;
+  role: AuthTokenRole;
+  accessId?: number | null;
+  iat: number;
+  exp: number;
+};
+
+const AUTH_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60;
+const AUTH_TOKEN_PREFIX = 'bb1';
+
+const signAuthTokenPayload = (encodedPayload: string) =>
+  crypto.createHmac('sha256', SESSION_SECRET).update(encodedPayload).digest('base64url');
+
+const createAuthToken = (params: { id: number | string; role: AuthTokenRole; accessId?: number | null }) => {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: AuthTokenPayload = {
+    sub: String(params.id),
+    role: params.role,
+    accessId: params.accessId ?? null,
+    iat: now,
+    exp: now + AUTH_TOKEN_TTL_SECONDS
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  return `${AUTH_TOKEN_PREFIX}.${encodedPayload}.${signAuthTokenPayload(encodedPayload)}`;
+};
+
+const verifyAuthToken = (token: string): AuthTokenPayload | null => {
+  const parts = token.split('.');
+  if (parts.length !== 3 || parts[0] !== AUTH_TOKEN_PREFIX) return null;
+
+  const [, encodedPayload, signature] = parts;
+  const expectedSignature = signAuthTokenPayload(encodedPayload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (signatureBuffer.length !== expectedBuffer.length) return null;
+  if (!crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8')) as AuthTokenPayload;
+    if (!payload.sub || !/^\d+$/.test(payload.sub)) return null;
+    if (!['admin', 'coach', 'parent'].includes(payload.role)) return null;
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -700,15 +760,67 @@ async function startServer() {
     resave: false,
     saveUninitialized: false,
     proxy: true,
+    name: 'bb.sid',
     cookie: {
-      secure: true,
+      secure: process.env.NODE_ENV === 'production' || process.env.VERCEL === '1',
       httpOnly: true,
-      sameSite: 'none',
+      sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
     }
   }));
 
+  const configuredAllowedOrigins = new Set(
+    [
+      process.env.APP_URL,
+      'https://shin-karate.kyiv.ua',
+      'https://www.shin-karate.kyiv.ua',
+      ...(process.env.ALLOWED_ORIGINS || '').split(',')
+    ]
+      .filter(Boolean)
+      .map((origin) => String(origin).trim().replace(/\/$/, ''))
+      .filter(Boolean)
+  );
+
+  const isTrustedOrigin = (origin: string, req: express.Request) => {
+    try {
+      const parsedOrigin = new URL(origin);
+      const normalizedOrigin = parsedOrigin.origin.replace(/\/$/, '');
+      if (configuredAllowedOrigins.has(normalizedOrigin)) return true;
+
+      const requestHost = req.get('host')?.toLowerCase();
+      if (requestHost && parsedOrigin.host.toLowerCase() === requestHost) return true;
+
+      if (process.env.VERCEL_URL && parsedOrigin.host.toLowerCase() === process.env.VERCEL_URL.toLowerCase()) {
+        return true;
+      }
+
+      return ['localhost', '127.0.0.1', '::1'].includes(parsedOrigin.hostname);
+    } catch {
+      return false;
+    }
+  };
+
+  app.use((req, res, next) => {
+    if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+
+    const origin = req.headers.origin;
+    if (!origin) return next();
+    if (Array.isArray(origin) || !isTrustedOrigin(origin, req)) {
+      return res.status(403).json({ error: 'Forbidden origin' });
+    }
+    next();
+  });
+
   const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
+
+  const setFreshSession = (req: express.Request, values: Record<string, any>) =>
+    new Promise<void>((resolve, reject) => {
+      req.session.regenerate((regenerateError) => {
+        if (regenerateError) return reject(regenerateError);
+        Object.assign(req.session as any, values);
+        req.session.save((saveError) => saveError ? reject(saveError) : resolve());
+      });
+    });
 
   const requireAuth = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const authHeader = req.headers.authorization;
@@ -717,19 +829,17 @@ async function startServer() {
       return next();
     }
 
-    // Check for custom tokens (simple implementation for now)
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
-      const [id, role] = token.split('-');
+      const tokenPayload = verifyAuthToken(authHeader.slice('Bearer '.length));
       try {
-        if (role === 'parent') {
-          const result = await pool.query("SELECT id, name, 'parent' as role FROM participants WHERE id::text = $1", [id]);
+        if (tokenPayload?.role === 'parent') {
+          const result = await pool.query("SELECT id, name, 'parent' as role FROM participants WHERE id::text = $1", [tokenPayload.sub]);
           if (result.rows.length > 0) {
             (req as any).user = result.rows[0];
             return next();
           }
-        } else {
-          const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [id]);
+        } else if (tokenPayload) {
+          const result = await pool.query("SELECT * FROM admin_users WHERE id::text = $1", [tokenPayload.sub]);
           if (result.rows.length > 0) {
             (req as any).user = result.rows[0];
             return next();
@@ -787,12 +897,11 @@ async function startServer() {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) return null;
 
-    const token = authHeader.slice('Bearer '.length);
-    const [id, role] = token.split('-');
-    if (role !== 'parent' || !/^\d+$/.test(id)) return null;
+    const tokenPayload = verifyAuthToken(authHeader.slice('Bearer '.length));
+    if (tokenPayload?.role !== 'parent') return null;
 
     try {
-      const result = await pool.query("SELECT id FROM participants WHERE id = $1", [Number(id)]);
+      const result = await pool.query("SELECT id FROM participants WHERE id = $1", [Number(tokenPayload.sub)]);
       return result.rows[0]?.id ?? null;
     } catch (e) {
       console.error('Parent token auth error:', e);
@@ -956,12 +1065,11 @@ async function startServer() {
         }
 
         const user = result.rows[0];
-        (req.session as any).userId = user.id;
-        (req.session as any).role = user.role || 'admin';
-        (req.session as any).userName = user.name;
-
-        await new Promise((resolve, reject) => {
-          req.session.save((err) => err ? reject(err) : resolve(null));
+        const role = (user.role === 'coach' ? 'coach' : 'admin') as AuthTokenRole;
+        await setFreshSession(req, {
+          userId: user.id,
+          role,
+          userName: user.name
         });
 
         return res.send(`
@@ -970,9 +1078,9 @@ async function startServer() {
               <script>
                 if (window.opener) {
                   window.opener.postMessage({ type: 'instagram_login_success', user: ${JSON.stringify({
-                    role: user.role,
+                    role,
                     name: user.name,
-                    token: `${user.id}-${user.role}`
+                    token: createAuthToken({ id: user.id, role })
                   })} }, '*');
                   window.close();
                 } else {
@@ -1742,6 +1850,27 @@ async function startServer() {
   const imageCache = new Map<string, { contentType: string, buffer: Buffer, timestamp: number }>();
   const CACHE_TTL = 15 * 60 * 1000; // 15 minutes cache
   const IMAGE_CACHE_TTL = 60 * 60 * 1000; // 1 hour server-side cache
+  const MAX_IMAGE_UPLOAD_BYTES = Number(process.env.MAX_IMAGE_UPLOAD_BYTES || 6 * 1024 * 1024);
+  const ALLOWED_IMAGE_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+  const parseSafeImageData = (image: unknown) => {
+    if (typeof image !== 'string' || !image.startsWith('data:image/')) return null;
+    const matches = image.match(/^data:([A-Za-z0-9.+/-]+);base64,([A-Za-z0-9+/=\r\n]+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const contentType = matches[1].toLowerCase();
+    if (!ALLOWED_IMAGE_CONTENT_TYPES.has(contentType)) return null;
+
+    const base64Payload = matches[2].replace(/\s/g, '');
+    const buffer = Buffer.from(base64Payload, 'base64');
+    if (!buffer.length || buffer.length > MAX_IMAGE_UPLOAD_BYTES) return null;
+
+    return {
+      contentType,
+      buffer,
+      dataUrl: `data:${contentType};base64,${base64Payload}`
+    };
+  };
 
   const invalidateInitCache = () => {
     initCache = null;
@@ -1769,21 +1898,17 @@ async function startServer() {
         return res.status(404).send("Image not found");
       }
 
-      const base64Data = result.rows[0].value;
-      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
+      const imageData = parseSafeImageData(result.rows[0].value);
+      if (!imageData) {
         return res.status(400).send("Invalid image format");
       }
 
-      const contentType = matches[1];
-      const buffer = Buffer.from(matches[2], 'base64');
-
       // Update cache
-      imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
+      imageCache.set(cacheKey, { contentType: imageData.contentType, buffer: imageData.buffer, timestamp: Date.now() });
 
-      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Type', imageData.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
-      res.send(buffer);
+      res.send(imageData.buffer);
     } catch (e) {
       console.error(e);
       res.status(500).send("Internal server error");
@@ -1792,6 +1917,9 @@ async function startServer() {
 
   app.get("/api/images/coaches/:id", async (req, res) => {
     if (!pool) return res.status(500).send("Database not configured");
+    if (!/^\d+$/.test(req.params.id)) {
+      return res.status(400).send("Invalid coach id");
+    }
     const cacheKey = `coach_${req.params.id}`;
     const cached = imageCache.get(cacheKey);
 
@@ -1807,21 +1935,17 @@ async function startServer() {
         return res.status(404).send("Image not found");
       }
 
-      const base64Data = result.rows[0].photo;
-      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
+      const imageData = parseSafeImageData(result.rows[0].photo);
+      if (!imageData) {
         return res.status(400).send("Invalid image format");
       }
 
-      const contentType = matches[1];
-      const buffer = Buffer.from(matches[2], 'base64');
-
       // Update cache
-      imageCache.set(cacheKey, { contentType, buffer, timestamp: Date.now() });
+      imageCache.set(cacheKey, { contentType: imageData.contentType, buffer: imageData.buffer, timestamp: Date.now() });
 
-      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Type', imageData.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
-      res.send(buffer);
+      res.send(imageData.buffer);
     } catch (e) {
       console.error(e);
       res.status(500).send("Internal server error");
@@ -2389,26 +2513,22 @@ async function startServer() {
         }
 
         console.log('Parent login successful:', user.id);
-        (req.session as any).userId = user.id;
-        (req.session as any).participantId = user.id;
-        (req.session as any).parentAccessId = user.access_id || null;
-        (req.session as any).parentAccessType = user.access_type || 'primary';
-        (req.session as any).role = 'parent';
-        (req.session as any).userName = user.access_name || user.name;
+        await setFreshSession(req, {
+          userId: user.id,
+          participantId: user.id,
+          parentAccessId: user.access_id || null,
+          parentAccessType: user.access_type || 'primary',
+          role: 'parent',
+          userName: user.access_name || user.name
+        });
 
-        return req.session.save((err) => {
-          if (err) {
-            console.error('Session save error:', err);
-            return res.status(500).json({ error: 'Session save failed' });
-          }
-          res.json({
-            success: true,
-            role: 'parent',
-            name: user.access_name || user.name,
-            participantId: user.id,
-            token: `${user.id}-parent`,
-            redirect: '/parent'
-          });
+        return res.json({
+          success: true,
+          role: 'parent',
+          name: user.access_name || user.name,
+          participantId: user.id,
+          token: createAuthToken({ id: user.id, role: 'parent', accessId: user.access_id || null }),
+          redirect: '/parent'
         });
       }
 
@@ -2434,23 +2554,20 @@ async function startServer() {
         }
 
         console.log('Admin login successful:', user.id);
-        (req.session as any).userId = user.id;
-        (req.session as any).role = user.role || 'admin';
-        (req.session as any).userName = user.name;
+        const role = (user.role === 'coach' ? 'coach' : 'admin') as AuthTokenRole;
+        await setFreshSession(req, {
+          userId: user.id,
+          role,
+          userName: user.name
+        });
 
-        return req.session.save((err) => {
-          if (err) {
-            console.error('Session save error:', err);
-            return res.status(500).json({ error: 'Session save failed' });
-          }
-          res.json({
-            success: true,
-            role: user.role || 'admin',
-            name: user.name,
-            id: user.id,
-            token: `${user.id}-${user.role || 'admin'}`,
-            redirect: '/admin'
-          });
+        return res.json({
+          success: true,
+          role,
+          name: user.name,
+          id: user.id,
+          token: createAuthToken({ id: user.id, role }),
+          redirect: '/admin'
         });
       }
     } catch (error) {
@@ -2459,8 +2576,18 @@ async function startServer() {
     }
   };
 
-  app.post('/api/login', loginHandler);
-  app.post('/api/auth/login', loginHandler);
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    message: { error: 'Too many login attempts. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    validate: false
+  });
+
+  app.post('/api/login', authLimiter, loginHandler);
+  app.post('/api/auth/login', authLimiter, loginHandler);
 
   app.post('/api/auth/logout', (req, res) => {
     req.session.destroy(() => {
@@ -2532,15 +2659,41 @@ async function startServer() {
   });
 
   app.post('/api/auth/change-password', requireAuth, async (req, res) => {
-    const { newPassword } = req.body;
-    if (!newPassword) return res.status(400).json({ error: 'New password required' });
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
 
-    // In this environment, we use process.env for the password.
-    // However, for a "real" app we'd update a database.
-    // Since we can't update process.env permanently, we'll just mock success
-    // or tell the user how to do it.
-    console.log(`Password change requested to: ${newPassword}`);
-    res.json({ success: true, message: 'Password change simulated. Please update ADMIN_PASSWORD in your environment variables for a permanent change.' });
+    const user = (req as any).user;
+    if (!user?.id || user.role === 'parent') {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current and new password are required' });
+    }
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    }
+
+    try {
+      const result = await pool.query("SELECT password FROM admin_users WHERE id = $1 LIMIT 1", [user.id]);
+      if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });
+
+      const storedPassword = result.rows[0].password;
+      const passwordMatches = isBcryptHash(storedPassword)
+        ? await bcrypt.compare(currentPassword, storedPassword)
+        : currentPassword === storedPassword;
+
+      if (!passwordMatches) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      const hashedPassword = await bcrypt.hash(String(newPassword), 10);
+      await pool.query("UPDATE admin_users SET password = $1 WHERE id = $2", [hashedPassword, user.id]);
+      res.json({ success: true });
+    } catch (e) {
+      console.error('Password change failed:', e);
+      res.status(500).json({ error: 'Failed to change password' });
+    }
   });
 
   app.get("/api/participants/export", requireAuth, async (req, res) => {
@@ -2553,15 +2706,40 @@ async function startServer() {
         ORDER BY p.name ASC
       `);
 
-      const worksheet = xlsx.utils.json_to_sheet(result.rows);
-      const workbook = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(workbook, worksheet, "Participants");
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Participants");
+      const rows = result.rows;
+      const columns = Object.keys(rows[0] || {
+        id: '',
+        name: '',
+        member_type: '',
+        age: '',
+        birthday: '',
+        email: '',
+        belt: '',
+        rank_points: '',
+        payment_status: '',
+        status: '',
+        parent_name: '',
+        phone: '',
+        parent_phone: '',
+        parent_login: '',
+        telegram_chat_id: '',
+        group_name: ''
+      });
 
-      const buffer = xlsx.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      worksheet.columns = columns.map((key) => ({
+        header: key,
+        key,
+        width: Math.min(32, Math.max(12, key.length + 4))
+      }));
+      rows.forEach((row: any) => worksheet.addRow(row));
+
+      const buffer = await workbook.xlsx.writeBuffer();
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename=participants.xlsx');
-      res.send(buffer);
+      res.send(Buffer.from(buffer as ArrayBuffer));
     } catch (e) {
       console.error('Export failed:', e);
       res.status(500).json({ error: "Failed to export participants" });
@@ -2778,9 +2956,155 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   });
 
   // Participants
-  const upload = multer({ storage: multer.memoryStorage() });
+  const MAX_IMPORT_FILE_BYTES = Number(process.env.MAX_IMPORT_FILE_BYTES || 5 * 1024 * 1024);
+  const MAX_IMPORT_ROWS = Number(process.env.MAX_IMPORT_ROWS || 3000);
+  const IMPORT_FILE_MIME_TYPES = new Set([
+    'text/csv',
+    'application/csv',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/octet-stream'
+  ]);
 
-  app.post("/api/participants/import", requireAuth, upload.single('file'), async (req, res) => {
+  const tableRowsToObjects = (rows: any[][]) => {
+    const cleanRows = rows.filter((row) => row.some((cell) => String(cell ?? '').trim() !== ''));
+    if (cleanRows.length === 0) return [];
+
+    const headers = cleanRows[0].map((cell, index) => {
+      const header = String(cell ?? '').replace(/^\ufeff/, '').trim();
+      return header || `column_${index + 1}`;
+    });
+
+    return cleanRows.slice(1).map((row) => {
+      const record: Record<string, any> = {};
+      headers.forEach((header, index) => {
+        record[header] = row[index] ?? '';
+      });
+      return record;
+    });
+  };
+
+  const parseCsvRecords = (text: string) => {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let inQuotes = false;
+
+    for (let index = 0; index < text.length; index += 1) {
+      const char = text[index];
+
+      if (inQuotes) {
+        if (char === '"') {
+          if (text[index + 1] === '"') {
+            cell += '"';
+            index += 1;
+          } else {
+            inQuotes = false;
+          }
+        } else {
+          cell += char;
+        }
+      } else if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        row.push(cell);
+        cell = '';
+      } else if (char === '\n') {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else if (char !== '\r') {
+        cell += char;
+      }
+    }
+
+    row.push(cell);
+    rows.push(row);
+    return tableRowsToObjects(rows);
+  };
+
+  const normalizeExcelCellValue = (value: any) => {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date) return value.toISOString().split('T')[0];
+    if (typeof value !== 'object') return value;
+    if (value.text !== undefined) return value.text;
+    if (value.result !== undefined) return value.result;
+    if (Array.isArray(value.richText)) {
+      return value.richText.map((part: any) => part?.text || '').join('');
+    }
+    return String(value);
+  };
+
+  const worksheetToRecords = (worksheet?: ExcelJS.Worksheet) => {
+    if (!worksheet) return [];
+    const rows: any[][] = [];
+    const columnCount = Math.min(Math.max(worksheet.columnCount || 0, 1), 80);
+
+    worksheet.eachRow({ includeEmpty: false }, (row) => {
+      const values: any[] = [];
+      for (let column = 1; column <= columnCount; column += 1) {
+        values.push(normalizeExcelCellValue(row.getCell(column).value));
+      }
+      rows.push(values);
+    });
+
+    return tableRowsToObjects(rows);
+  };
+
+  const readImportRecordsFromBuffer = async (buffer: Buffer, originalName: string, mimeType = '') => {
+    const isCsv = mimeType.includes('csv') || /\.csv$/i.test(originalName);
+    if (isCsv) {
+      return parseCsvRecords(buffer.toString('utf8'));
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as any);
+    return worksheetToRecords(workbook.worksheets[0]);
+  };
+
+  const getSafeGoogleSheetCsvUrl = (sheetUrl: unknown) => {
+    const rawUrl = String(sheetUrl || '').trim();
+    if (!rawUrl) return null;
+
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol !== 'https:' || parsed.hostname !== 'docs.google.com') return null;
+      const match = parsed.pathname.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      if (!match) return null;
+
+      const gid = parsed.searchParams.get('gid');
+      return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gid ? `&gid=${encodeURIComponent(gid)}` : ''}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: MAX_IMPORT_FILE_BYTES,
+      files: 1
+    },
+    fileFilter: (_req, file, cb) => {
+      const isAllowedExtension = /\.(csv|xlsx)$/i.test(file.originalname || '');
+      const isAllowedMime = IMPORT_FILE_MIME_TYPES.has(file.mimetype);
+      if (isAllowedExtension || isAllowedMime) return cb(null, true);
+      cb(new Error('Only CSV and XLSX files are allowed'));
+    }
+  });
+
+  const handleImportUpload: express.RequestHandler = (req, res, next) => {
+    upload.single('file')(req, res, (error: any) => {
+      if (!error) return next();
+      if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: "Import file is too large" });
+      }
+      return res.status(400).json({ error: error.message || "Invalid import file" });
+    });
+  };
+
+  app.post("/api/participants/import", requireAuth, handleImportUpload, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
 
     let data: any[] = [];
@@ -2788,39 +3112,34 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       if (req.file) {
-        const isCsvFile = req.file.mimetype.includes('csv') || /\.csv$/i.test(req.file.originalname || '');
-        const workbook = isCsvFile
-          ? xlsx.read(req.file.buffer.toString('utf8'), { type: 'string' })
-          : xlsx.read(req.file.buffer, { type: 'buffer' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
+        data = await readImportRecordsFromBuffer(req.file.buffer, req.file.originalname || '', req.file.mimetype || '');
       } else if (sheetUrl) {
-        let fetchUrl = sheetUrl;
-        if (sheetUrl.includes('docs.google.com/spreadsheets')) {
-          const match = sheetUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
-          if (match) {
-            const gid = sheetUrl.match(/[?&]gid=([^&]+)/)?.[1];
-            fetchUrl = `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gid ? `&gid=${gid}` : ''}`;
-          }
+        const fetchUrl = getSafeGoogleSheetCsvUrl(sheetUrl);
+        if (!fetchUrl) {
+          return res.status(400).json({ error: "Only Google Sheets URLs are allowed" });
         }
 
-        const response = await fetch(fetchUrl);
+        const response = await fetch(fetchUrl, { timeout: 10000, size: MAX_IMPORT_FILE_BYTES } as any);
         if (!response.ok) throw new Error('Failed to fetch Google Sheet');
-        const contentType = response.headers.get('content-type') || '';
-        const isCsvResponse = contentType.includes('csv') || fetchUrl.includes('format=csv');
-        const workbook = isCsvResponse
-          ? xlsx.read(await response.text(), { type: 'string' })
-          : xlsx.read(new Uint8Array(await response.arrayBuffer()), { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        data = xlsx.utils.sheet_to_json(worksheet, { defval: '' });
+        const contentLength = Number(response.headers.get('content-length') || 0);
+        if (contentLength > MAX_IMPORT_FILE_BYTES) {
+          return res.status(413).json({ error: "Google Sheet export is too large" });
+        }
+        const csvText = await response.text();
+        if (Buffer.byteLength(csvText, 'utf8') > MAX_IMPORT_FILE_BYTES) {
+          return res.status(413).json({ error: "Google Sheet export is too large" });
+        }
+        data = parseCsvRecords(csvText);
       } else {
         return res.status(400).json({ error: "No file or URL provided" });
       }
 
       if (data.length === 0) {
         return res.status(400).json({ error: "No data found in file or URL" });
+      }
+
+      if (data.length > MAX_IMPORT_ROWS) {
+        return res.status(413).json({ error: `Import is limited to ${MAX_IMPORT_ROWS} rows` });
       }
 
       const normalizeImportKey = (value: any) =>
@@ -2859,12 +3178,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         if (isBlank(value)) return undefined;
 
         if (typeof value === 'number') {
-          const xlsxModule = xlsx as any;
-          const parseExcelDate = xlsxModule.SSF?.parse_date_code || xlsxModule.default?.SSF?.parse_date_code;
-          const parsed = parseExcelDate?.(value);
-          if (parsed) {
-            return `${parsed.y}-${String(parsed.m).padStart(2, '0')}-${String(parsed.d).padStart(2, '0')}`;
-          }
+          const parsed = new Date(Math.round((value - 25569) * 86400 * 1000));
+          if (!isNaN(parsed.getTime())) return parsed.toISOString().split('T')[0];
         }
 
         const raw = String(value).trim();
@@ -5229,20 +5544,15 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.post("/api/upload", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     const { image } = req.body;
-    if (!image || !image.startsWith('data:image/')) {
-      return res.status(400).json({ error: "Invalid image data" });
+    const imageData = parseSafeImageData(image);
+    if (!imageData) {
+      return res.status(400).json({ error: "Invalid image data or image is too large" });
     }
 
     try {
-      const matches = image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        return res.status(400).json({ error: "Invalid image format" });
-      }
-
-      const contentType = matches[1];
       const result = await pool.query(
         "INSERT INTO images (data, content_type) VALUES ($1, $2) RETURNING id",
-        [image, contentType]
+        [imageData.dataUrl, imageData.contentType]
       );
 
       const id = result.rows[0].id;
@@ -5256,6 +5566,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   app.get("/api/images/:id", async (req, res) => {
     if (!pool) return res.status(500).send("Database not configured");
     const id = req.params.id;
+    if (!/^\d+$/.test(id)) {
+      return res.status(400).send("Invalid image id");
+    }
     const cacheKey = `img_${id}`;
     const cached = imageCache.get(cacheKey);
 
@@ -5271,20 +5584,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         return res.status(404).send("Image not found");
       }
 
-      const { data, content_type } = result.rows[0];
-      const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
+      const { data } = result.rows[0];
+      const imageData = parseSafeImageData(data);
+      if (!imageData) {
         return res.status(400).send("Invalid image format in database");
       }
 
-      const buffer = Buffer.from(matches[2], 'base64');
-
       // Update cache
-      imageCache.set(cacheKey, { contentType: content_type, buffer, timestamp: Date.now() });
+      imageCache.set(cacheKey, { contentType: imageData.contentType, buffer: imageData.buffer, timestamp: Date.now() });
 
-      res.setHeader('Content-Type', content_type);
+      res.setHeader('Content-Type', imageData.contentType);
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.send(buffer);
+      res.send(imageData.buffer);
     } catch (e) {
       console.error(e);
       res.status(500).send("Internal server error");
@@ -5447,7 +5758,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         if (familyIds.includes(Number(childId))) {
           (req.session as any).participantId = childId;
           return req.session.save(() => {
-            res.json({ success: true, token: `${childId}-parent` });
+            res.json({ success: true, token: createAuthToken({ id: childId, role: 'parent' }) });
           });
         }
         res.status(403).json({ error: "Forbidden" });
