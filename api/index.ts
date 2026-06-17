@@ -996,13 +996,15 @@ async function startServer() {
     if (loginParams.length > 0) {
       queryParams.push(loginParams);
       clauses.push(`
-        (LOWER(TRIM(COALESCE(p.parent_login, ''))) = ANY($${queryParams.length}::text[])
-         OR EXISTS (
-           SELECT 1
-           FROM participant_accesses pa
-           WHERE pa.participant_id = p.id
-             AND LOWER(TRIM(COALESCE(pa.login, ''))) = ANY($${queryParams.length}::text[])
-         )
+        (
+          LOWER(TRIM(COALESCE(p.parent_login, ''))) = ANY($${queryParams.length}::text[])
+          OR EXISTS (
+            SELECT 1
+            FROM participant_accesses pa
+            WHERE pa.participant_id = p.id
+              AND LOWER(TRIM(COALESCE(pa.login, ''))) = ANY($${queryParams.length}::text[])
+          )
+        )
       `);
     }
 
