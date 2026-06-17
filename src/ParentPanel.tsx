@@ -23,6 +23,7 @@ import {
   Users,
   Bell,
   BookOpen,
+  ClipboardCheck,
   Plus,
   Trash2
 } from 'lucide-react';
@@ -30,6 +31,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
 import { normalizeBeltName } from './belts';
 import KarateManual from './KarateManual';
+import { HomeworkParentDiary } from './HomeworkModules';
 
 const clampProgress = (value: unknown) => {
   const numericValue = typeof value === 'number' ? value : Number(value);
@@ -567,6 +569,7 @@ const ParentPanel = () => {
                 { id: 'schedule', label: 'Розклад', icon: Clock },
                 { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
                 { id: 'progress', label: 'Прогрес', icon: Trophy },
+                { id: 'homework', label: 'Домашні', icon: ClipboardCheck },
                 { id: 'manual', label: 'Методичка', icon: BookOpen },
                 { id: 'payments', label: 'Оплата', icon: CreditCard },
                 { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
@@ -661,6 +664,7 @@ const ParentPanel = () => {
             { id: 'schedule', label: 'Розклад', icon: Clock },
             { id: 'attendance', label: 'Відвідуваність', icon: Calendar },
             { id: 'progress', label: 'Прогрес', icon: Trophy },
+            { id: 'homework', label: 'Домашні', icon: ClipboardCheck },
             { id: 'manual', label: 'Методичка', icon: BookOpen },
             { id: 'payments', label: 'Оплата', icon: CreditCard },
             { id: 'notifications', label: 'Сповіщення', icon: AlertCircle },
@@ -713,6 +717,7 @@ const ParentPanel = () => {
                activeTab === 'schedule' ? 'Розклад' :
                activeTab === 'attendance' ? 'Відвідуваність' :
                activeTab === 'progress' ? 'Прогрес' :
+               activeTab === 'homework' ? 'Домашні завдання' :
                activeTab === 'manual' ? 'Методичка' :
                activeTab === 'payments' ? 'Оплата' :
                activeTab === 'notifications' ? 'Сповіщення' : 'Повідомлення'}
@@ -1405,6 +1410,10 @@ const ParentPanel = () => {
 
           {activeTab === 'manual' && (
             <KarateManual audience="parent" currentBelt={normalizeBeltName(participant?.belt)} />
+          )}
+
+          {activeTab === 'homework' && (
+            <HomeworkParentDiary participantId={participant?.id} />
           )}
 
           {activeTab === 'payments' && (

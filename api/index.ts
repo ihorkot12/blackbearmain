@@ -375,6 +375,45 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS homework_assignments (
+        id SERIAL PRIMARY KEY,
+        title TEXT NOT NULL,
+        description TEXT,
+        focus TEXT DEFAULT 'technique',
+        difficulty TEXT DEFAULT 'medium',
+        estimated_minutes INTEGER DEFAULT 15,
+        due_date DATE,
+        group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL,
+        coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL,
+        created_by_user_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL,
+        exercises JSONB DEFAULT '[]'::jsonb,
+        status TEXT DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS homework_assignment_participants (
+        id SERIAL PRIMARY KEY,
+        assignment_id INTEGER REFERENCES homework_assignments(id) ON DELETE CASCADE,
+        participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+        status TEXT DEFAULT 'assigned',
+        diary_entries JSONB DEFAULT '[]'::jsonb,
+        total_minutes INTEGER DEFAULT 0,
+        parent_comment TEXT,
+        coach_feedback TEXT,
+        points_awarded INTEGER DEFAULT 0,
+        submitted_at TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(assignment_id, participant_id)
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_homework_assignments_group_id ON homework_assignments(group_id);
+      CREATE INDEX IF NOT EXISTS idx_homework_assignments_coach_id ON homework_assignments(coach_id);
+      CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_assignment_id ON homework_assignment_participants(assignment_id);
+      CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_participant_id ON homework_assignment_participants(participant_id);
+
       CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
@@ -960,6 +999,104 @@ async function startServer() {
       return familyIds.includes(id);
     }
     return false;
+  };
+
+  const canAccessGroup = async (user: any, groupId: any): Promise<boolean> => {
+    const id = Number(groupId);
+    if (!Number.isFinite(id)) return false;
+    if (!user || user.role === 'admin') return true;
+    if (user.role !== 'coach' || !user.coach_id) return false;
+
+    const result = await pool.query(
+      "SELECT id FROM groups WHERE id = $1 AND coach_id = $2 LIMIT 1",
+      [id, user.coach_id]
+    );
+    return result.rows.length > 0;
+  };
+
+  const normalizeHomeworkExercises = (exercises: any) => {
+    const source = Array.isArray(exercises) ? exercises : [];
+    return source
+      .map((item: any, index: number) => ({
+        id: String(item?.id || `ex_${index + 1}`),
+        name: String(item?.name || '').trim(),
+        target: String(item?.target || '').trim(),
+        sets: Number.isFinite(Number(item?.sets)) ? Math.max(1, Math.min(20, Number(item.sets))) : 1,
+        reps: String(item?.reps || '').trim(),
+        rest: String(item?.rest || '').trim(),
+        note: String(item?.note || '').trim()
+      }))
+      .filter((item: any) => item.name && item.target);
+  };
+
+  const homeworkBlocks: Record<string, any[]> = {
+    technique: [
+      { name: 'Стійка + прямий удар', target: 'Зенкуцу-дачі, оі-цукі, повернення в захист', sets: 3, reps: '10 разів на кожну сторону', rest: '30 сек', note: 'Не гнати швидкість. Спочатку рівна спина і стабільні стопи.' },
+      { name: 'Блоки перед дзеркалом', target: 'Джодан-уке, гедан-барай, чудан сото-уке', sets: 3, reps: '8 повторів кожного блоку', rest: '30 сек', note: 'Після кожного блоку рука повертається в захист.' },
+      { name: 'Комбінація 1-2', target: 'Оі-цукі + гяку-цукі з видихом', sets: 4, reps: '12 комбінацій', rest: '40 сек', note: 'Видих на кожен удар, плечі не піднімати.' }
+    ],
+    kata: [
+      { name: 'Ката по рахунку', target: 'Повільне проходження ката без поспіху', sets: 3, reps: '1 ката', rest: '60 сек', note: 'Після кожного проходу назвати 1 місце, яке треба покращити.' },
+      { name: 'Перші 6 рухів', target: 'Чистота стійок і поворотів', sets: 5, reps: '6 рухів', rest: '30 сек', note: 'Працюємо якість, не швидкість.' },
+      { name: 'Фініш ката', target: 'Останні рухи + повернення в йой', sets: 4, reps: '1 фрагмент', rest: '30 сек', note: 'Фініш має бути спокійним і зібраним.' }
+    ],
+    conditioning: [
+      { name: 'База корпусу', target: 'Прес, планка, контроль дихання', sets: 3, reps: '20 прес + 30 сек планка', rest: '45 сек', note: 'Спина рівна, без ривків.' },
+      { name: 'Ноги каратиста', target: 'Присідання + випади', sets: 4, reps: '15 присідань + 8 випадів', rest: '60 сек', note: 'Коліна дивляться в напрямку стоп.' },
+      { name: 'Кардіо Осу', target: 'Легкі стрибки + удари руками', sets: 5, reps: '45 сек роботи', rest: '30 сек', note: 'Темп рівний, не до виснаження.' }
+    ],
+    flexibility: [
+      { name: 'Мобільність тазу', target: 'Підготовка до мае-гері і маваші-гері', sets: 3, reps: '40 сек на вправу', rest: '20 сек', note: 'Без болю, тільки контрольоване натягнення.' },
+      { name: 'Нахили і шпагатна база', target: 'Задня поверхня стегна, пах, спина', sets: 3, reps: '60 сек', rest: '30 сек', note: 'Дихати спокійно, не пружинити.' },
+      { name: 'Високий підйом коліна', target: 'Баланс і підготовка удару ногою', sets: 4, reps: '8 разів на ногу', rest: '30 сек', note: 'Корпус рівний, опорна стопа стабільна.' }
+    ],
+    discipline: [
+      { name: 'Щоденник Осу', target: 'Короткий запис після тренування або домашньої роботи', sets: 1, reps: '3 речення', rest: 'без паузи', note: 'Що вийшло, що було важко, що повторити наступного разу.' },
+      { name: 'Форма і пояс', target: 'Самостійно скласти догі та завʼязати пояс', sets: 3, reps: '1 раз', rest: '30 сек', note: 'Батьки тільки спостерігають, дитина робить сама.' },
+      { name: 'Команди японською', target: 'Осу, йой, хаджіме, яме, рей', sets: 2, reps: '5 команд', rest: '30 сек', note: 'Дитина каже команду і показує дію.' }
+    ]
+  };
+
+  const homeworkFocusLabel = (focus: string) => {
+    if (focus === 'kata') return 'ката';
+    if (focus === 'conditioning') return 'фізичну підготовку';
+    if (focus === 'flexibility') return 'гнучкість';
+    if (focus === 'discipline') return 'дисципліну';
+    return 'техніку';
+  };
+
+  const generateHomeworkSuggestions = (params: any) => {
+    const focus = String(params?.focus || 'technique');
+    const difficulty = String(params?.difficulty || 'medium');
+    const minutes = Math.max(8, Math.min(45, Number(params?.estimated_minutes) || 15));
+    const source = homeworkBlocks[focus] || homeworkBlocks.technique;
+    const intensityLabel = difficulty === 'easy' ? 'легкий' : difficulty === 'hard' ? 'сильний' : 'збалансований';
+
+    return [0, 1, 2].map((offset) => {
+      const exercises = [0, 1, 2].map((step) => {
+        const base = source[(offset + step) % source.length];
+        const setBonus = difficulty === 'hard' ? 1 : difficulty === 'easy' ? -1 : 0;
+        return {
+          ...base,
+          id: `${focus}_${offset}_${step}`,
+          sets: Math.max(1, Number(base.sets || 1) + setBonus)
+        };
+      });
+
+      return {
+        title: `${offset === 0 ? 'База' : offset === 1 ? 'Контроль' : 'Виклик'}: ${homeworkFocusLabel(focus)}`,
+        description: `Домашнє завдання на ${minutes} хв: ${intensityLabel} темп, контроль техніки і короткий запис у щоденнику після виконання.`,
+        focus,
+        difficulty,
+        estimated_minutes: minutes,
+        exercises,
+        coach_note: offset === 0
+          ? 'Добре для всієї групи після звичайного тренування.'
+          : offset === 1
+            ? 'Підійде перед атестацією або після пропусків.'
+            : 'Для мотивованих учнів, які нормально тримають техніку.'
+      };
+    });
   };
 
   // Instagram OAuth Routes
@@ -4343,6 +4480,310 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     }
   });
 
+  // Homework
+  app.post("/api/homework/generate", requireAuth, async (req, res) => {
+    try {
+      res.json({ suggestions: generateHomeworkSuggestions(req.body || {}) });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to generate homework" });
+    }
+  });
+
+  app.get("/api/homework", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const user = (req as any).user;
+
+    try {
+      const params: any[] = [];
+      const where: string[] = ["ha.status <> 'archived'"];
+      if (user.role === 'coach') {
+        params.push(user.coach_id || -1);
+        where.push(`g.coach_id = $${params.length}`);
+      }
+
+      const result = await pool.query(`
+        SELECT
+          ha.*,
+          g.name as group_name,
+          c.name as coach_name,
+          COUNT(hap.id)::int as recipients_count,
+          COUNT(*) FILTER (WHERE hap.status = 'submitted')::int as submitted_count,
+          COUNT(*) FILTER (WHERE hap.status = 'approved')::int as approved_count,
+          COUNT(*) FILTER (WHERE hap.status = 'needs_work')::int as needs_work_count
+        FROM homework_assignments ha
+        LEFT JOIN groups g ON ha.group_id = g.id
+        LEFT JOIN coaches c ON ha.coach_id = c.id
+        LEFT JOIN homework_assignment_participants hap ON hap.assignment_id = ha.id
+        WHERE ${where.join(' AND ')}
+        GROUP BY ha.id, g.name, c.name
+        ORDER BY ha.created_at DESC
+        LIMIT 80
+      `, params);
+
+      res.json(result.rows);
+    } catch (e) {
+      console.error("Failed to fetch homework:", e);
+      res.status(500).json({ error: "Failed to fetch homework" });
+    }
+  });
+
+  app.get("/api/homework/submissions", requireAuth, async (req, res) => {
+    if (!pool) return res.json([]);
+    const user = (req as any).user;
+
+    try {
+      const params: any[] = [];
+      const where: string[] = ["ha.status <> 'archived'"];
+      if (user.role === 'coach') {
+        params.push(user.coach_id || -1);
+        where.push(`g.coach_id = $${params.length}`);
+      }
+
+      const status = String(req.query.status || '');
+      if (status && ['assigned', 'in_progress', 'submitted', 'approved', 'needs_work'].includes(status)) {
+        params.push(status);
+        where.push(`hap.status = $${params.length}`);
+      }
+
+      const result = await pool.query(`
+        SELECT
+          hap.id,
+          hap.assignment_id,
+          hap.participant_id,
+          hap.status,
+          hap.diary_entries,
+          hap.total_minutes,
+          hap.parent_comment,
+          hap.coach_feedback,
+          hap.points_awarded,
+          hap.submitted_at,
+          hap.reviewed_at,
+          hap.updated_at,
+          ha.title,
+          ha.description,
+          ha.focus,
+          ha.difficulty,
+          ha.estimated_minutes,
+          ha.due_date,
+          ha.exercises,
+          p.name as participant_name,
+          g.name as group_name
+        FROM homework_assignment_participants hap
+        JOIN homework_assignments ha ON hap.assignment_id = ha.id
+        JOIN participants p ON hap.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE ${where.join(' AND ')}
+        ORDER BY
+          CASE hap.status WHEN 'submitted' THEN 0 WHEN 'needs_work' THEN 1 WHEN 'in_progress' THEN 2 ELSE 3 END,
+          hap.submitted_at DESC NULLS LAST,
+          ha.due_date ASC NULLS LAST,
+          ha.created_at DESC
+        LIMIT 120
+      `, params);
+
+      res.json(result.rows);
+    } catch (e) {
+      console.error("Failed to fetch homework submissions:", e);
+      res.status(500).json({ error: "Failed to fetch homework submissions" });
+    }
+  });
+
+  app.post("/api/homework", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    const {
+      title,
+      description,
+      focus,
+      difficulty,
+      estimated_minutes,
+      due_date,
+      group_id,
+      participant_ids,
+      exercises
+    } = req.body || {};
+
+    const normalizedExercises = normalizeHomeworkExercises(exercises);
+    if (!String(title || '').trim()) return res.status(400).json({ error: "Title is required" });
+    if (normalizedExercises.length === 0) return res.status(400).json({ error: "Add at least one exercise" });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const participantIds = new Set<number>();
+      let finalGroupId: number | null = Number.isFinite(Number(group_id)) ? Number(group_id) : null;
+      let finalCoachId: number | null = user.role === 'coach' ? Number(user.coach_id) : null;
+
+      if (finalGroupId) {
+        if (!(await canAccessGroup(user, finalGroupId))) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({ error: "Forbidden group" });
+        }
+
+        const groupRes = await client.query("SELECT coach_id FROM groups WHERE id = $1", [finalGroupId]);
+        finalCoachId = finalCoachId || groupRes.rows[0]?.coach_id || null;
+
+        const participantsRes = await client.query(
+          "SELECT id FROM participants WHERE group_id = $1 AND COALESCE(status, 'active') <> 'archived'",
+          [finalGroupId]
+        );
+        participantsRes.rows.forEach((row: any) => participantIds.add(Number(row.id)));
+      }
+
+      if (Array.isArray(participant_ids)) {
+        for (const rawId of participant_ids) {
+          const id = Number(rawId);
+          if (Number.isFinite(id) && await canAccessParticipant(user, id)) {
+            participantIds.add(id);
+          }
+        }
+      }
+
+      const finalParticipantIds = Array.from(participantIds);
+      if (finalParticipantIds.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: "No accessible participants selected" });
+      }
+
+      const assignmentRes = await client.query(`
+        INSERT INTO homework_assignments
+          (title, description, focus, difficulty, estimated_minutes, due_date, group_id, coach_id, created_by_user_id, exercises)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+        RETURNING *
+      `, [
+        String(title).trim(),
+        String(description || '').trim(),
+        String(focus || 'technique'),
+        String(difficulty || 'medium'),
+        Math.max(5, Math.min(90, Number(estimated_minutes) || 15)),
+        due_date || null,
+        finalGroupId,
+        finalCoachId,
+        Number.isFinite(Number(user.id)) ? Number(user.id) : null,
+        JSON.stringify(normalizedExercises)
+      ]);
+
+      const assignment = assignmentRes.rows[0];
+      for (const participantId of finalParticipantIds) {
+        await client.query(`
+          INSERT INTO homework_assignment_participants (assignment_id, participant_id)
+          VALUES ($1, $2)
+          ON CONFLICT (assignment_id, participant_id) DO NOTHING
+        `, [assignment.id, participantId]);
+        await client.query(
+          "INSERT INTO notifications (participant_id, type, message) VALUES ($1, 'homework', $2)",
+          [participantId, `Нове домашнє завдання: ${assignment.title}`]
+        );
+      }
+
+      await client.query('COMMIT');
+      res.json({ success: true, assignment, count: finalParticipantIds.length });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error("Failed to create homework:", e);
+      res.status(500).json({ error: "Failed to create homework" });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.patch("/api/homework/:id/archive", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    try {
+      const assignmentRes = await pool.query(`
+        SELECT ha.id, g.coach_id
+        FROM homework_assignments ha
+        LEFT JOIN groups g ON ha.group_id = g.id
+        WHERE ha.id = $1
+      `, [req.params.id]);
+      if (assignmentRes.rows.length === 0) return res.status(404).json({ error: "Homework not found" });
+      if (user.role === 'coach' && assignmentRes.rows[0].coach_id !== user.coach_id) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      await pool.query("UPDATE homework_assignments SET status = 'archived', updated_at = CURRENT_TIMESTAMP WHERE id = $1", [req.params.id]);
+      res.json({ success: true });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to archive homework" });
+    }
+  });
+
+  app.patch("/api/homework/submissions/:id/review", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    const status = ['approved', 'needs_work'].includes(String(req.body?.status)) ? String(req.body.status) : 'approved';
+    const coachFeedback = String(req.body?.coach_feedback || '').trim();
+    const nextPoints = Math.max(0, Math.min(50, Number(req.body?.points_awarded) || 0));
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const currentRes = await client.query(`
+        SELECT hap.*, ha.title, p.name as participant_name, g.coach_id
+        FROM homework_assignment_participants hap
+        JOIN homework_assignments ha ON hap.assignment_id = ha.id
+        JOIN participants p ON hap.participant_id = p.id
+        LEFT JOIN groups g ON p.group_id = g.id
+        WHERE hap.id = $1
+      `, [req.params.id]);
+
+      if (currentRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: "Submission not found" });
+      }
+
+      const current = currentRes.rows[0];
+      if (user.role === 'coach' && current.coach_id !== user.coach_id) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const previousPoints = Number(current.points_awarded || 0);
+      const pointDelta = status === 'approved' ? nextPoints - previousPoints : 0 - previousPoints;
+
+      await client.query(`
+        UPDATE homework_assignment_participants
+        SET status = $1,
+            coach_feedback = $2,
+            points_awarded = $3,
+            reviewed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $4
+      `, [status, coachFeedback, status === 'approved' ? nextPoints : 0, req.params.id]);
+
+      if (pointDelta !== 0) {
+        await client.query(
+          "UPDATE participants SET rank_points = COALESCE(rank_points, 0) + $1 WHERE id = $2",
+          [pointDelta, current.participant_id]
+        );
+        await client.query(
+          "INSERT INTO points_log (participant_id, points, reason, reference_id) VALUES ($1, $2, 'homework', $3)",
+          [current.participant_id, pointDelta, `homework_${current.id}`]
+        );
+      }
+
+      await client.query(
+        "INSERT INTO notifications (participant_id, type, message) VALUES ($1, 'homework_review', $2)",
+        [
+          current.participant_id,
+          status === 'approved'
+            ? `Домашнє завдання "${current.title}" перевірено. ${nextPoints > 0 ? `+${nextPoints} балів.` : ''}`
+            : `Тренер залишив правки до ДЗ "${current.title}".`
+        ]
+      );
+
+      await client.query('COMMIT');
+      res.json({ success: true });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error("Failed to review homework:", e);
+      res.status(500).json({ error: "Failed to review homework" });
+    } finally {
+      client.release();
+    }
+  });
+
   // Dashboard Stats
   const runWorkflows = async () => {
     if (!pool) return;
@@ -5661,6 +6102,104 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.json(result.rows);
     } catch (e) {
       res.status(500).json({ error: "Server error" });
+    }
+  });
+
+  app.get("/api/parent/homework", async (req, res) => {
+    if (!pool) return res.json([]);
+    const participantId = await getParentParticipantId(req);
+    if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+    try {
+      const result = await pool.query(`
+        SELECT
+          hap.id as assignment_participant_id,
+          hap.status,
+          hap.diary_entries,
+          hap.total_minutes,
+          hap.parent_comment,
+          hap.coach_feedback,
+          hap.points_awarded,
+          hap.submitted_at,
+          hap.reviewed_at,
+          hap.updated_at as submission_updated_at,
+          ha.id as assignment_id,
+          ha.title,
+          ha.description,
+          ha.focus,
+          ha.difficulty,
+          ha.estimated_minutes,
+          ha.due_date,
+          ha.exercises,
+          ha.created_at,
+          g.name as group_name,
+          c.name as coach_name
+        FROM homework_assignment_participants hap
+        JOIN homework_assignments ha ON hap.assignment_id = ha.id
+        LEFT JOIN groups g ON ha.group_id = g.id
+        LEFT JOIN coaches c ON ha.coach_id = c.id
+        WHERE hap.participant_id = $1
+          AND ha.status = 'active'
+        ORDER BY
+          CASE hap.status WHEN 'needs_work' THEN 0 WHEN 'assigned' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'submitted' THEN 3 ELSE 4 END,
+          ha.due_date ASC NULLS LAST,
+          ha.created_at DESC
+      `, [participantId]);
+      res.json(result.rows);
+    } catch (e) {
+      console.error("Failed to fetch parent homework:", e);
+      res.status(500).json({ error: "Failed to fetch homework" });
+    }
+  });
+
+  app.put("/api/parent/homework/:id", async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const participantId = await getParentParticipantId(req);
+    if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+    const status = String(req.body?.status) === 'submitted' ? 'submitted' : 'in_progress';
+    const diaryEntries = Array.isArray(req.body?.diary_entries) ? req.body.diary_entries : [];
+    const safeDiaryEntries = diaryEntries.slice(0, 20).map((entry: any, index: number) => ({
+      exercise_id: String(entry?.exercise_id || `entry_${index + 1}`),
+      exercise_name: String(entry?.exercise_name || '').trim().slice(0, 160),
+      sets_done: Math.max(0, Math.min(50, Number(entry?.sets_done) || 0)),
+      reps_done: String(entry?.reps_done || '').trim().slice(0, 80),
+      minutes: Math.max(0, Math.min(180, Number(entry?.minutes) || 0)),
+      note: String(entry?.note || '').trim().slice(0, 500)
+    }));
+    const totalMinutes = Math.max(0, Math.min(240, Number(req.body?.total_minutes) || safeDiaryEntries.reduce((sum: number, entry: any) => sum + Number(entry.minutes || 0), 0)));
+    const parentComment = String(req.body?.parent_comment || '').trim().slice(0, 1200);
+
+    try {
+      const check = await pool.query(
+        "SELECT id FROM homework_assignment_participants WHERE id = $1 AND participant_id = $2",
+        [req.params.id, participantId]
+      );
+      if (check.rows.length === 0) return res.status(404).json({ error: "Homework not found" });
+
+      const result = await pool.query(`
+        UPDATE homework_assignment_participants
+        SET diary_entries = $1::jsonb,
+            total_minutes = $2,
+            parent_comment = $3,
+            status = $4,
+            submitted_at = CASE WHEN $4 = 'submitted' THEN CURRENT_TIMESTAMP ELSE submitted_at END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $5 AND participant_id = $6
+        RETURNING *
+      `, [
+        JSON.stringify(safeDiaryEntries),
+        totalMinutes,
+        parentComment,
+        status,
+        req.params.id,
+        participantId
+      ]);
+
+      res.json(result.rows[0]);
+    } catch (e) {
+      console.error("Failed to update parent homework:", e);
+      res.status(500).json({ error: "Failed to update homework" });
     }
   });
 
