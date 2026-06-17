@@ -414,6 +414,30 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_assignment_id ON homework_assignment_participants(assignment_id);
       CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_participant_id ON homework_assignment_participants(participant_id);
 
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS focus TEXT DEFAULT 'technique';
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS difficulty TEXT DEFAULT 'medium';
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS estimated_minutes INTEGER DEFAULT 15;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS due_date DATE;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS group_id INTEGER REFERENCES groups(id) ON DELETE SET NULL;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS coach_id INTEGER REFERENCES coaches(id) ON DELETE SET NULL;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES admin_users(id) ON DELETE SET NULL;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS exercises JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'assigned';
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS diary_entries JSONB DEFAULT '[]'::jsonb;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS total_minutes INTEGER DEFAULT 0;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS parent_comment TEXT;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS coach_feedback TEXT;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS points_awarded INTEGER DEFAULT 0;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS submitted_at TIMESTAMP;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+      ALTER TABLE homework_assignment_participants ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+
       CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
         participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
@@ -4725,8 +4749,12 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       for (const participantId of finalParticipantIds) {
         await client.query(`
           INSERT INTO homework_assignment_participants (assignment_id, participant_id)
-          VALUES ($1, $2)
-          ON CONFLICT (assignment_id, participant_id) DO NOTHING
+          SELECT $1, $2
+          WHERE NOT EXISTS (
+            SELECT 1
+            FROM homework_assignment_participants
+            WHERE assignment_id = $1 AND participant_id = $2
+          )
         `, [assignment.id, participantId]);
         await client.query(
           "INSERT INTO notifications (participant_id, type, message) VALUES ($1, 'homework', $2)",
