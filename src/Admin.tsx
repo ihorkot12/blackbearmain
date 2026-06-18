@@ -411,7 +411,11 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-3xl lg:text-5xl font-black uppercase tracking-tighter mb-3">Головна</h2>
-          <p className="text-zinc-500 font-medium text-sm lg:text-lg">Огляд активності та ключові показники клубу</p>
+          <p className="text-zinc-500 font-medium text-sm lg:text-lg">
+            {role === 'coach'
+              ? 'Ваші групи, заняття, домашні завдання і повідомлення батьків в одному робочому центрі'
+              : 'Огляд активності, заявок, фінансів і ключових дій клубу'}
+          </p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
           <div className="bg-zinc-900/50 backdrop-blur-md px-6 py-3 rounded-2xl border border-white/5 text-right flex-1 md:flex-none">
@@ -419,6 +423,36 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             <p className="text-white font-black uppercase tracking-tight text-xs lg:text-base">{new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {[
+          { title: 'Сьогодні', value: 'Заняття', description: 'План дня, групи, відмітки присутності', icon: Zap, tab: 'today', color: 'text-red-500', ring: 'hover:border-red-500/30' },
+          { title: 'Домашні', value: 'ДЗ', description: 'Видати завдання, перевірити щоденники, зарахувати бали', icon: FileText, tab: 'homework', color: 'text-emerald-400', ring: 'hover:border-emerald-400/30' },
+          { title: 'Методичка', value: 'База', description: 'Нормативи, техніка, словник і підготовка до поясів', icon: Book, tab: 'manual', color: 'text-amber-400', ring: 'hover:border-amber-400/30' },
+          { title: 'Повідомлення', value: recentMessages.length, description: 'Нові діалоги з батьками і швидка відповідь', icon: MessageSquare, tab: 'parent_messages', color: 'text-blue-400', ring: 'hover:border-blue-400/30' },
+        ].map((card, i) => (
+          <motion.button
+            type="button"
+            key={card.title}
+            onClick={() => onQuickAction(card.tab)}
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className={`group relative overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/40 p-6 text-left transition-all hover:-translate-y-1 hover:bg-zinc-900/70 ${card.ring} focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50`}
+          >
+            <div className="absolute right-5 top-5 opacity-10 transition-transform duration-500 group-hover:scale-110">
+              <card.icon size={74} />
+            </div>
+            <card.icon className={`mb-8 ${card.color}`} size={30} />
+            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">{card.title}</div>
+            <div className="mt-2 text-3xl font-black uppercase tracking-tighter text-white">{card.value}</div>
+            <p className="mt-3 max-w-xs text-sm leading-relaxed text-zinc-500">{card.description}</p>
+            <div className="mt-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-400 transition-colors group-hover:text-white">
+              Відкрити <ChevronRight size={14} />
+            </div>
+          </motion.button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">

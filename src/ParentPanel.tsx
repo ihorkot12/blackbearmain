@@ -163,6 +163,7 @@ const ParentPanel = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [homeworkItems, setHomeworkItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
   const [homeworkFocusTarget, setHomeworkFocusTarget] = useState<{ id?: number | null; title?: string; nonce: number } | null>(null);
@@ -330,7 +331,7 @@ const ParentPanel = () => {
   const fetchData = async (isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
-      const [pRes, aRes, bRes, eventRes, pointsRes, notesRes, ratingsRes, sRes, cRes, payRes, annRes, notifRes] = await Promise.all([
+      const [pRes, aRes, bRes, eventRes, pointsRes, notesRes, ratingsRes, sRes, cRes, payRes, annRes, notifRes, homeworkRes] = await Promise.all([
         parentFetch('/api/parent/me'),
         parentFetch('/api/parent/attendance'),
         parentFetch('/api/parent/badges'),
@@ -342,7 +343,8 @@ const ParentPanel = () => {
         parentFetch('/api/parent/children'),
         parentFetch('/api/parent/payments'),
         fetch('/api/announcements'),
-        parentFetch('/api/parent/notifications')
+        parentFetch('/api/parent/notifications'),
+        parentFetch('/api/parent/homework')
       ]);
 
       if (pRes.status === 401) {
@@ -364,6 +366,7 @@ const ParentPanel = () => {
       const payData = payRes.ok ? await payRes.json() : [];
       const annData = annRes.ok ? await annRes.json() : [];
       const notifData = notifRes.ok ? await notifRes.json() : [];
+      const homeworkData = homeworkRes.ok ? await homeworkRes.json() : [];
 
       if (pData) setParticipant(pData);
       setAttendance(aData);
@@ -377,6 +380,7 @@ const ParentPanel = () => {
       setPayments(payData);
       setAnnouncements(annData);
       setNotifications(notifData);
+      setHomeworkItems(Array.isArray(homeworkData) ? homeworkData : []);
     } catch (e) {
       toast.error('Помилка завантаження даних');
     } finally {
@@ -448,6 +452,50 @@ const ParentPanel = () => {
   const totalAchievements = badges.length + events.length;
   const currentSkillChecklist = normalizeSkillChecklist(participant?.skill_checklist);
   const isAdultMember = participant?.member_type === 'adult';
+  const switchParentTab = (tab: string) => {
+    setActiveTab(tab);
+    setIsMobileMenuOpen(false);
+  };
+  const openPortalTabFromAthlete = (tab: string) => {
+    setIsChildMode(false);
+    switchParentTab(tab);
+  };
+  const activeHomeworkItems = homeworkItems.filter(item => !['approved', 'archived'].includes(String(item.status || '')));
+  const homeworkNeedsAction = activeHomeworkItems.filter(item => ['assigned', 'in_progress', 'needs_work'].includes(String(item.status || '')));
+  const urgentHomework = homeworkNeedsAction[0] || activeHomeworkItems[0] || homeworkItems[0];
+  const homeworkDueText = urgentHomework?.due_date
+    ? `до ${new Date(urgentHomework.due_date).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}`
+    : 'без дедлайну';
+  const homeworkStatusText = urgentHomework
+    ? urgentHomework.status === 'submitted'
+      ? 'очікує перевірки тренера'
+      : urgentHomework.status === 'needs_work'
+        ? 'потрібні правки'
+        : homeworkDueText
+    : 'немає активних завдань';
+  const unreadNotificationsCount = notifications.filter(n => !n.is_read).length;
+  const importantNotifications = notifications
+    .filter(n => !n.is_read || isHomeworkNotification(n) || ['payment', 'announcement'].includes(String(n.type || '')))
+    .slice(0, 3);
+  const firstImportantNotification = importantNotifications[0] || notifications[0];
+  const openImportantNotification = () => {
+    if (firstImportantNotification && isHomeworkNotification(firstImportantNotification)) {
+      handleNotificationClick(firstImportantNotification);
+      return;
+    }
+    switchParentTab('notifications');
+  };
+  const dashboardTitle = isAdultMember
+    ? 'Вітаємо, учаснику!'
+    : isChildMode
+      ? 'Вітаємо, спортсмене!'
+      : 'Вітаємо, батьки!';
+  const dashboardSubtitle = isAdultMember
+    ? 'Ваші тренування, прогрес, домашні завдання і важливі сповіщення в одному місці.'
+    : 'Тренування, прогрес дитини, домашні завдання і важливі сповіщення в одному місці.';
+  const manualCardText = isAdultMember
+    ? 'Нормативи, техніка, словник і підготовка до пояса'
+    : 'Нормативи, техніка і пояснення для учня та сімʼї';
   const nextTraining = schedule?.[0];
   const nextTrainingText = formatTrainingTime(nextTraining);
   const nextTrainingMeta = [
@@ -535,6 +583,63 @@ const ParentPanel = () => {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="grid gap-4 sm:grid-cols-2">
+            {[
+              {
+                title: 'Домашні',
+                value: homeworkNeedsAction.length > 0 ? `${homeworkNeedsAction.length} активні` : 'немає активних',
+                text: urgentHomework?.title || 'Нові завдання від тренера будуть тут',
+                icon: ClipboardCheck,
+                tab: 'homework',
+                tone: 'text-red-500',
+                border: 'hover:border-red-500/30'
+              },
+              {
+                title: 'Методичка',
+                value: 'техніка',
+                text: 'Нормативи, словник, пояси і підготовка',
+                icon: BookOpen,
+                tab: 'manual',
+                tone: 'text-amber-400',
+                border: 'hover:border-amber-400/30'
+              },
+              {
+                title: 'Сповіщення',
+                value: unreadNotificationsCount > 0 ? `${unreadNotificationsCount} нових` : 'все прочитано',
+                text: firstImportantNotification?.message || 'Важливі повідомлення зʼявляться тут',
+                icon: Bell,
+                tab: 'notifications',
+                tone: 'text-blue-400',
+                border: 'hover:border-blue-400/30'
+              },
+              {
+                title: 'Розклад',
+                value: nextTrainingText,
+                text: nextTrainingMeta || 'Графік тренувань',
+                icon: Clock,
+                tab: 'schedule',
+                tone: 'text-emerald-400',
+                border: 'hover:border-emerald-400/30'
+              },
+            ].map((card, i) => (
+              <motion.button
+                type="button"
+                key={card.title}
+                onClick={() => openPortalTabFromAthlete(card.tab)}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className={`group relative overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/40 p-5 text-left transition-all hover:-translate-y-1 hover:bg-zinc-900 ${card.border} focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50`}
+              >
+                <card.icon className={`mb-8 ${card.tone}`} size={30} />
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-zinc-500">{card.title}</div>
+                <div className="mt-2 line-clamp-1 text-2xl font-black uppercase tracking-tight text-white">{card.value}</div>
+                <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-zinc-500">{card.text}</p>
+                <ChevronRight className="absolute right-5 top-5 text-zinc-700 transition-colors group-hover:text-white" size={18} />
+              </motion.button>
+            ))}
           </section>
 
           {/* Belt Progress Roadmap */}
@@ -1005,59 +1110,125 @@ const ParentPanel = () => {
           )}
 
           {activeTab === 'overview' && (
-            <div className="space-y-12">
-              <header>
-                <h1 className="text-5xl font-black uppercase tracking-tighter mb-4">Вітаємо, <span className="text-red-600">батьки!</span></h1>
-                <p className="text-zinc-500 font-medium max-w-2xl">Слідкуйте за успіхами вашої дитини в реальному часі.</p>
+            <div className="space-y-10">
+              <header className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-end">
+                <div>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-[0.28em] text-red-600">Дашборд</p>
+                  <h1 className="text-4xl font-black uppercase tracking-tighter sm:text-5xl">
+                    {dashboardTitle.split(',')[0]}, <span className="text-red-600">{dashboardTitle.split(',')[1]?.trim()}</span>
+                  </h1>
+                  <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-zinc-500">{dashboardSubtitle}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => switchParentTab('schedule')}
+                  className="group flex min-h-20 items-center gap-4 rounded-[1.5rem] border border-white/5 bg-zinc-900/50 px-5 py-4 text-left transition-all hover:border-red-600/30 hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-600/10 text-red-500 transition-transform group-hover:scale-105">
+                    <Clock size={22} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[9px] font-black uppercase tracking-[0.2em] text-zinc-500">Наступне заняття</div>
+                    <div className="mt-1 max-w-64 truncate text-sm font-black text-white">{nextTrainingText}</div>
+                    {nextTrainingMeta && <div className="mt-1 max-w-64 truncate text-[10px] font-bold uppercase tracking-widest text-zinc-600">{nextTrainingMeta}</div>}
+                  </div>
+                  <ChevronRight className="ml-auto text-zinc-700 transition-colors group-hover:text-red-500" size={18} />
+                </button>
               </header>
 
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                    <Activity size={80} />
+              <section className="grid gap-4 xl:grid-cols-[1.12fr_0.88fr]">
+                <motion.button
+                  type="button"
+                  onClick={() => switchParentTab('homework')}
+                  whileHover={{ y: -3 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="group relative min-h-60 overflow-hidden rounded-[2rem] border border-red-600/25 bg-gradient-to-br from-red-600/20 via-zinc-950 to-zinc-950 p-6 text-left shadow-2xl shadow-red-950/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/60"
+                >
+                  <div className="absolute right-6 top-6 opacity-10 transition-transform duration-500 group-hover:scale-110">
+                    <ClipboardCheck size={112} />
                   </div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Відвідуваність</div>
-                  <div className="text-4xl font-black mb-2">{attendance.length}</div>
-                  <div className="text-xs text-zinc-400">занять всього</div>
-                </div>
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                    <Award size={80} />
-                  </div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Досягнення</div>
-                  <div className="text-4xl font-black mb-2">{totalAchievements}</div>
-                  <div className="text-xs text-zinc-400">відзнаки, семінари та події</div>
-                </div>
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                    <MessageSquare size={80} />
-                  </div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Telegram Сповіщення</div>
-                  {participant?.telegram_chat_id ? (
-                    <div className="flex items-center gap-2 text-green-500 font-bold mt-4">
-                      <CheckCircle2 size={20} />
-                      <span>Підключено</span>
+                  <div className="relative z-10 flex h-full flex-col justify-between gap-10">
+                    <div>
+                      <div className="mb-5 flex items-center gap-3">
+                        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-600 text-white shadow-lg shadow-red-600/25">
+                          <ClipboardCheck size={24} />
+                        </span>
+                        <span className="rounded-full border border-red-500/30 bg-red-600/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-red-300">
+                          {homeworkNeedsAction.length > 0 ? `${homeworkNeedsAction.length} активні` : 'все спокійно'}
+                        </span>
+                      </div>
+                      <h2 className="max-w-xl text-3xl font-black uppercase tracking-tighter text-white sm:text-4xl">Домашні завдання</h2>
+                      <p className="mt-3 max-w-xl text-sm leading-relaxed text-zinc-400">
+                        {urgentHomework?.title ? urgentHomework.title : 'Коли тренер надішле завдання, воно одразу зʼявиться тут.'}
+                      </p>
                     </div>
-                  ) : (
-                    <button 
-                      onClick={handleConnectTelegram}
-                      className="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-blue-600/20"
-                    >
-                      Підключити
-                    </button>
-                  )}
-                </div>
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform">
-                    <CreditCard size={80} />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-2xl bg-black/40 px-4 py-3 text-xs font-black uppercase tracking-widest text-white">{homeworkStatusText}</span>
+                      <span className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-red-300">
+                        Відкрити <ChevronRight size={14} />
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Статус оплати</div>
-                  <div className={`text-xl font-black uppercase tracking-widest mt-4 px-4 py-2 rounded-xl inline-block ${
-                    participant?.payment_status === 'paid' ? 'bg-green-500/20 text-green-500' : 'bg-red-600/20 text-red-500'
-                  }`}>
-                    {participant?.payment_status === 'paid' ? 'Оплачено' : 'Є заборгованість'}
-                  </div>
+                </motion.button>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                  <motion.button
+                    type="button"
+                    onClick={() => switchParentTab('manual')}
+                    whileHover={{ y: -3 }}
+                    whileTap={{ scale: 0.99 }}
+                    className="group relative overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/50 p-6 text-left transition-colors hover:border-amber-400/25 hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/50"
+                  >
+                    <BookOpen className="mb-8 text-amber-400 transition-transform group-hover:scale-110" size={34} />
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-amber-400">Методичка</div>
+                    <h3 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">Техніка і пояси</h3>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-500">{manualCardText}</p>
+                    <ChevronRight className="absolute right-6 top-6 text-zinc-700 transition-colors group-hover:text-amber-400" size={20} />
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={openImportantNotification}
+                    whileHover={{ y: -3 }}
+                    whileTap={{ scale: 0.99 }}
+                    className="group relative overflow-hidden rounded-[2rem] border border-white/5 bg-zinc-900/50 p-6 text-left transition-colors hover:border-blue-400/25 hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
+                  >
+                    <Bell className="mb-8 text-blue-400 transition-transform group-hover:scale-110" size={34} />
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-blue-400">Важливе</div>
+                    <h3 className="mt-2 text-2xl font-black uppercase tracking-tight text-white">
+                      {unreadNotificationsCount > 0 ? `${unreadNotificationsCount} нових` : 'Сповіщення'}
+                    </h3>
+                    <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-zinc-500">
+                      {firstImportantNotification?.message || 'Нові повідомлення тренера, оплати і домашки будуть тут.'}
+                    </p>
+                    <ChevronRight className="absolute right-6 top-6 text-zinc-700 transition-colors group-hover:text-blue-400" size={20} />
+                  </motion.button>
                 </div>
+              </section>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { label: 'Відвідуваність', value: attendance.length, hint: 'занять всього', icon: Activity, tab: 'attendance', tone: 'text-green-500' },
+                  { label: 'Досягнення', value: totalAchievements, hint: 'відзнаки, семінари та події', icon: Award, tab: 'progress', tone: 'text-amber-400' },
+                  { label: 'Оплата', value: participant?.payment_status === 'paid' ? 'ОК' : 'Борг', hint: participant?.payment_status === 'paid' ? 'все оплачено' : 'потрібна увага', icon: CreditCard, tab: 'payments', tone: participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500' },
+                  { label: 'Telegram', value: participant?.telegram_chat_id ? 'ОК' : 'Підключити', hint: participant?.telegram_chat_id ? 'сповіщення активні' : 'для важливих повідомлень', icon: MessageSquare, action: handleConnectTelegram, tone: participant?.telegram_chat_id ? 'text-blue-400' : 'text-zinc-300' },
+                ].map((card, index) => (
+                  <motion.button
+                    type="button"
+                    key={card.label}
+                    onClick={() => card.action ? card.action() : switchParentTab(card.tab || 'overview')}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.04 }}
+                    className="group relative overflow-hidden rounded-[1.75rem] border border-white/5 bg-zinc-900/45 p-5 text-left transition-all hover:-translate-y-0.5 hover:border-white/10 hover:bg-zinc-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/40"
+                  >
+                    <card.icon className={`mb-6 ${card.tone}`} size={26} />
+                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">{card.label}</div>
+                    <div className="mt-2 text-3xl font-black text-white">{card.value}</div>
+                    <div className="mt-2 text-xs font-medium text-zinc-500">{card.hint}</div>
+                    <ChevronRight className="absolute right-5 top-5 text-zinc-800 transition-colors group-hover:text-red-500" size={18} />
+                  </motion.button>
+                ))}
               </div>
 
               {(bestAthlete || currentRank) && (
