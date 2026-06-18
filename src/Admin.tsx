@@ -2471,7 +2471,7 @@ const RatingEditor = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <h2 className="text-5xl font-black uppercase tracking-tighter mb-3">Рейтинг</h2>
-          <p className="text-zinc-500 font-medium text-lg">Найкращі спортсмени за результатами відвідуваності, змагань, атестацій та семінарів</p>
+          <p className="text-zinc-500 font-medium text-lg">Найкращі спортсмени за результатами відвідуваності, домашніх завдань, змагань, атестацій та семінарів</p>
         </div>
         
         <div className="flex flex-col gap-4">
@@ -2540,18 +2540,28 @@ const RatingEditor = () => {
                     }`}>
                       {i + 1}
                     </div>
-                    <div>
-                      <p className="text-sm font-black uppercase tracking-tight">{r.name}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{r.group_name}</p>
-                        {isGlobal && r.location_name && (
-                          <>
+                      <div className="min-w-0">
+                        <p className="text-sm font-black uppercase tracking-tight">{r.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{r.group_name}</p>
+                          {isGlobal && r.location_name && (
+                            <>
                             <span className="w-1 h-1 bg-zinc-700 rounded-full" />
-                            <p className="text-[10px] text-red-500/70 font-bold uppercase tracking-widest">{r.location_name}</p>
-                          </>
-                        )}
+                              <p className="text-[10px] text-red-500/70 font-bold uppercase tracking-widest">{r.location_name}</p>
+                            </>
+                          )}
+                          <span className="w-1 h-1 bg-zinc-700 rounded-full" />
+                          <p className="text-[10px] text-emerald-400/80 font-bold uppercase tracking-widest">
+                            ДЗ: {r.homework_approved_count || 0} / +{r.homework_points || 0}
+                          </p>
+                          {Number(r.homework_completion_rate || 0) > 0 && (
+                            <>
+                              <span className="w-1 h-1 bg-zinc-700 rounded-full" />
+                              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">{r.homework_completion_rate}% виконання</p>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
@@ -2580,6 +2590,15 @@ const RatingEditor = () => {
                 <div>
                   <p className="text-sm font-bold text-white uppercase tracking-tight">Відвідування</p>
                   <p className="text-xs text-zinc-500 font-medium">+1 бал за кожне тренування</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-emerald-500/10 text-emerald-400 rounded-lg flex items-center justify-center shrink-0">
+                  <FileText size={16} />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white uppercase tracking-tight">Домашнє завдання</p>
+                  <p className="text-xs text-zinc-500 font-medium">0-50 балів після перевірки тренером. На правки - без балів.</p>
                 </div>
               </div>
               <div className="flex items-start gap-4">

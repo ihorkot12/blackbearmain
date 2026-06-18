@@ -141,6 +141,7 @@ const pointReasonLabel = (reason?: string) => {
   if (reason === 'technique') return 'Техніка';
   if (reason === 'progress') return 'Прогрес';
   if (reason === 'manual_adjustment') return 'Корекція балів';
+  if (reason === 'homework') return 'Домашнє завдання';
   if (reason === 'badge') return 'Досягнення';
   if (reason.startsWith('seminar')) return 'Семінар';
   if (reason.startsWith('certification')) return 'Атестація';
@@ -1067,7 +1068,11 @@ const ParentPanel = () => {
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 mb-4">Кращий спортсмен групи</div>
                     <div className="text-2xl font-black uppercase tracking-tight mb-2">{bestAthlete?.name || 'Поки немає даних'}</div>
-                    <div className="text-sm text-zinc-400">{bestAthlete ? `${bestAthlete.total_points} балів • ${bestAthlete.attendance_count} відвідувань` : 'Рейтинг зʼявиться після перших балів'}</div>
+                    <div className="text-sm text-zinc-400">
+                      {bestAthlete
+                        ? `${bestAthlete.total_points} балів • ${bestAthlete.attendance_count} відвідувань • ДЗ +${bestAthlete.homework_points || 0}`
+                        : 'Рейтинг зʼявиться після перших балів'}
+                    </div>
                   </div>
 
                   <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
@@ -1076,7 +1081,14 @@ const ParentPanel = () => {
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Місце вашої дитини</div>
                     <div className="text-4xl font-black mb-2">{currentRank ? `#${currentRank}` : '—'}</div>
-                    <div className="text-sm text-zinc-400">{currentPoints} балів у поточному рейтингу групи</div>
+                    <div className="text-sm text-zinc-400">
+                      {currentPoints} балів у поточному рейтингу групи
+                      {Number(ratingsSummary?.currentChild?.homework_points || 0) > 0 && (
+                        <span className="block mt-1 text-[11px] font-bold uppercase tracking-widest text-emerald-400">
+                          +{ratingsSummary.currentChild.homework_points} за домашні завдання
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -1391,7 +1403,9 @@ const ParentPanel = () => {
                       <div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-amber-500 mb-1">Кращий спортсмен</div>
                         <div className="font-black uppercase tracking-tight">{bestAthlete.name}</div>
-                        <div className="text-xs text-zinc-400">{bestAthlete.total_points} балів</div>
+                        <div className="text-xs text-zinc-400">
+                          {bestAthlete.total_points} балів • ДЗ +{bestAthlete.homework_points || 0}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1408,7 +1422,12 @@ const ParentPanel = () => {
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-bold truncate">{row.name}</div>
-                            <div className="text-[10px] text-zinc-500">{row.attendance_count || 0} відвідувань • {row.seminar_count || 0} семінарів</div>
+                            <div className="text-[10px] text-zinc-500">
+                              {row.attendance_count || 0} відвідувань • {row.seminar_count || 0} семінарів • {row.homework_approved_count || 0} ДЗ
+                            </div>
+                            <div className="text-[9px] font-black uppercase tracking-widest text-emerald-400">
+                              +{row.homework_points || 0} балів за домашки
+                            </div>
                           </div>
                         </div>
                         <div className="text-sm font-black text-white">{row.total_points}</div>

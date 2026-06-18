@@ -528,7 +528,20 @@ async function initDb() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      ALTER TABLE points_log ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE;
       ALTER TABLE points_log ADD COLUMN IF NOT EXISTS reference_id TEXT;
+
+      UPDATE points_log pl
+      SET date = COALESCE(hap.reviewed_at::date, hap.updated_at::date, CURRENT_DATE)
+      FROM homework_assignment_participants hap
+      WHERE pl.reason = 'homework'
+      AND pl.date IS NULL
+      AND pl.reference_id = 'homework_' || hap.id::text;
+
+      UPDATE points_log
+      SET date = CURRENT_DATE
+      WHERE reason = 'homework'
+      AND date IS NULL;
 
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'subscription';
       ALTER TABLE payments ADD COLUMN IF NOT EXISTS method TEXT DEFAULT 'cash';
@@ -4858,7 +4871,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           [pointDelta, current.participant_id]
         );
         await client.query(
-          "INSERT INTO points_log (participant_id, points, reason, reference_id) VALUES ($1, $2, 'homework', $3)",
+          "INSERT INTO points_log (participant_id, points, reason, date, reference_id) VALUES ($1, $2, 'homework', CURRENT_DATE, $3)",
           [current.participant_id, pointDelta, `homework_${current.id}`]
         );
       }
@@ -5963,13 +5976,13 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     const user = (req as any).user;
 
     try {
-      let dateFilter = "";
+      let periodStartSql = "";
       if (period === 'month') {
-        dateFilter = "AND pl.date >= date_trunc('month', CURRENT_DATE)";
+        periodStartSql = "date_trunc('month', CURRENT_DATE)";
       } else if (period === 'year') {
-        dateFilter = "AND pl.date >= date_trunc('year', CURRENT_DATE)";
+        periodStartSql = "date_trunc('year', CURRENT_DATE)";
       } else if (period === 'season') {
-        dateFilter = `AND pl.date >= CASE
+        periodStartSql = `CASE
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) = 12 THEN date_trunc('year', CURRENT_DATE) + INTERVAL '11 months'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (1, 2) THEN date_trunc('year', CURRENT_DATE) - INTERVAL '1 month'
           WHEN EXTRACT(MONTH FROM CURRENT_DATE) IN (3, 4, 5) THEN date_trunc('year', CURRENT_DATE) + INTERVAL '2 months'
@@ -5977,12 +5990,55 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           ELSE date_trunc('year', CURRENT_DATE) + INTERVAL '8 months'
         END`;
       }
+      const dateFilter = periodStartSql ? `AND pl.date >= ${periodStartSql}` : "";
+      const homeworkReviewedDateFilter = periodStartSql ? `AND COALESCE(hap.reviewed_at, hap.updated_at, hap.created_at) >= ${periodStartSql}` : "";
+      const homeworkAssignedDateFilter = periodStartSql
+        ? `AND (hap.created_at >= ${periodStartSql} OR COALESCE(hap.reviewed_at, hap.updated_at, hap.created_at) >= ${periodStartSql})`
+        : "";
 
       let query = `
         SELECT
           p.id,
           p.name,
           GREATEST(COALESCE(SUM(pl.points), 0), COALESCE(p.rank_points, 0))::int as total_points,
+          COALESCE(SUM(pl.points), 0)::int as period_points,
+          COALESCE(SUM(CASE WHEN pl.reason = 'homework' THEN pl.points ELSE 0 END), 0)::int as homework_points,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM homework_assignment_participants hap
+            WHERE hap.participant_id = p.id
+            AND hap.status = 'approved'
+            ${homeworkReviewedDateFilter}
+          ), 0)::int as homework_approved_count,
+          COALESCE((
+            SELECT COUNT(*)
+            FROM homework_assignment_participants hap
+            WHERE hap.participant_id = p.id
+            ${homeworkAssignedDateFilter}
+          ), 0)::int as homework_assigned_count,
+          CASE
+            WHEN COALESCE((
+              SELECT COUNT(*)
+              FROM homework_assignment_participants hap
+              WHERE hap.participant_id = p.id
+              ${homeworkAssignedDateFilter}
+            ), 0) = 0 THEN 0
+            ELSE ROUND(
+              COALESCE((
+                SELECT COUNT(*)
+                FROM homework_assignment_participants hap
+                WHERE hap.participant_id = p.id
+                AND hap.status = 'approved'
+                ${homeworkReviewedDateFilter}
+              ), 0)::numeric * 100 /
+              NULLIF((
+                SELECT COUNT(*)
+                FROM homework_assignment_participants hap
+                WHERE hap.participant_id = p.id
+                ${homeworkAssignedDateFilter}
+              ), 0)
+            )::int
+          END as homework_completion_rate,
           g.name as group_name,
           l.name as location_name
         FROM participants p
@@ -5996,7 +6052,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         query += " AND g.coach_id = $1";
         params.push(user.coach_id);
       }
-      query += " GROUP BY p.id, p.name, p.rank_points, g.name, l.name ORDER BY total_points DESC, p.name ASC LIMIT 20";
+      query += " GROUP BY p.id, p.name, p.rank_points, g.name, l.name ORDER BY total_points DESC, homework_points DESC, homework_approved_count DESC, p.name ASC LIMIT 20";
 
       const result = await pool.query(query, params);
       res.json(result.rows);
@@ -6539,6 +6595,16 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
                 COALESCE(p.rank_points, 0)
               )::int as total_points,
               COALESCE((SELECT COUNT(*) FROM attendance a WHERE a.participant_id = p.id AND a.status = 'present'), 0)::int as attendance_count,
+              COALESCE((SELECT SUM(points) FROM points_log pl WHERE pl.participant_id = p.id AND pl.reason = 'homework'), 0)::int as homework_points,
+              COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id AND hap.status = 'approved'), 0)::int as homework_approved_count,
+              COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0)::int as homework_assigned_count,
+              CASE
+                WHEN COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0) = 0 THEN 0
+                ELSE ROUND(
+                  COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id AND hap.status = 'approved'), 0)::numeric * 100 /
+                  NULLIF((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0)
+                )::int
+              END as homework_completion_rate,
               COALESCE((SELECT COUNT(*) FROM competitions c WHERE c.participant_id = p.id AND c.type = 'seminar'), 0)::int as seminar_count,
               COALESCE((SELECT COUNT(*) FROM competitions c WHERE c.participant_id = p.id AND c.type = 'competition'), 0)::int as competition_count
             FROM participants p
@@ -6550,7 +6616,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           ranked AS (
             SELECT
               *,
-              ROW_NUMBER() OVER (ORDER BY total_points DESC, attendance_count DESC, name ASC) as rank_position
+              ROW_NUMBER() OVER (ORDER BY total_points DESC, homework_points DESC, attendance_count DESC, name ASC) as rank_position
             FROM scored
           )
           SELECT * FROM ranked
@@ -6569,13 +6635,23 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
                 COALESCE((SELECT SUM(points) FROM points_log pl WHERE pl.participant_id = p.id), 0),
                 COALESCE(p.rank_points, 0)
               )::int as total_points,
-              COALESCE((SELECT COUNT(*) FROM attendance a WHERE a.participant_id = p.id AND a.status = 'present'), 0)::int as attendance_count
+              COALESCE((SELECT COUNT(*) FROM attendance a WHERE a.participant_id = p.id AND a.status = 'present'), 0)::int as attendance_count,
+              COALESCE((SELECT SUM(points) FROM points_log pl WHERE pl.participant_id = p.id AND pl.reason = 'homework'), 0)::int as homework_points,
+              COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id AND hap.status = 'approved'), 0)::int as homework_approved_count,
+              COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0)::int as homework_assigned_count,
+              CASE
+                WHEN COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0) = 0 THEN 0
+                ELSE ROUND(
+                  COALESCE((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id AND hap.status = 'approved'), 0)::numeric * 100 /
+                  NULLIF((SELECT COUNT(*) FROM homework_assignment_participants hap WHERE hap.participant_id = p.id), 0)
+                )::int
+              END as homework_completion_rate
             FROM participants p
             LEFT JOIN groups g ON p.group_id = g.id
             WHERE p.id = ANY($1::int[])
           )
           SELECT * FROM scored
-          ORDER BY total_points DESC, attendance_count DESC, name ASC
+          ORDER BY total_points DESC, homework_points DESC, attendance_count DESC, name ASC
         `, [familyIds]) : { rows: [] };
 
         const currentChild = ratingsRes.rows.find((row: any) => Number(row.id) === Number(participantId)) || null;
