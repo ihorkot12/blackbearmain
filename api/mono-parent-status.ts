@@ -95,6 +95,23 @@ async function ensureSchema() {
   await pool.query(`
     ALTER TABLE payments ADD COLUMN IF NOT EXISTS reference_id TEXT;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_reference_id ON payments(reference_id) WHERE reference_id IS NOT NULL;
+
+    CREATE TABLE IF NOT EXISTS monobank_payments (
+      id SERIAL PRIMARY KEY,
+      participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+      invoice_id TEXT UNIQUE NOT NULL,
+      reference TEXT UNIQUE,
+      amount INTEGER NOT NULL,
+      amount_uah NUMERIC(10,2) NOT NULL,
+      status TEXT DEFAULT 'created',
+      page_url TEXT,
+      purpose TEXT,
+      raw_payload JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      paid_at TIMESTAMP
+    );
+
     ALTER TABLE monobank_payments ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'debit';
   `);
 }
@@ -174,37 +191,43 @@ export default async function handler(req: any, res: any) {
   let statusPayload: any = null;
   const monoToken = await getMonobankToken();
   if (monoToken) {
-    const response = await fetch(`https://api.monobank.ua/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoice.invoice_id)}`, {
-      headers: { 'X-Token': monoToken },
-    });
-    const text = await response.text();
     try {
-      statusPayload = text ? JSON.parse(text) : null;
-    } catch {
-      statusPayload = null;
-    }
-
-    if (response.ok && statusPayload?.status) {
-      const finalAmountKop = asNumber(statusPayload.finalAmount) ?? asNumber(statusPayload.amount) ?? Number(invoice.amount);
-      const finalAmountUah = Math.round(finalAmountKop) / 100;
-      await pool.query(
-        `UPDATE monobank_payments
-         SET status = $1,
-             amount = COALESCE($2, amount),
-             amount_uah = COALESCE($3, amount_uah),
-             raw_payload = $4::jsonb,
-             updated_at = CURRENT_TIMESTAMP,
-             paid_at = CASE WHEN $1 = 'success' THEN COALESCE(paid_at, CURRENT_TIMESTAMP) ELSE paid_at END
-         WHERE id = $5`,
-        [statusPayload.status, finalAmountKop, finalAmountUah, JSON.stringify(statusPayload), invoice.id]
-      );
-
-      if (statusPayload.status === 'success') {
-        await markSuccessfulPayment(invoice, finalAmountUah);
+      const response = await fetch(`https://api.monobank.ua/api/merchant/invoice/status?invoiceId=${encodeURIComponent(invoice.invoice_id)}`, {
+        headers: { 'X-Token': monoToken },
+      });
+      const text = await response.text();
+      try {
+        statusPayload = text ? JSON.parse(text) : null;
+      } catch {
+        statusPayload = null;
       }
 
-      invoice.status = statusPayload.status;
-      invoice.amount_uah = finalAmountUah;
+      if (response.ok && statusPayload?.status) {
+        const finalAmountKop = asNumber(statusPayload.finalAmount) ?? asNumber(statusPayload.amount) ?? Number(invoice.amount);
+        const finalAmountUah = Math.round(finalAmountKop) / 100;
+        await pool.query(
+          `UPDATE monobank_payments
+           SET status = $1,
+               amount = COALESCE($2, amount),
+               amount_uah = COALESCE($3, amount_uah),
+               raw_payload = $4::jsonb,
+               updated_at = CURRENT_TIMESTAMP,
+               paid_at = CASE WHEN $1 = 'success' THEN COALESCE(paid_at, CURRENT_TIMESTAMP) ELSE paid_at END
+           WHERE id = $5`,
+          [statusPayload.status, finalAmountKop, finalAmountUah, JSON.stringify(statusPayload), invoice.id]
+        );
+
+        if (statusPayload.status === 'success') {
+          await markSuccessfulPayment(invoice, finalAmountUah);
+        }
+
+        invoice.status = statusPayload.status;
+        invoice.amount_uah = finalAmountUah;
+      } else if (!response.ok) {
+        console.warn('Monobank status check failed', { status: response.status, invoiceId: invoice.invoice_id, body: statusPayload || text });
+      }
+    } catch (error) {
+      console.warn('Monobank status check error', { invoiceId: invoice.invoice_id, error });
     }
   }
 
