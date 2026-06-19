@@ -1,7 +1,9 @@
 (() => {
   const API_URL = '/api/parent/payments/monobank-invoice';
+  const STATUS_URL = '/api/parent/payments/monobank-status';
   const installedButtons = new WeakSet();
   let stylesReady = false;
+  let returnStatusChecked = false;
 
   const normalize = (value) => String(value || '').trim().toLowerCase();
 
@@ -68,6 +70,78 @@
       .bb-mono-status[data-ok="true"] {
         color: #22c55e;
       }
+      .bb-mono-result {
+        position: fixed;
+        z-index: 2147483000;
+        top: 18px;
+        right: 18px;
+        width: min(420px, calc(100vw - 36px));
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 22px;
+        background: rgba(10,10,12,.94);
+        color: #fff;
+        box-shadow: 0 22px 70px rgba(0,0,0,.46), 0 0 0 1px rgba(239,68,68,.08) inset;
+        backdrop-filter: blur(18px);
+        padding: 18px 18px 16px;
+        display: grid;
+        grid-template-columns: 42px 1fr auto;
+        gap: 14px;
+        align-items: start;
+        transform: translateY(-12px);
+        opacity: 0;
+        animation: bbMonoResultIn .28s ease forwards;
+      }
+      .bb-mono-result__mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        font-size: 22px;
+        font-weight: 1000;
+        background: rgba(239,68,68,.18);
+        color: #ff2a36;
+      }
+      .bb-mono-result[data-kind="success"] .bb-mono-result__mark {
+        background: rgba(34,197,94,.16);
+        color: #22c55e;
+      }
+      .bb-mono-result[data-kind="pending"] .bb-mono-result__mark {
+        background: rgba(37,99,235,.18);
+        color: #3b82f6;
+      }
+      .bb-mono-result__title {
+        margin: 0 0 5px;
+        font-size: 17px;
+        line-height: 1.15;
+        font-weight: 1000;
+        letter-spacing: 0;
+      }
+      .bb-mono-result__text {
+        margin: 0;
+        color: rgba(228,228,231,.76);
+        font-size: 13px;
+        line-height: 1.45;
+        font-weight: 700;
+      }
+      .bb-mono-result__close {
+        border: 0;
+        width: 34px;
+        height: 34px;
+        border-radius: 12px;
+        background: rgba(255,255,255,.07);
+        color: rgba(255,255,255,.78);
+        cursor: pointer;
+        font-size: 20px;
+        line-height: 1;
+      }
+      .bb-mono-result__close:hover {
+        background: rgba(255,255,255,.12);
+        color: #fff;
+      }
+      @keyframes bbMonoResultIn {
+        to { transform: translateY(0); opacity: 1; }
+      }
       @media (max-width: 720px) {
         .bb-mono-row {
           justify-content: stretch;
@@ -80,6 +154,15 @@
         .bb-mono-caption,
         .bb-mono-status {
           text-align: left;
+        }
+        .bb-mono-result {
+          top: auto;
+          right: 12px;
+          bottom: 12px;
+          width: calc(100vw - 24px);
+          grid-template-columns: 38px 1fr auto;
+          border-radius: 18px;
+          padding: 15px;
         }
       }
     `;
@@ -95,6 +178,120 @@
     button.disabled = locked;
     button.style.opacity = locked ? '.72' : '';
     button.style.cursor = locked ? 'wait' : '';
+  }
+
+  function showResultBanner(kind, title, text) {
+    ensureStyles();
+    document.querySelectorAll('.bb-mono-result').forEach((node) => node.remove());
+
+    const banner = document.createElement('section');
+    banner.className = 'bb-mono-result';
+    banner.dataset.kind = kind;
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'polite');
+
+    const mark = document.createElement('div');
+    mark.className = 'bb-mono-result__mark';
+    mark.textContent = kind === 'success' ? '✓' : kind === 'pending' ? '…' : '!';
+
+    const content = document.createElement('div');
+    const heading = document.createElement('h3');
+    heading.className = 'bb-mono-result__title';
+    heading.textContent = title;
+    const description = document.createElement('p');
+    description.className = 'bb-mono-result__text';
+    description.textContent = text;
+    content.appendChild(heading);
+    content.appendChild(description);
+
+    const close = document.createElement('button');
+    close.className = 'bb-mono-result__close';
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Закрити повідомлення');
+    close.textContent = '×';
+    close.addEventListener('click', () => banner.remove());
+
+    banner.appendChild(mark);
+    banner.appendChild(content);
+    banner.appendChild(close);
+    document.body.appendChild(banner);
+  }
+
+  function statusCopy(status) {
+    switch (status) {
+      case 'success':
+        return {
+          kind: 'success',
+          title: 'Оплату підтверджено',
+          text: 'Дякуємо, платіж зараховано в кабінеті.',
+        };
+      case 'hold':
+        return {
+          kind: 'pending',
+          title: 'Кошти заблоковано',
+          text: 'Monobank підтвердив hold-платіж. Остаточне списання робиться після підтвердження.',
+        };
+      case 'processing':
+      case 'created':
+        return {
+          kind: 'pending',
+          title: 'Оплата обробляється',
+          text: 'Monobank ще підтверджує платіж. Оновіть кабінет за хвилину.',
+        };
+      case 'failure':
+      case 'expired':
+      case 'reversed':
+        return {
+          kind: 'error',
+          title: 'Оплата не зарахована',
+          text: 'Платіж не пройшов або був скасований. Спробуйте ще раз або напишіть тренеру.',
+        };
+      default:
+        return {
+          kind: 'pending',
+          title: 'Статус оплати',
+          text: status ? `Поточний статус Monobank: ${status}.` : 'Перевіряємо платіж у Monobank.',
+        };
+    }
+  }
+
+  async function checkReturnStatus() {
+    if (returnStatusChecked || !isParentPage()) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('payment') !== 'monobank') return;
+
+    returnStatusChecked = true;
+    const reference = params.get('invoice') || params.get('reference') || params.get('invoiceId');
+    if (!reference) {
+      showResultBanner('error', 'Не знайшли рахунок', 'Повернення з Monobank було без номера платежу. Перевірте оплату трохи пізніше.');
+      return;
+    }
+
+    showResultBanner('pending', 'Перевіряємо оплату', 'Звіряємо статус платежу з Monobank.');
+
+    try {
+      const queryKey = reference.startsWith('p2_') ? 'invoiceId' : 'reference';
+      const response = await fetch(`${STATUS_URL}?${queryKey}=${encodeURIComponent(reference)}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: getAuthHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || 'Не вдалося перевірити оплату');
+
+      const copy = statusCopy(data.status);
+      showResultBanner(copy.kind, copy.title, copy.text);
+    } catch (error) {
+      showResultBanner(
+        'error',
+        'Не вдалося перевірити оплату',
+        error?.message || 'Платіж міг пройти, але сайт зараз не отримав статус. Оновіть кабінет за хвилину.'
+      );
+    } finally {
+      const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+      window.history.replaceState({}, '', cleanUrl);
+    }
   }
 
   function install(button) {
@@ -196,8 +393,12 @@
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scan);
+    document.addEventListener('DOMContentLoaded', () => {
+      scan();
+      checkReturnStatus();
+    });
   } else {
     scan();
+    checkReturnStatus();
   }
 })();
