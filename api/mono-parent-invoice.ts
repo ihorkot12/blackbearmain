@@ -150,7 +150,7 @@ async function ensureSchema() {
   `);
 }
 
-async function getParentParticipantId(req: any): Promise<number | null> {
+async function getPortalParticipantId(req: any): Promise<number | null> {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   const authValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
   if (!authValue?.startsWith('Bearer ')) return null;
@@ -180,16 +180,16 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'База даних не налаштована' });
   }
 
-  const monoToken = await getMonobankToken();
-  if (!monoToken) {
-    return res.status(500).json({ error: 'MONOBANK_TOKEN не налаштований у Vercel або налаштуваннях сайту' });
+  const participantId = await getPortalParticipantId(req);
+  if (!participantId) {
+    return res.status(401).json({ error: 'Потрібно увійти в кабінет учасника' });
   }
 
   await ensureSchema();
 
-  const participantId = await getParentParticipantId(req);
-  if (!participantId) {
-    return res.status(401).json({ error: 'Потрібно увійти в батьківський кабінет' });
+  const monoToken = await getMonobankToken();
+  if (!monoToken) {
+    return res.status(500).json({ error: 'MONOBANK_TOKEN не налаштований у Vercel або налаштуваннях сайту' });
   }
 
   const body = await readBody(req);
@@ -199,7 +199,7 @@ export default async function handler(req: any, res: any) {
   }
 
   const participantResult = await pool.query(
-    'SELECT id, name, email, parent_name, parent_phone, phone FROM participants WHERE id = $1',
+    'SELECT id, name, email, parent_name, parent_phone, phone, member_type FROM participants WHERE id = $1',
     [participantId]
   );
   const participant = participantResult.rows[0];
