@@ -1,9 +1,13 @@
 (() => {
   const API_URL = '/api/parent/payments/monobank-invoice';
   const STATUS_URL = '/api/parent/payments/monobank-status';
+  const CONFIG_URL = '/api/parent/payments/monobank-config';
   const installedButtons = new WeakSet();
   let stylesReady = false;
   let returnStatusChecked = false;
+  let configLoaded = false;
+  let paymentsEnabled = true;
+  let configPromise = null;
 
   const normalize = (value) => String(value || '').trim().toLowerCase();
 
@@ -15,8 +19,45 @@
     const text = normalize(button.textContent);
     return (
       (text.includes('оплат') && text.includes('онлайн')) ||
-      (text.includes('рћрї') && text.includes('рѕрЅ'))
+      (text.includes('рћрї') && text.includes('рѕрЅ')) ||
+      (text.includes('monobank') && text.includes('оплат'))
     );
+  }
+
+  async function loadPaymentConfig() {
+    if (configLoaded) return paymentsEnabled;
+    if (configPromise) return configPromise;
+
+    configPromise = fetch(CONFIG_URL, {
+      method: 'GET',
+      cache: 'no-store',
+      credentials: 'include',
+    })
+      .then((response) => response.ok ? response.json() : {})
+      .then((data) => {
+        paymentsEnabled = data.enabled !== false && data.monobankPaymentsEnabled !== false;
+        configLoaded = true;
+        return paymentsEnabled;
+      })
+      .catch(() => {
+        paymentsEnabled = true;
+        configLoaded = true;
+        return paymentsEnabled;
+      });
+
+    return configPromise;
+  }
+
+  function hidePaymentButton(button) {
+    const panel = button.closest('.bb-mono-panel');
+    if (panel) {
+      panel.remove();
+      return;
+    }
+
+    button.dataset.bbMonoHidden = 'true';
+    button.hidden = true;
+    button.style.display = 'none';
   }
 
   function ensureStyles() {
@@ -298,6 +339,10 @@
   }
 
   function install(button) {
+    if (!paymentsEnabled) {
+      hidePaymentButton(button);
+      return;
+    }
     if (installedButtons.has(button)) return;
     installedButtons.add(button);
     ensureStyles();
@@ -387,8 +432,18 @@
 
   function scan() {
     if (!isParentPage()) return;
+    if (!configLoaded) {
+      loadPaymentConfig().then(scan);
+      return;
+    }
+
     document.querySelectorAll('button').forEach((button) => {
-      if (isPaymentButton(button)) install(button);
+      if (!isPaymentButton(button)) return;
+      if (!paymentsEnabled) {
+        hidePaymentButton(button);
+        return;
+      }
+      install(button);
     });
   }
 
