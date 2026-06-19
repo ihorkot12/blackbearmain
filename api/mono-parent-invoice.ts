@@ -89,6 +89,40 @@ function getBaseUrl(req: any) {
   return host.startsWith('http') ? host.replace(/\/+$/, '') : `${protocol}://${host}`.replace(/\/+$/, '');
 }
 
+async function getSettingsValue(keys: string[]) {
+  if (!pool) return null;
+
+  try {
+    const result = await pool.query('SELECT key, value FROM settings WHERE key = ANY($1)', [keys]);
+    for (const key of keys) {
+      const value = clean(result.rows.find((row: any) => row.key === key)?.value);
+      if (value) return value;
+    }
+  } catch {
+    // Older deployments may not have a settings table yet.
+  }
+
+  try {
+    const result = await pool.query('SELECT key, value FROM site_content WHERE key = ANY($1)', [keys]);
+    for (const key of keys) {
+      const value = clean(result.rows.find((row: any) => row.key === key)?.value);
+      if (value) return value;
+    }
+  } catch {
+    // site_content is only a fallback for emergency setup.
+  }
+
+  return null;
+}
+
+async function getMonobankToken() {
+  return (
+    clean(process.env.MONOBANK_TOKEN) ||
+    clean(process.env.MONOBANK_ACQUIRING_TOKEN) ||
+    (await getSettingsValue(['monobank_token', 'MONOBANK_TOKEN', 'monobank_acquiring_token', 'MONOBANK_ACQUIRING_TOKEN']))
+  );
+}
+
 async function ensureSchema() {
   if (!pool) return;
 
@@ -144,9 +178,9 @@ export default async function handler(req: any, res: any) {
     return res.status(500).json({ error: 'База даних не налаштована' });
   }
 
-  const monoToken = clean(process.env.MONOBANK_TOKEN) || clean(process.env.MONOBANK_ACQUIRING_TOKEN);
+  const monoToken = await getMonobankToken();
   if (!monoToken) {
-    return res.status(500).json({ error: 'MONOBANK_TOKEN не налаштований у Vercel' });
+    return res.status(500).json({ error: 'MONOBANK_TOKEN не налаштований у Vercel або налаштуваннях сайту' });
   }
 
   await ensureSchema();
