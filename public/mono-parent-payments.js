@@ -223,7 +223,7 @@
         return {
           kind: 'success',
           title: 'Оплату підтверджено',
-          text: 'Дякуємо, платіж зараховано в кабінеті.',
+          text: 'Дякуємо, платіж зараховано. Кабінет зараз оновиться і покаже статус оплачено.',
         };
       case 'hold':
         return {
@@ -282,6 +282,9 @@
 
       const copy = statusCopy(data.status);
       showResultBanner(copy.kind, copy.title, copy.text);
+      if (data.status === 'success') {
+        window.setTimeout(() => window.location.reload(), 1800);
+      }
     } catch (error) {
       showResultBanner(
         'error',
