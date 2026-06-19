@@ -5,6 +5,8 @@
   let currentEnabled = true;
   let isLoaded = false;
   let isSaving = false;
+  let isScanning = false;
+  let scanTimer = 0;
   let lastMessage = '';
 
   const isAdminPage = () => window.location.pathname === '/admin' || window.location.pathname.startsWith('/admin/');
@@ -48,13 +50,13 @@
     const token = getAdminToken();
     if (!token) {
       lastMessage = 'Потрібно увійти в адмінку';
-      render();
+      render(true);
       return;
     }
 
     isSaving = true;
     lastMessage = 'Зберігаю...';
-    render();
+    render(true);
 
     try {
       const response = await fetch(SETTINGS_URL, {
@@ -73,7 +75,7 @@
       lastMessage = 'Не вдалося зберегти налаштування';
     } finally {
       isSaving = false;
-      render();
+      render(true);
     }
   }
 
@@ -135,7 +137,7 @@
     `;
   }
 
-  function render() {
+  function render(force = false) {
     if (!isAdminPage()) return;
     const grid = findSettingsGrid();
     if (!grid) return;
@@ -146,25 +148,53 @@
       card.id = CARD_ID;
       card.className = 'bg-zinc-900 border border-white/5 rounded-[2.5rem] p-8';
       grid.appendChild(card);
+      force = true;
     }
 
+    const renderKey = `${currentEnabled}|${isSaving}|${lastMessage}`;
+    if (!force && card.dataset.renderKey === renderKey) return;
+
+    card.dataset.renderKey = renderKey;
     card.innerHTML = cardHtml();
     const toggle = card.querySelector('#bb-mono-admin-toggle');
-    toggle?.addEventListener('click', () => saveSetting(!currentEnabled));
+    if (toggle) toggle.onclick = () => saveSetting(!currentEnabled);
   }
 
   async function scan() {
-    if (!isAdminPage()) return;
-    await loadSettings();
-    render();
+    window.clearTimeout(scanTimer);
+    scanTimer = 0;
+    if (isScanning || !isAdminPage()) return;
+    if (!findSettingsGrid()) return;
+
+    isScanning = true;
+    try {
+      await loadSettings();
+      render(false);
+    } finally {
+      isScanning = false;
+    }
   }
 
-  const observer = new MutationObserver(() => scan());
+  function scheduleScan() {
+    if (!isAdminPage() || scanTimer) return;
+    scanTimer = window.setTimeout(scan, 120);
+  }
+
+  const observer = new MutationObserver((mutations) => {
+    const onlyWidgetChanged = mutations.every((mutation) => {
+      const target = mutation.target;
+      const targetInsideWidget = target instanceof HTMLElement && Boolean(target.closest(`#${CARD_ID}`));
+      const addedWidget = Array.from(mutation.addedNodes).some((node) => node instanceof HTMLElement && node.id === CARD_ID);
+      return targetInsideWidget || addedWidget;
+    });
+
+    if (!onlyWidgetChanged) scheduleScan();
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scan);
+    document.addEventListener('DOMContentLoaded', scheduleScan);
   } else {
-    scan();
+    scheduleScan();
   }
 })();
