@@ -37,6 +37,10 @@
       "destination": "/api/mono-parent-invoice.ts"
     },
     {
+      "source": "/api/parent/payments/monobank-status",
+      "destination": "/api/mono-parent-status.ts"
+    },
+    {
       "source": "/api/monobank/webhook",
       "destination": "/api/monobank-webhook.ts"
     },
