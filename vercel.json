@@ -33,6 +33,14 @@
       "destination": "/api/meta-lead-webhook.ts"
     },
     {
+      "source": "/api/parent/payments/monobank-invoice",
+      "destination": "/api/mono-parent-invoice.ts"
+    },
+    {
+      "source": "/api/monobank/webhook",
+      "destination": "/api/monobank-webhook.ts"
+    },
+    {
       "source": "/privacy",
       "destination": "/privacy.html"
     },
