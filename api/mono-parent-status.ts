@@ -30,6 +30,20 @@ const SESSION_SECRET =
 
 const clean = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
+function htmlEscape(value: unknown) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatAmount(amountUah: number) {
+  return new Intl.NumberFormat('uk-UA', {
+    minimumFractionDigits: Number.isInteger(amountUah) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amountUah);
+}
+
 const signAuthTokenPayload = (encodedPayload: string) =>
   crypto.createHmac('sha256', SESSION_SECRET).update(encodedPayload).digest('base64url');
 
@@ -81,6 +95,15 @@ async function getSettingsValue(keys: string[]) {
   return null;
 }
 
+async function getConfiguredValue(envKeys: string[], settingKeys: string[]) {
+  for (const key of envKeys) {
+    const value = clean(process.env[key]);
+    if (value) return value;
+  }
+
+  return getSettingsValue(settingKeys);
+}
+
 async function getMonobankToken() {
   return (
     clean(process.env.MONOBANK_TOKEN) ||
@@ -113,10 +136,24 @@ async function ensureSchema() {
     );
 
     ALTER TABLE monobank_payments ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'debit';
+
+    CREATE TABLE IF NOT EXISTS notifications (
+      id SERIAL PRIMARY KEY,
+      participant_id INTEGER REFERENCES participants(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      reference_type TEXT,
+      reference_id TEXT,
+      is_read BOOLEAN DEFAULT FALSE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_type TEXT;
+    ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id TEXT;
   `);
 }
 
-async function getParentParticipantId(req: any): Promise<number | null> {
+async function getPortalParticipantId(req: any): Promise<number | null> {
   const authHeader = req.headers?.authorization || req.headers?.Authorization;
   const authValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
   if (!authValue?.startsWith('Bearer ')) return null;
@@ -131,15 +168,96 @@ const asNumber = (value: unknown) => {
   return Number.isFinite(numeric) ? numeric : null;
 };
 
-async function markSuccessfulPayment(invoice: any, amountUah: number) {
+async function sendTelegramMessage(text: string) {
+  const token = await getConfiguredValue(
+    ['TELEGRAM_BOT_TOKEN'],
+    ['telegram_bot_token', 'TELEGRAM_BOT_TOKEN']
+  );
+  const chatId = await getConfiguredValue(
+    ['TELEGRAM_PAYMENT_CHAT_ID', 'MONOBANK_PAYMENT_CHAT_ID', 'TELEGRAM_CHAT_ID'],
+    ['telegram_payment_chat_id', 'monobank_payment_chat_id', 'telegram_chat_id', 'TELEGRAM_PAYMENT_CHAT_ID', 'MONOBANK_PAYMENT_CHAT_ID', 'TELEGRAM_CHAT_ID']
+  );
+  if (!token || !chatId) return false;
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      disable_web_page_preview: true,
+    }),
+  });
+
+  if (!response.ok) {
+    console.warn('Telegram payment notification failed', { status: response.status });
+  }
+
+  return response.ok;
+}
+
+async function getPaymentParticipant(participantId: number) {
+  if (!pool) return null;
+  const result = await pool.query(
+    `SELECT p.id,
+            p.name,
+            p.member_type,
+            p.parent_name,
+            p.parent_phone,
+            p.phone,
+            p.email,
+            g.name AS group_name
+     FROM participants p
+     LEFT JOIN groups g ON g.id = p.group_id
+     WHERE p.id = $1
+     LIMIT 1`,
+    [participantId]
+  );
+  return result.rows[0] || null;
+}
+
+async function notifySuccessfulPayment(invoice: any, amountUah: number) {
   if (!pool) return;
+
+  const participant = await getPaymentParticipant(Number(invoice.participant_id));
+  const participantName = participant?.name || `ID ${invoice.participant_id}`;
+  const memberType = participant?.member_type === 'adult' ? 'дорослий учасник' : 'учень / дитина';
+  const phone = participant?.parent_phone || participant?.phone || 'не вказано';
+  const amountText = `${formatAmount(amountUah)} грн`;
+  const cabinetMessage = `Оплата через monobank зарахована: ${amountText}.`;
+
+  await pool.query(
+    `INSERT INTO notifications (participant_id, type, message, reference_type, reference_id)
+     VALUES ($1, 'payment', $2, 'monobank_payment', $3)`,
+    [invoice.participant_id, cabinetMessage, invoice.invoice_id]
+  );
+
+  const telegramText = `
+<b>Оплата monobank зарахована</b>
+<b>Учасник:</b> ${htmlEscape(participantName)}
+<b>Тип:</b> ${htmlEscape(memberType)}
+<b>Сума:</b> ${htmlEscape(amountText)}
+<b>Група:</b> ${htmlEscape(participant?.group_name || 'не вказано')}
+<b>Телефон:</b> ${htmlEscape(phone)}
+<b>Рахунок:</b> ${htmlEscape(invoice.invoice_id)}
+  `.trim();
+
+  await sendTelegramMessage(telegramText).catch((error) => {
+    console.warn('Telegram payment notification error', error);
+  });
+}
+
+async function markSuccessfulPayment(invoice: any, amountUah: number) {
+  if (!pool) return false;
   const referenceId = `monobank:${invoice.invoice_id}`;
   const now = new Date();
 
-  await pool.query(
+  const insertResult = await pool.query(
     `INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes, reference_id)
      SELECT $1, $2, CURRENT_DATE, $3, $4, 'subscription', 'monobank', $5, $6
-     WHERE NOT EXISTS (SELECT 1 FROM payments WHERE reference_id = $6)`,
+     WHERE NOT EXISTS (SELECT 1 FROM payments WHERE reference_id = $6)
+     RETURNING id`,
     [
       invoice.participant_id,
       amountUah,
@@ -151,6 +269,13 @@ async function markSuccessfulPayment(invoice: any, amountUah: number) {
   );
 
   await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [invoice.participant_id]);
+
+  const inserted = (insertResult.rowCount || 0) > 0;
+  if (inserted) {
+    await notifySuccessfulPayment(invoice, amountUah);
+  }
+
+  return inserted;
 }
 
 function getQuery(req: any) {
@@ -172,8 +297,8 @@ export default async function handler(req: any, res: any) {
   if (!pool) return res.status(500).json({ error: 'База даних не налаштована' });
   await ensureSchema();
 
-  const participantId = await getParentParticipantId(req);
-  if (!participantId) return res.status(401).json({ error: 'Потрібно увійти в батьківський кабінет' });
+  const participantId = await getPortalParticipantId(req);
+  if (!participantId) return res.status(401).json({ error: 'Потрібно увійти в кабінет учасника' });
 
   const { invoiceId, reference } = getQuery(req);
   if (!invoiceId && !reference) return res.status(400).json({ error: 'invoiceId або reference обовʼязковий' });
