@@ -28,6 +28,13 @@ const SESSION_SECRET =
     ? crypto.createHash('sha256').update(`black-bear-session:${process.env.DATABASE_URL}`).digest('hex')
     : 'black-bear-local-dev-secret');
 
+const PAYMENT_VISIBILITY_KEYS = [
+  'monobank_payments_enabled',
+  'MONOBANK_PAYMENTS_ENABLED',
+  'parent_monobank_payments_enabled',
+];
+const PAYMENT_DISABLED_VALUES = new Set(['false', '0', 'off', 'disabled', 'hidden', 'hide', 'no']);
+
 const clean = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
 const signAuthTokenPayload = (encodedPayload: string) =>
@@ -115,6 +122,12 @@ async function getSettingsValue(keys: string[]) {
   return null;
 }
 
+async function areMonobankPaymentsEnabled() {
+  const value = await getSettingsValue(PAYMENT_VISIBILITY_KEYS);
+  if (!value) return true;
+  return !PAYMENT_DISABLED_VALUES.has(value.toLowerCase());
+}
+
 async function getMonobankToken() {
   return (
     clean(process.env.MONOBANK_TOKEN) ||
@@ -183,6 +196,10 @@ export default async function handler(req: any, res: any) {
   const participantId = await getPortalParticipantId(req);
   if (!participantId) {
     return res.status(401).json({ error: 'Потрібно увійти в кабінет учасника' });
+  }
+
+  if (!(await areMonobankPaymentsEnabled())) {
+    return res.status(403).json({ error: 'Онлайн-оплата тимчасово вимкнена адміністратором' });
   }
 
   await ensureSchema();
