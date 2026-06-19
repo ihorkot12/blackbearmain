@@ -105,6 +105,9 @@
     const parent = button.parentElement;
     if (!parent) return;
 
+    parent.style.flexWrap = 'wrap';
+    parent.style.gap = parent.style.gap || '24px';
+
     const panel = document.createElement('div');
     panel.className = 'bb-mono-panel';
 
