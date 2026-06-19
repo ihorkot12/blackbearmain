@@ -145,6 +145,8 @@ async function ensureSchema() {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       paid_at TIMESTAMP
     );
+
+    ALTER TABLE monobank_payments ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'debit';
   `);
 }
 
@@ -210,6 +212,7 @@ export default async function handler(req: any, res: any) {
   const baseUrl = getBaseUrl(req);
   const purpose = clean(body.purpose) || `Оплата тренувань BLACK BEAR DOJO: ${participant.name}`;
   const email = clean(participant.email);
+  const paymentType = body.paymentType === 'hold' ? 'hold' : 'debit';
 
   const monoPayload: Record<string, any> = {
     amount: amountKop,
@@ -223,7 +226,7 @@ export default async function handler(req: any, res: any) {
     redirectUrl: `${baseUrl}/parent?payment=monobank&invoice=${encodeURIComponent(reference)}`,
     webHookUrl: `${baseUrl}/api/monobank/webhook`,
     validity: 3600,
-    paymentType: 'debit',
+    paymentType,
   };
 
   const monoResponse = await fetch('https://api.monobank.ua/api/merchant/invoice/create', {
@@ -255,8 +258,8 @@ export default async function handler(req: any, res: any) {
   }
 
   await pool.query(
-    `INSERT INTO monobank_payments (participant_id, invoice_id, reference, amount, amount_uah, status, page_url, purpose, raw_payload)
-     VALUES ($1, $2, $3, $4, $5, 'created', $6, $7, $8::jsonb)
+    `INSERT INTO monobank_payments (participant_id, invoice_id, reference, amount, amount_uah, status, page_url, purpose, payment_type, raw_payload)
+     VALUES ($1, $2, $3, $4, $5, 'created', $6, $7, $8, $9::jsonb)
      ON CONFLICT (invoice_id) DO UPDATE SET
        page_url = EXCLUDED.page_url,
        updated_at = CURRENT_TIMESTAMP`,
@@ -268,7 +271,8 @@ export default async function handler(req: any, res: any) {
       amountUah,
       monoData.pageUrl,
       purpose,
-      JSON.stringify({ request: { amount: amountKop, ccy: 980, reference }, response: monoData }),
+      paymentType,
+      JSON.stringify({ request: { amount: amountKop, ccy: 980, reference, paymentType }, response: monoData }),
     ]
   );
 
