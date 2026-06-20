@@ -1,6 +1,5 @@
 (() => {
   const loaded = new Set();
-  const path = location.pathname;
 
   const loadScript = (src) => {
     if (loaded.has(src) || document.querySelector(`script[src="${src}"]`)) return;
@@ -21,6 +20,8 @@
   };
 
   afterFirstPaint(() => {
+    const path = location.pathname;
+
     if (path === '/parent' || path.startsWith('/parent/')) {
       loadScript('/mono-parent-payments.js');
       loadScript('/parent-dashboard-priority.js');
