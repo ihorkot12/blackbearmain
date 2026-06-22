@@ -21,6 +21,14 @@ const SESSION_SECRET =
     ? crypto.createHash('sha256').update(`black-bear-session:${process.env.DATABASE_URL}`).digest('hex')
     : 'black-bear-local-dev-secret');
 
+type InstagramAccountCandidate = {
+  username: string;
+  accessToken: string;
+  instagramBusinessAccountId: string;
+  facebookPageId: string | null;
+  pageName?: string | null;
+};
+
 const clean = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
 async function getSetting(keys: string[]) {
@@ -124,6 +132,7 @@ async function ensureInstagramSchema() {
     ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS instagram_business_account_id TEXT;
     ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS facebook_page_id TEXT;
     ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    ALTER TABLE instagram_accounts ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT FALSE;
 
     DO $$
     BEGIN
@@ -134,11 +143,32 @@ async function ensureInstagramSchema() {
   `);
 }
 
-async function findInstagramAccount(accessToken: string) {
+const scoreInstagramCandidate = (account: InstagramAccountCandidate) => {
+  const haystack = `${account.username || ''} ${account.pageName || ''}`.toLowerCase();
+  const positive = ['karate', 'карате', 'dojo', 'доджо', 'blackbear', 'black bear', 'bbdojo', 'shin', 'shinkyokushin', 'kyokushin', 'кіокушин', 'киокушин', 'kyiv', 'київ', 'kiev'];
+  const negative = ['uafrontarmour', 'front armour', 'front armor', 'front', 'armour', 'armor', 'military', 'tactical'];
+
+  let score = 0;
+  positive.forEach((word) => {
+    if (haystack.includes(word)) score += 20;
+  });
+  negative.forEach((word) => {
+    if (haystack.includes(word)) score -= 100;
+  });
+  return score;
+};
+
+const sortInstagramCandidates = (accounts: InstagramAccountCandidate[]) =>
+  [...accounts].sort((a, b) => scoreInstagramCandidate(b) - scoreInstagramCandidate(a));
+
+async function findInstagramAccounts(accessToken: string): Promise<InstagramAccountCandidate[]> {
   const pagesData = await graphGet('/me/accounts', accessToken, {
     fields: 'id,name,access_token,instagram_business_account',
-    limit: '50'
+    limit: '100'
   });
+
+  const accounts: InstagramAccountCandidate[] = [];
+  const seen = new Set<string>();
 
   for (const page of pagesData?.data || []) {
     const pageToken = clean(page.access_token) || accessToken;
@@ -153,24 +183,59 @@ async function findInstagramAccount(accessToken: string) {
       }
     }
 
-    if (instagram?.id) {
-      let username = 'Connected Account';
-      try {
-        const userData = await graphGet(`/${instagram.id}`, pageToken, { fields: 'username' });
-        username = clean(userData.username) || username;
-      } catch {
-        username = clean(page.name) || username;
-      }
-      return {
-        username,
-        accessToken: pageToken,
-        instagramBusinessAccountId: String(instagram.id),
-        facebookPageId: String(page.id)
-      };
+    if (!instagram?.id || seen.has(String(instagram.id))) continue;
+    seen.add(String(instagram.id));
+
+    let username = 'Connected Account';
+    try {
+      const userData = await graphGet(`/${instagram.id}`, pageToken, { fields: 'username,name' });
+      username = clean(userData.username) || clean(userData.name) || username;
+    } catch {
+      username = clean(page.name) || username;
     }
+
+    accounts.push({
+      username,
+      accessToken: pageToken,
+      instagramBusinessAccountId: String(instagram.id),
+      facebookPageId: String(page.id),
+      pageName: clean(page.name)
+    });
   }
 
-  throw new Error('No Instagram Business Account linked to your Facebook Pages found.');
+  if (accounts.length === 0) {
+    throw new Error('No Instagram Business Account linked to your Facebook Pages found.');
+  }
+
+  return sortInstagramCandidates(accounts);
+}
+
+async function saveInstagramAccounts(adminUserId: number, accounts: InstagramAccountCandidate[]) {
+  if (!pool) throw new Error('Database not configured');
+  await ensureInstagramSchema();
+
+  const rankedAccounts = sortInstagramCandidates(accounts);
+  const selected = rankedAccounts[0];
+  await pool.query('UPDATE instagram_accounts SET is_active = FALSE WHERE admin_user_id = $1', [adminUserId]);
+
+  for (const account of rankedAccounts) {
+    const isActive = account.instagramBusinessAccountId === selected.instagramBusinessAccountId;
+    await pool.query(
+      `INSERT INTO instagram_accounts (admin_user_id, username, access_token, instagram_business_account_id, facebook_page_id, is_active, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP)
+       ON CONFLICT (instagram_business_account_id)
+       DO UPDATE SET
+         admin_user_id = EXCLUDED.admin_user_id,
+         username = EXCLUDED.username,
+         access_token = EXCLUDED.access_token,
+         facebook_page_id = EXCLUDED.facebook_page_id,
+         is_active = EXCLUDED.is_active,
+         updated_at = CURRENT_TIMESTAMP`,
+      [adminUserId, account.username, account.accessToken, account.instagramBusinessAccountId, account.facebookPageId, isActive]
+    );
+  }
+
+  return { selected, accounts: rankedAccounts };
 }
 
 const htmlScript = (script: string) => `<!doctype html><html><body><script>${script}</script></body></html>`;
@@ -244,13 +309,19 @@ export default async function handler(req: any, res: any) {
     const tokenData: any = await tokenRes.json().catch(() => ({}));
     if (!tokenRes.ok || tokenData?.error) throw new Error(tokenData?.error?.message || 'Failed to exchange Instagram code');
 
-    const account = await findInstagramAccount(tokenData.access_token);
+    const accounts = await findInstagramAccounts(tokenData.access_token);
     await ensureInstagramSchema();
 
     if (state.action === 'login') {
+      const accountIds = accounts.map((account) => account.instagramBusinessAccountId);
       const result = await pool.query(
-        'SELECT admin_users.* FROM admin_users JOIN instagram_accounts ON admin_users.id = instagram_accounts.admin_user_id WHERE instagram_accounts.instagram_business_account_id = $1',
-        [account.instagramBusinessAccountId]
+        `SELECT admin_users.*
+         FROM admin_users
+         JOIN instagram_accounts ON admin_users.id = instagram_accounts.admin_user_id
+         WHERE instagram_accounts.instagram_business_account_id = ANY($1::text[])
+         ORDER BY COALESCE(instagram_accounts.is_active, FALSE) DESC, instagram_accounts.updated_at DESC NULLS LAST
+         LIMIT 1`,
+        [accountIds]
       );
       if (result.rows.length === 0) {
         return res.send(htmlScript('alert("Цей Instagram акаунт не привʼязаний до жодного адміна."); window.close();'));
@@ -264,20 +335,30 @@ export default async function handler(req: any, res: any) {
     const adminUserId = Number(state.userId);
     if (!Number.isFinite(adminUserId)) return res.status(400).send('Invalid admin state');
 
-    await pool.query(
-      `INSERT INTO instagram_accounts (admin_user_id, username, access_token, instagram_business_account_id, facebook_page_id, updated_at)
-       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
-       ON CONFLICT (instagram_business_account_id)
-       DO UPDATE SET
-         admin_user_id = EXCLUDED.admin_user_id,
-         username = EXCLUDED.username,
-         access_token = EXCLUDED.access_token,
-         facebook_page_id = EXCLUDED.facebook_page_id,
-         updated_at = CURRENT_TIMESTAMP`,
-      [adminUserId, account.username, account.accessToken, account.instagramBusinessAccountId, account.facebookPageId]
-    );
+    const saved = await saveInstagramAccounts(adminUserId, accounts);
+    const messagePayload = JSON.stringify({
+      type: 'instagram_connected',
+      account: {
+        username: saved.selected.username,
+        instagram_business_account_id: saved.selected.instagramBusinessAccountId
+      },
+      accounts: saved.accounts.map((account) => ({
+        username: account.username,
+        instagram_business_account_id: account.instagramBusinessAccountId,
+        facebook_page_id: account.facebookPageId,
+        page_name: account.pageName || null
+      }))
+    });
 
-    return res.send(htmlScript(`if (window.opener) { window.opener.postMessage('instagram_connected', '*'); window.close(); } else { window.location.href = '/admin'; }`));
+    return res.send(htmlScript(`
+      if (window.opener) {
+        window.opener.postMessage(${messagePayload}, '*');
+        window.opener.postMessage('instagram_connected', '*');
+        window.close();
+      } else {
+        window.location.href = '/admin';
+      }
+    `));
   } catch (error: any) {
     console.error('Instagram OAuth callback failed:', error?.message || error);
     return res.status(500).send(popupMessage('instagram_error', error?.message || 'Instagram OAuth failed'));
