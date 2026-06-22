@@ -33,6 +33,10 @@
       "destination": "/api/meta-lead-webhook.ts"
     },
     {
+      "source": "/api/instagram/manual-connect",
+      "destination": "/api/instagram-manual-connect.ts"
+    },
+    {
       "source": "/api/parent/payments/monobank-config",
       "destination": "/api/mono-parent-config.ts"
     },
