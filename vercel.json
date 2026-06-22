@@ -42,19 +42,19 @@
     },
     {
       "source": "/api/instagram/status",
-      "destination": "/api/instagram-status.ts"
+      "destination": "/api/instagram-admin.ts?mode=status"
     },
     {
       "source": "/api/instagram/sync",
-      "destination": "/api/instagram-sync.ts"
+      "destination": "/api/instagram-admin.ts?mode=sync"
     },
     {
       "source": "/api/instagram/accounts",
-      "destination": "/api/instagram-accounts.ts"
+      "destination": "/api/instagram-admin.ts?mode=accounts"
     },
     {
       "source": "/api/instagram/select-account",
-      "destination": "/api/instagram-select-account.ts"
+      "destination": "/api/instagram-admin.ts?mode=select-account"
     },
     {
       "source": "/api/instagram/credentials",
