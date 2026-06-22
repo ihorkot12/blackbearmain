@@ -7,6 +7,13 @@
   const isCoach = () => window.localStorage.getItem('admin_role') === 'coach';
   const authToken = () => window.localStorage.getItem('admin_token') || '';
   const norm = (value) => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    "'": '&#39;',
+    '"': '&quot;'
+  }[char]));
 
   const addStyles = () => {
     if (document.getElementById(STYLE_ID)) return;
@@ -18,7 +25,7 @@
         z-index: 2147483647;
         top: 18px;
         right: 18px;
-        width: min(420px, calc(100vw - 36px));
+        width: min(440px, calc(100vw - 36px));
         border: 1px solid rgba(255,255,255,.12);
         border-radius: 18px;
         background: rgba(10,10,12,.96);
@@ -56,6 +63,21 @@
       #${NOTICE_ID}.is-success strong { color: #4ade80; }
       #${NOTICE_ID}.is-info { border-color: rgba(59,130,246,.45); }
       #${NOTICE_ID}.is-info strong { color: #60a5fa; }
+      #${NOTICE_ID} button,
+      .bb-ig-config-note button {
+        margin-top: 12px;
+        min-height: 38px;
+        border: 0;
+        border-radius: 12px;
+        background: linear-gradient(90deg, #9333ea, #db2777);
+        color: #fff;
+        padding: 0 14px;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
       .bb-ig-config-note {
         margin-top: 12px;
         border-radius: 16px;
@@ -70,7 +92,7 @@
     document.head.appendChild(style);
   };
 
-  const showNotice = (message, type = 'info') => {
+  const showNotice = (message, type = 'info', manualAction = false) => {
     addStyles();
     let notice = document.getElementById(NOTICE_ID);
     if (!notice) {
@@ -86,12 +108,18 @@
         : 'Перевірка Instagram';
 
     notice.className = `is-visible is-${type}`;
-    notice.innerHTML = `<strong>${title}</strong><p>${message}</p>`;
+    notice.innerHTML = `
+      <strong>${title}</strong>
+      <p>${escapeHtml(message)}</p>
+      ${manualAction ? '<button type="button" data-bb-ig-token-connect>Вставити токен вручну</button>' : ''}
+    `;
 
     window.clearTimeout(showNotice.timer);
-    showNotice.timer = window.setTimeout(() => {
-      notice.classList.remove('is-visible');
-    }, type === 'error' ? 9000 : 4500);
+    if (!manualAction) {
+      showNotice.timer = window.setTimeout(() => {
+        notice.classList.remove('is-visible');
+      }, type === 'error' ? 9000 : 4500);
+    }
   };
 
   const parseResponse = async (response) => {
@@ -107,7 +135,7 @@
   const humanInstagramError = (message, status) => {
     const raw = String(message || '').trim();
     if (/client id not configured/i.test(raw)) {
-      return 'На сервері не задано INSTAGRAM_CLIENT_ID. Додай його у Vercel Environment Variables для Production і перевір Meta App.';
+      return 'На сервері не задано INSTAGRAM_CLIENT_ID. Додай його у Vercel або підключи Instagram через long-lived token вручну.';
     }
     if (/client secret/i.test(raw)) {
       return 'На сервері не задано INSTAGRAM_CLIENT_SECRET. Без нього Instagram OAuth не зможе завершити підключення.';
@@ -121,13 +149,16 @@
     return raw || 'Сервер не повернув посилання Instagram. Потрібні INSTAGRAM_CLIENT_ID і INSTAGRAM_CLIENT_SECRET.';
   };
 
-  const getConnectUrl = async () => {
+  const authHeaders = () => {
     const headers = {};
     const token = authToken();
     if (token) headers.Authorization = `Bearer ${token}`;
+    return headers;
+  };
 
+  const getConnectUrl = async () => {
     const response = await fetch('/api/auth/instagram/url?action=connect', {
-      headers,
+      headers: authHeaders(),
       cache: 'no-store'
     });
     const data = await parseResponse(response);
@@ -143,7 +174,9 @@
     return data.url;
   };
 
-  const showConfigNote = (message) => {
+  const isManualTokenHelpful = (message) => /INSTAGRAM_CLIENT_ID|long-lived token|не повернув посилання/i.test(String(message || ''));
+
+  const showConfigNote = (message, manualAction = false) => {
     document.querySelectorAll('.bb-admin-instagram-card').forEach((card) => {
       let note = card.querySelector('.bb-ig-config-note');
       if (!note) {
@@ -151,7 +184,7 @@
         note.className = 'bb-ig-config-note';
         card.appendChild(note);
       }
-      note.textContent = message;
+      note.innerHTML = `${escapeHtml(message)}${manualAction ? '<br><button type="button" data-bb-ig-token-connect>Вставити токен вручну</button>' : ''}`;
     });
   };
 
@@ -165,6 +198,38 @@
       'InstagramLogin',
       `width=${width},height=${height},left=${left},top=${top},noopener=false,noreferrer=false`
     );
+  };
+
+  const connectWithManualToken = async () => {
+    const rawToken = window.prompt('Встав long-lived Facebook/Instagram access token. Він буде збережений тільки на сервері.');
+    const accessToken = String(rawToken || '').replace(/^Bearer\s+/i, '').trim();
+    if (!accessToken) return;
+    if (accessToken.length < 30) {
+      showNotice('Токен занадто короткий. Потрібен long-lived access token з Meta.', 'error', true);
+      return;
+    }
+
+    try {
+      showNotice('Перевіряю токен і шукаю Instagram Business акаунт...', 'info');
+      const response = await fetch('/api/instagram/manual-connect', {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ accessToken })
+      });
+      const data = await parseResponse(response);
+      if (!response.ok) throw new Error(data?.error || 'Не вдалося підключити Instagram по токену');
+
+      showNotice(`Підключено акаунт ${data?.account?.username || 'Instagram'}. Оновлюю адмінку...`, 'success');
+      window.setTimeout(() => window.location.reload(), 1000);
+    } catch (error) {
+      const message = error?.message || 'Не вдалося підключити Instagram по токену.';
+      showNotice(message, 'error', true);
+      showConfigNote(message, true);
+      console.warn('[Black Bear] Manual Instagram connect failed:', message);
+    }
   };
 
   const connectInstagram = async (button) => {
@@ -181,8 +246,9 @@
       showNotice('Вікно Instagram відкрилось. Після авторизації дані підтягнуться в адмінку.', 'success');
     } catch (error) {
       const message = error?.message || 'Не вдалося підключити Instagram.';
-      showNotice(message, 'error');
-      showConfigNote(message);
+      const manualAction = isManualTokenHelpful(message);
+      showNotice(message, 'error', manualAction);
+      showConfigNote(message, manualAction);
       console.warn('[Black Bear] Instagram connect blocked:', message);
     } finally {
       if (button) window.setTimeout(() => { button.dataset.bbIgBusy = '0'; }, 600);
@@ -191,6 +257,7 @@
 
   const shouldHandleButton = (button) => {
     if (!button || !isAdminPath() || isCoach()) return false;
+    if (button.matches('[data-bb-ig-token-connect]')) return true;
     const text = norm(button.textContent);
     const label = norm(`${button.getAttribute('aria-label') || ''} ${button.getAttribute('title') || ''}`);
     const selectorMatch = button.matches('[data-bb-ig-connect]');
@@ -206,6 +273,12 @@
     event.preventDefault();
     event.stopPropagation();
     if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+
+    if (button.matches('[data-bb-ig-token-connect]')) {
+      connectWithManualToken();
+      return;
+    }
+
     connectInstagram(button);
   }, true);
 
