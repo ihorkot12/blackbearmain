@@ -39,6 +39,7 @@
       loadScript('/admin-smm-repair-v2.js');
       loadScript('/admin-smm-save-router.js');
       loadScript('/admin-smm-controls-fix.js');
+      loadScript('/admin-smm-mobile-fix.js');
     }
   };
 
