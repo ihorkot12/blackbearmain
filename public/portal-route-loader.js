@@ -35,7 +35,7 @@
       loadScript('/admin-role-cleanup.js');
       loadScript('/admin-instagram-fix.js');
       loadScript('/admin-instagram-account-picker.js');
-      loadScript('/admin-smm-repair.js');
+      loadScript('/admin-smm-repair-v2.js');
     }
   };
 
