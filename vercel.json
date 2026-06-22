@@ -41,6 +41,22 @@
       "destination": "/api/instagram-callback.ts"
     },
     {
+      "source": "/api/instagram/status",
+      "destination": "/api/instagram-status.ts"
+    },
+    {
+      "source": "/api/instagram/sync",
+      "destination": "/api/instagram-sync.ts"
+    },
+    {
+      "source": "/api/instagram/accounts",
+      "destination": "/api/instagram-accounts.ts"
+    },
+    {
+      "source": "/api/instagram/select-account",
+      "destination": "/api/instagram-select-account.ts"
+    },
+    {
       "source": "/api/instagram/credentials",
       "destination": "/api/instagram-credentials.ts"
     },
