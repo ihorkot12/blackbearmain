@@ -2,6 +2,8 @@
   const ADMIN_PATH_RE = /^\/admin(?:\/|$)/;
   const STYLE_ID = 'bb-instagram-account-picker-style';
   const IG_CACHE_KEY = 'bb_admin_instagram_stats_cache_v1';
+  const IG_ACCOUNTS_URL = '/api/social/ig/accounts';
+  const IG_SELECT_ACCOUNT_URL = '/api/social/ig/select-account';
 
   const isAdminPath = () => ADMIN_PATH_RE.test(window.location.pathname);
   const isAdmin = () => window.localStorage.getItem('admin_role') === 'admin';
@@ -211,7 +213,7 @@
     `);
 
     try {
-      const data = await requestJson('/api/instagram/accounts');
+      const data = await requestJson(IG_ACCOUNTS_URL);
       renderAccounts(card, Array.isArray(data?.accounts) ? data.accounts : []);
     } catch (error) {
       setPanel(card, `
@@ -231,7 +233,7 @@
     button.dataset.bbBusy = '1';
 
     try {
-      await requestJson('/api/instagram/select-account', {
+      await requestJson(IG_SELECT_ACCOUNT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ instagram_business_account_id: id })
