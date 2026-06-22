@@ -33,6 +33,30 @@
       "destination": "/api/meta-lead-webhook.ts"
     },
     {
+      "source": "/api/social/ig/connect-url",
+      "destination": "/api/instagram-auth-url.ts"
+    },
+    {
+      "source": "/api/social/ig/status",
+      "destination": "/api/instagram-admin.ts?mode=status"
+    },
+    {
+      "source": "/api/social/ig/sync",
+      "destination": "/api/instagram-admin.ts?mode=sync"
+    },
+    {
+      "source": "/api/social/ig/accounts",
+      "destination": "/api/instagram-admin.ts?mode=accounts"
+    },
+    {
+      "source": "/api/social/ig/select-account",
+      "destination": "/api/instagram-admin.ts?mode=select-account"
+    },
+    {
+      "source": "/api/social/ig/manual-connect",
+      "destination": "/api/instagram-manual-connect.ts"
+    },
+    {
       "source": "/api/auth/instagram/url",
       "destination": "/api/instagram-auth-url.ts"
     },
