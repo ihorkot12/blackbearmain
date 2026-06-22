@@ -29,6 +29,12 @@ type AuthTokenPayload = {
   exp: number;
 };
 
+type InstagramInsight = {
+  name: string;
+  period?: string;
+  values?: Array<{ value: number | string; end_time?: string }>;
+};
+
 const signAuthTokenPayload = (encodedPayload: string) =>
   crypto.createHmac('sha256', SESSION_SECRET).update(encodedPayload).digest('base64url');
 
@@ -156,9 +162,111 @@ async function fetchGraph(url: string, required = true) {
     const message = data?.error?.message || `Graph API error ${response.status}`;
     if (required) throw new Error(message);
     console.warn('Optional Instagram Graph request failed:', message);
-    return { data: [] };
+    return { data: [], error: message };
   }
   return data;
+}
+
+const numericValue = (value: unknown) => {
+  const number = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(number) ? number : 0;
+};
+
+const latestInsightValue = (insights: InstagramInsight[] = [], name: string) => {
+  const insight = insights.find((item) => item?.name === name);
+  const values = Array.isArray(insight?.values) ? insight!.values! : [];
+  if (!values.length) return 0;
+  return numericValue(values[values.length - 1]?.value);
+};
+
+const makeInsight = (name: string, value: number): InstagramInsight => ({
+  name,
+  period: 'day',
+  values: [{ value: Math.max(0, Math.round(value)) }],
+});
+
+const mergeSyntheticInsight = (insights: InstagramInsight[], name: string, value: number) => {
+  const current = latestInsightValue(insights, name);
+  if (current > 0 || value <= 0) return insights;
+  return [...insights, makeInsight(name, value)];
+};
+
+const sumMetric = (items: Array<{ insights?: InstagramInsight[] }>, names: string[]) =>
+  items.reduce((total, item) => {
+    const metric = names.map((name) => latestInsightValue(item.insights || [], name)).find((value) => value > 0) || 0;
+    return total + metric;
+  }, 0);
+
+async function fetchMediaInsights(media: any[], encodedToken: string) {
+  const metricSetsByType = (type: string) => {
+    const normalized = String(type || '').toUpperCase();
+    if (normalized === 'VIDEO' || normalized === 'REELS') {
+      return [
+        ['reach', 'plays', 'saved', 'shares', 'total_interactions'],
+        ['reach', 'views', 'saved', 'shares', 'total_interactions'],
+        ['reach'],
+      ];
+    }
+    return [
+      ['reach', 'impressions', 'saved', 'shares', 'total_interactions'],
+      ['reach', 'views', 'saved', 'shares', 'total_interactions'],
+      ['reach'],
+    ];
+  };
+
+  const result: any[] = [];
+  const queue = media.slice(0, 25);
+  const workers = Array.from({ length: Math.min(4, queue.length || 1) }, async () => {
+    while (queue.length) {
+      const item = queue.shift();
+      if (!item?.id) continue;
+
+      let insights: InstagramInsight[] = [];
+      for (const metrics of metricSetsByType(item.media_type)) {
+        const url = `https://graph.facebook.com/${GRAPH_VERSION}/${item.id}/insights?metric=${metrics.join(',')}&access_token=${encodedToken}`;
+        const data = await fetchGraph(url, false);
+        if (Array.isArray(data?.data) && data.data.length) {
+          insights = data.data;
+          break;
+        }
+      }
+
+      result.push({ id: item.id, insights });
+    }
+  });
+
+  await Promise.all(workers);
+  const byId = new Map(result.map((item) => [item.id, item.insights]));
+  return media.map((item) => ({ ...item, insights: byId.get(item.id) || [] }));
+}
+
+function buildInstagramSummary(profileData: any, accountInsights: InstagramInsight[], mediaWithInsights: any[]) {
+  const reach = latestInsightValue(accountInsights, 'reach') || sumMetric(mediaWithInsights, ['reach']);
+  const impressions =
+    latestInsightValue(accountInsights, 'impressions') ||
+    sumMetric(mediaWithInsights, ['impressions', 'views', 'plays']);
+  const followers = latestInsightValue(accountInsights, 'follower_count') || numericValue(profileData?.followers_count);
+  const mediaCount = numericValue(profileData?.media_count) || mediaWithInsights.length;
+  const interactions = mediaWithInsights.reduce(
+    (total, item) => total + numericValue(item.like_count) + numericValue(item.comments_count),
+    0
+  );
+
+  let mergedInsights = Array.isArray(accountInsights) ? [...accountInsights] : [];
+  mergedInsights = mergeSyntheticInsight(mergedInsights, 'reach', reach);
+  mergedInsights = mergeSyntheticInsight(mergedInsights, 'impressions', impressions);
+  mergedInsights = mergeSyntheticInsight(mergedInsights, 'follower_count', followers);
+
+  return {
+    account_insights: mergedInsights,
+    summary: {
+      reach: Math.round(reach),
+      impressions: Math.round(impressions),
+      followers: Math.round(followers),
+      media_count: Math.round(mediaCount),
+      interactions: Math.round(interactions),
+    },
+  };
 }
 
 function resolveMode(req: any) {
@@ -207,25 +315,37 @@ async function handleSync(adminId: number, res: any) {
   if (!igId || !token) return res.status(400).json({ error: 'Instagram account is incomplete' });
 
   const encodedToken = encodeURIComponent(token);
+  const profileUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${igId}?fields=username,followers_count,media_count&access_token=${encodedToken}`;
   const insightsUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${igId}/insights?metric=impressions,reach,follower_count&period=day&access_token=${encodedToken}`;
-  const mediaUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${igId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&access_token=${encodedToken}`;
+  const mediaUrl = `https://graph.facebook.com/${GRAPH_VERSION}/${igId}/media?fields=id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count&limit=25&access_token=${encodedToken}`;
 
-  const [insightsData, mediaData] = await Promise.all([
+  const [profileData, insightsData, mediaData] = await Promise.all([
+    fetchGraph(profileUrl, false),
     fetchGraph(insightsUrl, false),
     fetchGraph(mediaUrl, true),
   ]);
 
+  const media = Array.isArray(mediaData?.data) ? mediaData.data : [];
+  const mediaWithInsights = await fetchMediaInsights(media, encodedToken);
+  const summaryData = buildInstagramSummary(
+    profileData,
+    Array.isArray(insightsData?.data) ? insightsData.data : [],
+    mediaWithInsights
+  );
+
   return res.status(200).json({
     success: true,
-    username: account.username,
+    username: profileData?.username || account.username,
     account: {
-      username: account.username,
+      username: profileData?.username || account.username,
       instagram_business_account_id: account.instagram_business_account_id,
       facebook_page_id: account.facebook_page_id,
       is_active: Boolean(account.is_active),
     },
-    account_insights: Array.isArray(insightsData?.data) ? insightsData.data : [],
-    media: Array.isArray(mediaData?.data) ? mediaData.data : [],
+    summary: summaryData.summary,
+    account_insights: summaryData.account_insights,
+    media: mediaWithInsights,
+    media_insights: mediaWithInsights.map((item) => ({ id: item.id, insights: item.insights || [] })),
   });
 }
 
@@ -304,7 +424,7 @@ export default async function handler(req: any, res: any) {
   try {
     if (mode === 'status') return await handleStatus(admin.id, res);
     if (mode === 'accounts') return await handleAccounts(admin.id, res);
-    if (mode === 'sync') return await handleSync(admin.id, res);
+    if (mode === 'sync') return await handleSync(admin.id, req);
     if (mode === 'select-account') return await handleSelect(admin.id, req, res);
     return res.status(404).json({ error: 'Unknown Instagram API route' });
   } catch (error: any) {
