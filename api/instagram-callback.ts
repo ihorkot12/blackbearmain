@@ -175,6 +175,21 @@ async function findInstagramAccount(accessToken: string) {
 
 const htmlScript = (script: string) => `<!doctype html><html><body><script>${script}</script></body></html>`;
 
+const popupMessage = (type: string, message: string, fallbackPath = '/admin') => {
+  const safeMessage = JSON.stringify(message);
+  const payload = JSON.stringify({ type, message });
+  const fallback = JSON.stringify(fallbackPath);
+  return htmlScript(`
+    alert(${safeMessage});
+    if (window.opener) {
+      window.opener.postMessage(${payload}, '*');
+      window.close();
+    } else {
+      window.location.href = ${fallback};
+    }
+  `);
+};
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -185,10 +200,21 @@ export default async function handler(req: any, res: any) {
 
   if (!pool) return res.status(500).send('Database not configured');
 
+  const metaError = clean(req.query?.error_message) || clean(req.query?.error_description) || clean(req.query?.error_reason);
+  const metaErrorCode = clean(req.query?.error_code);
+  if (metaError || metaErrorCode) {
+    const message = `Meta не дозволила підключення Instagram${metaErrorCode ? ` (${metaErrorCode})` : ''}: ${metaError || 'перевір App Domains і Valid OAuth Redirect URI у Meta App.'}`;
+    return res.status(400).send(popupMessage('instagram_error', message));
+  }
+
   const code = clean(req.query?.code);
   const state = parseState(req.query?.state);
-  if (!code) return res.status(400).send('No code provided');
-  if (!state) return res.status(400).send('Invalid state');
+  if (!code) {
+    return res.status(400).send(popupMessage('instagram_error', 'Meta не повернула код авторизації. Перевір App Domains і Valid OAuth Redirect URI у Meta App, потім спробуй ще раз.'));
+  }
+  if (!state) {
+    return res.status(400).send(popupMessage('instagram_error', 'Не вдалося перевірити Instagram-сесію. Спробуй підключити Instagram ще раз з адмінки.'));
+  }
 
   const clientId = await getConfiguredValue(
     ['INSTAGRAM_CLIENT_ID', 'INSTAGRAM_APP_ID', 'META_APP_ID', 'FACEBOOK_CLIENT_ID'],
@@ -254,7 +280,6 @@ export default async function handler(req: any, res: any) {
     return res.send(htmlScript(`if (window.opener) { window.opener.postMessage('instagram_connected', '*'); window.close(); } else { window.location.href = '/admin'; }`));
   } catch (error: any) {
     console.error('Instagram OAuth callback failed:', error?.message || error);
-    const message = JSON.stringify(error?.message || 'Instagram OAuth failed');
-    return res.status(500).send(htmlScript(`alert(${message}); window.close();`));
+    return res.status(500).send(popupMessage('instagram_error', error?.message || 'Instagram OAuth failed'));
   }
 }
