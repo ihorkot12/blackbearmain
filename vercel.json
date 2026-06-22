@@ -33,6 +33,18 @@
       "destination": "/api/meta-lead-webhook.ts"
     },
     {
+      "source": "/api/auth/instagram/url",
+      "destination": "/api/instagram-auth-url.ts"
+    },
+    {
+      "source": "/api/auth/instagram/callback",
+      "destination": "/api/instagram-callback.ts"
+    },
+    {
+      "source": "/api/instagram/credentials",
+      "destination": "/api/instagram-credentials.ts"
+    },
+    {
       "source": "/api/instagram/manual-connect",
       "destination": "/api/instagram-manual-connect.ts"
     },
