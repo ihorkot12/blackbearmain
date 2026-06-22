@@ -35,6 +35,7 @@
       loadScript('/admin-role-cleanup.js');
       loadScript('/admin-instagram-fix.js');
       loadScript('/admin-instagram-account-picker.js');
+      loadScript('/admin-smm-repair.js');
     }
   };
 
@@ -56,7 +57,7 @@
   };
 
   patchHistory('pushState');
-  patchHistory('replaceState');
+  history.replaceState && patchHistory('replaceState');
   window.addEventListener('popstate', scheduleRouteLoad);
   window.addEventListener('pageshow', scheduleRouteLoad);
   scheduleRouteLoad();
