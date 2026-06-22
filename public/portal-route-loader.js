@@ -33,6 +33,7 @@
     if (path === '/admin' || path.startsWith('/admin/')) {
       loadScript('/admin-payment-settings.js');
       loadScript('/admin-role-cleanup.js');
+      loadScript('/admin-dashboard-organizer.js');
       loadScript('/admin-instagram-fix.js');
       loadScript('/admin-instagram-account-picker.js');
       loadScript('/admin-smm-repair-v2.js');
