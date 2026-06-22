@@ -1,8 +1,12 @@
 (() => {
+  if (window.__bbSmmRepairV2Installed) return;
+  window.__bbSmmRepairV2Installed = true;
+
   const ADMIN_PATH_RE = /^\/admin(?:\/|$)/;
   const STYLE_ID = 'bb-smm-repair-style';
   const NOTICE_ID = 'bb-smm-repair-notice';
   const PANEL_ID = 'bb-smm-local-options';
+  const SMM_RESTORE_KEY = 'bb:smm:restore-view';
 
   const isAdminPath = () => ADMIN_PATH_RE.test(location.pathname);
   const authToken = () => localStorage.getItem('admin_token') || '';
@@ -10,6 +14,30 @@
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const isSmmPage = () => /Content OS|Black Bear Dojo AI SMM Agency/i.test(document.body?.innerText || '');
   const todayIso = () => new Date().toISOString().split('T')[0];
+
+  const rememberSmmView = () => {
+    try { sessionStorage.setItem(SMM_RESTORE_KEY, '1'); } catch (_) {}
+  };
+
+  const restoreSmmView = () => {
+    if (!isAdminPath()) return;
+    let shouldRestore = false;
+    try {
+      shouldRestore = sessionStorage.getItem(SMM_RESTORE_KEY) === '1';
+      if (shouldRestore) sessionStorage.removeItem(SMM_RESTORE_KEY);
+    } catch (_) {}
+    if (!shouldRestore || isSmmPage()) return;
+
+    const openSmm = () => {
+      if (isSmmPage()) return;
+      const button = [...document.querySelectorAll('button')].find((item) => norm(item.textContent) === 'smm agency');
+      button?.click();
+    };
+
+    window.setTimeout(openSmm, 350);
+    window.setTimeout(openSmm, 1000);
+    window.setTimeout(openSmm, 1800);
+  };
 
   const authHeaders = () => {
     const token = authToken();
@@ -143,7 +171,10 @@
       showNotice(`${label}: виконую...`);
       await action();
       showNotice(`${label}: готово.`, 'success');
-      if (reload) setTimeout(() => location.reload(), 800);
+      if (reload) {
+        rememberSmmView();
+        setTimeout(() => location.reload(), 800);
+      }
     } catch (error) {
       showNotice(error?.message || `${label}: сталася помилка`, 'error');
     } finally {
@@ -174,4 +205,7 @@
     if (isAuditButton) return runAction(button, 'Аудит акаунту', saveAnalysis);
     renderOptions(); showNotice('Ідеї згенеровано у стабільному режимі.', 'success');
   }, true);
+
+  restoreSmmView();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', restoreSmmView, { once: true });
 })();
