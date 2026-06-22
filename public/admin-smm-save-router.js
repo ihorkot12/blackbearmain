@@ -1,8 +1,11 @@
 (() => {
   if (window.__bbSmmSaveRouterInstalled) return;
+
+  const originalFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : null;
+  if (!originalFetch) return;
+
   window.__bbSmmSaveRouterInstalled = true;
 
-  const originalFetch = window.fetch.bind(window);
   const isRepairSaveUrl = (input) => {
     try {
       const rawUrl = typeof input === 'string' ? input : input?.url;
