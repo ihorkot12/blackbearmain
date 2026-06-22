@@ -30,6 +30,11 @@
         .bb-smm-mobile-actions button{min-height:40px;border:0;border-radius:14px;padding:0 12px;color:#fff;font-size:10px;font-weight:950;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
         .bb-smm-mobile-actions [data-bb-smm-mobile-analysis]{background:#ef0008;box-shadow:0 12px 28px rgba(239,0,8,.18)}
         .bb-smm-mobile-actions [data-bb-ig-connect]{background:linear-gradient(90deg,#9333ea,#db2777);box-shadow:0 12px 28px rgba(219,39,119,.2)}
+        .bb-smm-mobile-control-row{display:flex!important;flex-wrap:wrap!important;align-items:stretch!important;gap:10px!important;width:100%!important;max-width:100%!important;overflow:visible!important}
+        .bb-smm-mobile-control-row>*{flex:1 1 145px!important;min-width:0!important;max-width:100%!important}
+        .bb-smm-mobile-control-row button{width:100%!important;max-width:100%!important;min-height:44px!important;white-space:normal!important;line-height:1.12!important;text-align:center!important}
+        .bb-smm-mobile-audit-card{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;gap:16px!important;padding:22px!important;border-radius:28px!important}
+        .bb-smm-mobile-audit-card button{width:100%!important;min-height:52px!important;white-space:normal!important;line-height:1.12!important}
       }
     `;
     document.head.appendChild(style);
@@ -120,10 +125,32 @@
     else root.prepend(actions);
   };
 
+  const ensureMobileControlRows = () => {
+    if (!isAdminPath() || !isSmmPage()) return;
+    const root = smmRoot();
+    if (!root) return;
+
+    [...root.querySelectorAll('button')]
+      .filter(isVisible)
+      .forEach((button) => {
+        const text = textOf(button);
+        if (/синхронізувати|оновити дані/i.test(text)) {
+          let row = button.parentElement;
+          while (row && row !== root && row.querySelectorAll('button').length < 2) row = row.parentElement;
+          row?.classList.add('bb-smm-mobile-control-row');
+        }
+        if (/запустити аудит/i.test(text)) {
+          const card = button.closest('div');
+          card?.classList.add('bb-smm-mobile-audit-card');
+        }
+      });
+  };
+
   const run = () => {
     addStyles();
     labelSmmTabs();
     ensureMobileInstagramActions();
+    ensureMobileControlRows();
   };
 
   document.addEventListener('click', (event) => {
