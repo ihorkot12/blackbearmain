@@ -2,6 +2,15 @@
   const ADMIN_PATH_RE = /^\/admin(?:\/|$)/;
   const NOTICE_ID = 'bb-instagram-connect-notice';
   const STYLE_ID = 'bb-instagram-connect-style';
+  const IG_CONNECT_URL = '/api/social/ig/connect-url?action=connect';
+  const IG_MANUAL_CONNECT_URL = '/api/social/ig/manual-connect';
+  const IG_API_ROUTE_MAP = {
+    '/api/instagram/status': '/api/social/ig/status',
+    '/api/instagram/sync': '/api/social/ig/sync',
+    '/api/instagram/accounts': '/api/social/ig/accounts',
+    '/api/instagram/select-account': '/api/social/ig/select-account',
+    '/api/instagram/manual-connect': '/api/social/ig/manual-connect'
+  };
 
   const isAdminPath = () => ADMIN_PATH_RE.test(window.location.pathname);
   const isCoach = () => window.localStorage.getItem('admin_role') === 'coach';
@@ -14,6 +23,50 @@
     "'": '&#39;',
     '"': '&quot;'
   }[char]));
+
+  const rewriteIgApiUrl = (value) => {
+    const raw = String(value || '');
+    if (!raw) return value;
+
+    try {
+      const url = new URL(raw, window.location.origin);
+      if (url.origin !== window.location.origin) return value;
+      const replacement = IG_API_ROUTE_MAP[url.pathname];
+      if (!replacement) return value;
+      url.pathname = replacement;
+      return /^https?:\/\//i.test(raw) ? url.toString() : `${url.pathname}${url.search}${url.hash}`;
+    } catch (_) {
+      return value;
+    }
+  };
+
+  const installInstagramApiPathPatch = () => {
+    if (window.__bbInstagramApiPathPatchInstalled) return;
+    window.__bbInstagramApiPathPatchInstalled = true;
+
+    if (typeof window.fetch === 'function') {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = (input, init) => {
+        if (typeof input === 'string' || input instanceof URL) {
+          return originalFetch(rewriteIgApiUrl(input), init);
+        }
+        if (typeof Request === 'function' && input instanceof Request) {
+          const rewritten = rewriteIgApiUrl(input.url);
+          if (rewritten !== input.url) return originalFetch(new Request(rewritten, input), init);
+        }
+        return originalFetch(input, init);
+      };
+    }
+
+    if (typeof window.XMLHttpRequest === 'function') {
+      const originalOpen = window.XMLHttpRequest.prototype.open;
+      window.XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+        return originalOpen.call(this, method, rewriteIgApiUrl(url), ...rest);
+      };
+    }
+  };
+
+  installInstagramApiPathPatch();
 
   const addStyles = () => {
     if (document.getElementById(STYLE_ID)) return;
@@ -62,7 +115,6 @@
       #${NOTICE_ID}.is-success { border-color: rgba(34,197,94,.45); }
       #${NOTICE_ID}.is-success strong { color: #4ade80; }
       #${NOTICE_ID}.is-info { border-color: rgba(59,130,246,.45); }
-      #${NOTICE_ID}.is-info strong { color: #60a5fa; }
       #${NOTICE_ID} button,
       .bb-ig-config-note button {
         margin-top: 12px;
@@ -157,7 +209,7 @@
   };
 
   const getConnectUrl = async () => {
-    const response = await fetch('/api/auth/instagram/url?action=connect', {
+    const response = await fetch(IG_CONNECT_URL, {
       headers: authHeaders(),
       cache: 'no-store'
     });
@@ -211,7 +263,7 @@
 
     try {
       showNotice('Перевіряю токен і шукаю Instagram Business акаунт...', 'info');
-      const response = await fetch('/api/instagram/manual-connect', {
+      const response = await fetch(IG_MANUAL_CONNECT_URL, {
         method: 'POST',
         headers: {
           ...authHeaders(),
