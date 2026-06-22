@@ -251,6 +251,9 @@ function buildInstagramSummary(profileData: any, accountInsights: InstagramInsig
     (total, item) => total + numericValue(item.like_count) + numericValue(item.comments_count),
     0
   );
+  const engagementRate = followers > 0 && interactions > 0
+    ? Number(((interactions / followers) * 100).toFixed(2))
+    : 0;
 
   let mergedInsights = Array.isArray(accountInsights) ? [...accountInsights] : [];
   mergedInsights = mergeSyntheticInsight(mergedInsights, 'reach', reach);
@@ -264,7 +267,9 @@ function buildInstagramSummary(profileData: any, accountInsights: InstagramInsig
       impressions: Math.round(impressions),
       followers: Math.round(followers),
       media_count: Math.round(mediaCount),
+      posts_count: Math.round(mediaCount),
       interactions: Math.round(interactions),
+      engagement_rate: engagementRate,
     },
   };
 }
