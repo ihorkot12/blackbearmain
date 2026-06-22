@@ -31,6 +31,7 @@
 
     if (path === '/admin' || path.startsWith('/admin/')) {
       loadScript('/admin-payment-settings.js');
+      loadScript('/admin-role-cleanup.js');
     }
   });
 })();
