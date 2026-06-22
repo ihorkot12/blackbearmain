@@ -34,6 +34,7 @@
       loadScript('/admin-payment-settings.js');
       loadScript('/admin-role-cleanup.js');
       loadScript('/admin-instagram-fix.js');
+      loadScript('/admin-instagram-account-picker.js');
     }
   };
 
