@@ -283,9 +283,18 @@
   }, true);
 
   window.addEventListener('message', (event) => {
-    if (event.data === 'instagram_connected' || event.data?.type === 'instagram_login_success') {
+    const data = event.data || {};
+    if (event.data === 'instagram_connected' || data?.type === 'instagram_login_success') {
       showNotice('Instagram підключено. Оновлюю адмінку...', 'success');
       window.setTimeout(() => window.location.reload(), 900);
+      return;
+    }
+
+    if (data?.type === 'instagram_error') {
+      const message = data.message || 'Instagram не підключено. Перевір налаштування Meta App і спробуй ще раз.';
+      const manualAction = isManualTokenHelpful(message);
+      showNotice(message, 'error', manualAction);
+      showConfigNote(message, manualAction);
     }
   });
 })();
