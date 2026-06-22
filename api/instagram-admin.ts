@@ -99,6 +99,51 @@ async function requireAdmin(req: any) {
   return result.rows[0] || null;
 }
 
+async function ensureSmmPostsSchema() {
+  if (!pool) return;
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS smm_posts (
+      id SERIAL PRIMARY KEY,
+      title TEXT NOT NULL,
+      audience TEXT,
+      goal TEXT,
+      pain TEXT,
+      format TEXT,
+      source_signal TEXT,
+      score INTEGER,
+      reason TEXT,
+      content JSONB,
+      scoring JSONB,
+      status TEXT DEFAULT 'generated',
+      metrics JSONB DEFAULT '{}',
+      result_tag TEXT,
+      notes TEXT,
+      published_at TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS title TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS audience TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS goal TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS pain TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS format TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS source_signal TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS score INTEGER;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS reason TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS content JSONB;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS scoring JSONB;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'generated';
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS metrics JSONB DEFAULT '{}';
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS result_tag TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS notes TEXT;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS published_at TIMESTAMP;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    ALTER TABLE smm_posts ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+  `);
+}
+
 async function ensureInstagramSchema() {
   if (!pool) return;
 
@@ -145,6 +190,8 @@ async function ensureInstagramSchema() {
           AND COALESCE(active_ia.is_active, FALSE) = TRUE
       );
   `);
+
+  await ensureSmmPostsSchema();
 }
 
 const activeInstagramAccountSql = (selectAll = false) => `
