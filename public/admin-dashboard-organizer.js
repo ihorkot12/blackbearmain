@@ -3,8 +3,8 @@
   window.__bbAdminDashboardOrganizerInstalled = true;
 
   const STYLE_ID = 'bb-admin-dashboard-organizer-style';
-  const CARD_STORAGE_PREFIX = 'bb:admin:accordion:';
-  const NAV_STORAGE_PREFIX = 'bb:admin:nav:';
+  const CARD_STORAGE_PREFIX = 'bb:admin:accordion:v2:';
+  const NAV_STORAGE_PREFIX = 'bb:admin:nav:v2:';
 
   const norm = (value) => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const isAdminPath = () => /^\/admin(?:\/|$)/.test(location.pathname);
@@ -30,12 +30,14 @@
   const findNearestCard = (node, title) => {
     let current = node;
     const titleNorm = norm(title);
+    const compactChart = titleNorm === 'динаміка заявок' || titleNorm === 'розподіл по групах';
     while (current && current !== document.body) {
       const className = String(current.className || '');
       const text = norm(current.innerText || current.textContent || '');
       const looksLikeCard = current.classList?.contains('bb-admin-instagram-top') || (className.includes('rounded') && className.includes('border'));
       const tooBroad = text.includes('операційка') || text.includes('control panel');
-      if (looksLikeCard && text.includes(titleNorm) && text.length > titleNorm.length + 20 && !tooBroad) {
+      const hasEnoughText = text.length > titleNorm.length + 20 || compactChart;
+      if (looksLikeCard && text.includes(titleNorm) && hasEnoughText && !tooBroad) {
         return current;
       }
       current = current.parentElement;
@@ -84,7 +86,7 @@
 
     const seen = new Set();
     titles.forEach((title) => {
-      headingsForTitle(title).forEach((heading, index) => {
+      headingsForTitle(title).forEach((heading) => {
         const card = findNearestCard(heading, title);
         if (!card || seen.has(card)) return;
         seen.add(card);
@@ -105,8 +107,7 @@
 
         let stored = null;
         try { stored = localStorage.getItem(CARD_STORAGE_PREFIX + title); } catch (_) {}
-        const defaultExpanded = title === 'Останні заявки' || title === 'Повідомлення від батьків';
-        const collapsed = stored ? stored === 'collapsed' : !defaultExpanded;
+        const collapsed = stored ? stored === 'collapsed' : true;
         applyCardState(card, title, collapsed);
       });
     });
