@@ -36,9 +36,12 @@
   };
 
   const smmRoot = () => {
-    const roots = [...document.querySelectorAll('main,section,div')]
+    const main = document.querySelector('main');
+    if (main && isVisible(main) && /Content OS|Black Bear Dojo AI SMM Agency/i.test(textOf(main))) return main;
+
+    const roots = [...document.querySelectorAll('section,div')]
       .filter((node) => isVisible(node) && /Content OS|Black Bear Dojo AI SMM Agency/i.test(textOf(node)));
-    return roots.sort((a, b) => textOf(a).length - textOf(b).length)[0] || document.querySelector('main') || document.body;
+    return roots.sort((a, b) => textOf(b).length - textOf(a).length)[0] || main || document.body;
   };
 
   const findSmmTabButtons = () => {
