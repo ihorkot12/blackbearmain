@@ -424,7 +424,7 @@ export default async function handler(req: any, res: any) {
   try {
     if (mode === 'status') return await handleStatus(admin.id, res);
     if (mode === 'accounts') return await handleAccounts(admin.id, res);
-    if (mode === 'sync') return await handleSync(admin.id, req);
+    if (mode === 'sync') return await handleSync(admin.id, res);
     if (mode === 'select-account') return await handleSelect(admin.id, req, res);
     return res.status(404).json({ error: 'Unknown Instagram API route' });
   } catch (error: any) {
