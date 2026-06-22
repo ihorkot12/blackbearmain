@@ -4,6 +4,7 @@
   const STYLE_ID = 'bb-instagram-connect-style';
   const IG_CONNECT_URL = '/api/social/ig/connect-url?action=connect';
   const IG_MANUAL_CONNECT_URL = '/api/social/ig/manual-connect';
+  const IG_METRICS_CACHE_KEY = 'bb_latest_instagram_metrics';
   const IG_API_ROUTE_MAP = {
     '/api/instagram/status': '/api/social/ig/status',
     '/api/instagram/sync': '/api/social/ig/sync',
@@ -40,6 +41,139 @@
     }
   };
 
+  const requestPath = (input) => {
+    try {
+      const raw = typeof input === 'string' || input instanceof URL ? String(input) : input?.url;
+      if (!raw) return '';
+      return new URL(raw, window.location.origin).pathname;
+    } catch (_) {
+      return '';
+    }
+  };
+
+  const requestMethod = (input, init) => String(init?.method || input?.method || 'GET').toUpperCase();
+
+  const toNumber = (value, fallback = 0) => {
+    const number = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+
+  const firstNumber = (...values) => {
+    for (const value of values) {
+      const number = toNumber(value, NaN);
+      if (Number.isFinite(number)) return number;
+    }
+    return 0;
+  };
+
+  const insightValue = (insights, name) => {
+    const metric = Array.isArray(insights) ? insights.find((item) => item?.name === name) : null;
+    const values = Array.isArray(metric?.values) ? metric.values : [];
+    for (let index = values.length - 1; index >= 0; index -= 1) {
+      const number = toNumber(values[index]?.value, NaN);
+      if (Number.isFinite(number)) return number;
+    }
+    return 0;
+  };
+
+  const mediaInteractions = (media) => {
+    if (!Array.isArray(media)) return 0;
+    return media.reduce((total, item) => {
+      const direct = firstNumber(item?.interactions, item?.total_interactions, item?.insights?.total_interactions);
+      if (direct) return total + direct;
+      return total + firstNumber(item?.like_count) + firstNumber(item?.comments_count) + firstNumber(item?.saved) + firstNumber(item?.shares);
+    }, 0);
+  };
+
+  const buildInstagramMetrics = (data, existing = {}) => {
+    const summary = data?.summary || {};
+    const accountInsights = Array.isArray(data?.account_insights) ? data.account_insights : [];
+    const media = Array.isArray(data?.media) ? data.media : [];
+    const followers = firstNumber(summary.followers, insightValue(accountInsights, 'follower_count'), existing.followers);
+    const reach = firstNumber(summary.reach, insightValue(accountInsights, 'reach'), existing.reach);
+    const impressions = firstNumber(summary.impressions, insightValue(accountInsights, 'impressions'), existing.impressions);
+    const postsCount = firstNumber(summary.media_count, summary.posts_count, media.length, existing.posts_count);
+    const interactions = firstNumber(summary.interactions, summary.total_interactions, mediaInteractions(media), existing.interactions);
+    const engagementRate = followers > 0 && interactions > 0
+      ? Number(((interactions / followers) * 100).toFixed(2))
+      : firstNumber(summary.engagement_rate, existing.engagement_rate);
+
+    return {
+      followers,
+      reach,
+      impressions,
+      posts_count: postsCount,
+      engagement_rate: engagementRate,
+      interactions,
+      synced_at: new Date().toISOString()
+    };
+  };
+
+  const rememberInstagramMetrics = (data) => {
+    const metrics = buildInstagramMetrics(data);
+    if (!metrics.reach && !metrics.impressions && !metrics.followers && !metrics.posts_count) return;
+    window.__bbLatestInstagramMetrics = metrics;
+    try {
+      window.sessionStorage.setItem(IG_METRICS_CACHE_KEY, JSON.stringify(metrics));
+    } catch (_) {}
+    console.info('[Black Bear] Instagram metrics prepared for SMM sync:', metrics);
+  };
+
+  const latestInstagramMetrics = () => {
+    if (window.__bbLatestInstagramMetrics) return window.__bbLatestInstagramMetrics;
+    try {
+      const cached = JSON.parse(window.sessionStorage.getItem(IG_METRICS_CACHE_KEY) || 'null');
+      if (cached && typeof cached === 'object') return cached;
+    } catch (_) {}
+    return null;
+  };
+
+  const readJsonBody = async (input, init) => {
+    let body = init?.body;
+    if (body == null && typeof Request === 'function' && input instanceof Request) {
+      try {
+        body = await input.clone().text();
+      } catch (_) {
+        return null;
+      }
+    }
+    if (typeof body !== 'string' || !body.trim()) return null;
+    try {
+      return JSON.parse(body);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const withJsonBody = (input, init, payload) => {
+    const headers = new Headers(init?.headers || (typeof Request === 'function' && input instanceof Request ? input.headers : undefined));
+    headers.set('Content-Type', 'application/json');
+    return {
+      ...(init || {}),
+      method: requestMethod(input, init),
+      headers,
+      body: JSON.stringify(payload)
+    };
+  };
+
+  const mergeSmmMetricPayload = (payload) => {
+    const latest = latestInstagramMetrics();
+    if (!latest) return payload;
+
+    const fullMetrics = buildInstagramMetrics({ summary: latest }, payload);
+    const merged = {
+      ...payload,
+      followers: fullMetrics.followers || payload.followers || 0,
+      reach: fullMetrics.reach || payload.reach || 0,
+      impressions: fullMetrics.impressions || payload.impressions || 0,
+      posts_count: fullMetrics.posts_count || payload.posts_count || 0,
+      engagement_rate: fullMetrics.engagement_rate || payload.engagement_rate || 0
+    };
+
+    console.info('[Black Bear] SMM metrics payload normalized:', merged);
+    return merged;
+  };
+
   const installInstagramApiPathPatch = () => {
     if (window.__bbInstagramApiPathPatchInstalled) return;
     window.__bbInstagramApiPathPatchInstalled = true;
@@ -66,7 +200,39 @@
     }
   };
 
+  const installInstagramMetricsBridge = () => {
+    if (window.__bbInstagramMetricsBridgeInstalled || typeof window.fetch !== 'function') return;
+    window.__bbInstagramMetricsBridgeInstalled = true;
+
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const path = requestPath(input);
+      const method = requestMethod(input, init);
+
+      if (method === 'POST' && (path === '/api/instagram/sync' || path === '/api/social/ig/sync')) {
+        const response = await originalFetch(input, init);
+        try {
+          const data = await response.clone().json();
+          rememberInstagramMetrics(data);
+        } catch (error) {
+          console.warn('[Black Bear] Could not cache Instagram sync metrics:', error?.message || error);
+        }
+        return response;
+      }
+
+      if (method === 'POST' && path === '/api/smm/metrics') {
+        const payload = await readJsonBody(input, init);
+        if (payload) {
+          return originalFetch(input, withJsonBody(input, init, mergeSmmMetricPayload(payload)));
+        }
+      }
+
+      return originalFetch(input, init);
+    };
+  };
+
   installInstagramApiPathPatch();
+  installInstagramMetricsBridge();
 
   const addStyles = () => {
     if (document.getElementById(STYLE_ID)) return;
