@@ -26,4 +26,4 @@ The bot must be connected only from the parent or participant cabinet. The cabin
 
 The public Telegram routes are routed through the existing `api/mono-parent-status.ts` function with explicit modes. This keeps the production deployment within the existing Vercel serverless function footprint while adding the parent bot endpoints.
 
-The notification dispatcher runs through Vercel Cron at `/api/telegram/dispatch`. It sends only important notification types: homework, homework review, payment, coach/admin messages, announcements, absences, birthdays, and personal events. Attendance marks and small point changes are not sent.
+The notification dispatcher runs through Vercel Cron at `/api/telegram/dispatch`. On the current Vercel plan it is scheduled once per day at 08:00 UTC so production deploys are not blocked by cron limits. It sends only important notification types: homework, homework review, payment, coach/admin messages, announcements, absences, birthdays, and personal events. Attendance marks and small point changes are not sent.
