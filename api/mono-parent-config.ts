@@ -59,6 +59,8 @@ async function readPaymentVisibility() {
   return true;
 }
 
+const getParentBotUsername = () => clean(process.env.TELEGRAM_PARENT_BOT_USERNAME) || 'karate_kyiv_bot';
+
 const getTelegramWebhookUrl = () => {
   const baseUrl =
     clean(process.env.APP_URL) ||
@@ -112,6 +114,17 @@ async function callParentTelegram(method: string, payload?: Record<string, any>)
   }
 }
 
+async function handleTelegramBotInfo(req: any, res: any) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', 'GET');
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const botUsername = getParentBotUsername();
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  return res.status(200).json({ botUsername, username: botUsername });
+}
+
 async function handleTelegramWebhookStatus(req: any, res: any) {
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader('Allow', 'GET, POST');
@@ -160,8 +173,12 @@ async function handleTelegramWebhookStatus(req: any, res: any) {
 export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'no-store');
 
-  if (clean(getQuery(req).mode) === 'telegram-webhook-status') {
+  const mode = clean(getQuery(req).mode);
+  if (mode === 'telegram-webhook-status') {
     return handleTelegramWebhookStatus(req, res);
+  }
+  if (mode === 'telegram-bot-info') {
+    return handleTelegramBotInfo(req, res);
   }
 
   if (req.method !== 'GET') {
