@@ -167,15 +167,25 @@
   }
 
   async function openTelegramConnect() {
+    const popup = window.open('', '_blank');
+    if (popup) {
+      popup.opener = null;
+      popup.document.write('<title>Telegram</title><p style="font-family: system-ui, sans-serif; padding: 24px;">Відкриваємо Telegram...</p>');
+    }
+
     const info = await fetchTelegram(true);
     if (info?.connectUrl) {
-      window.open(info.connectUrl, '_blank', 'noopener,noreferrer');
+      if (popup) popup.location.href = info.connectUrl;
+      else window.location.href = info.connectUrl;
       renderPanel();
+      return;
     }
+
+    if (popup) popup.close();
   }
 
   function shouldInterceptTelegramClick(target) {
-    if (!isParentPage()) return null;
+    if (!isParentPage() || !(target instanceof Element)) return null;
     const control = target.closest('button, a, [role="button"]');
     if (!control || control.closest(`#${PANEL_ID}`)) return null;
     const text = (control.textContent || '').toLowerCase();
