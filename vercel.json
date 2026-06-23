@@ -1,5 +1,11 @@
 {
   "version": 2,
+  "crons": [
+    {
+      "path": "/api/telegram/dispatch",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -24,6 +30,22 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/parent/telegram-link",
+      "destination": "/api/parent-telegram-link.ts"
+    },
+    {
+      "source": "/api/parent/social-links",
+      "destination": "/api/parent-social-links.ts"
+    },
+    {
+      "source": "/api/telegram/parent-webhook",
+      "destination": "/api/telegram-parent-webhook.ts"
+    },
+    {
+      "source": "/api/telegram/dispatch",
+      "destination": "/api/telegram-dispatch.ts"
+    },
     {
       "source": "/api/leads-public",
       "destination": "/api/leads-public.ts"
