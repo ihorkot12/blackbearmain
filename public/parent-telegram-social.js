@@ -73,6 +73,13 @@
         font-size: 14px;
         line-height: 1.5;
       }
+      .bb-parent-connect-social-note {
+        margin: -4px 0 14px;
+        color: #991b1b;
+        font-size: 14px;
+        font-weight: 800;
+        line-height: 1.35;
+      }
       .bb-parent-connect-actions {
         display: flex;
         flex-wrap: wrap;
@@ -231,9 +238,10 @@
         </section>
         <section class="bb-parent-connect-section" aria-label="Соцмережі клубу">
           <div class="bb-parent-connect-eyebrow"><span class="bb-parent-connect-dot"></span>Підпишіться на клуб</div>
-          <h2 class="bb-parent-connect-title">Новини BLACK BEAR DOJO</h2>
+          <h2 class="bb-parent-connect-title">BLACK BEAR DOJO в соцмережах</h2>
           <p class="bb-parent-connect-text">Там публікуємо фото, відео, новини клубу, змагання, атестації та важливі оголошення.</p>
-          <div class="bb-parent-connect-actions">
+          <p class="bb-parent-connect-social-note">Підписуйтесь, щоб бачити життя клубу першими.</p>
+          <div class="bb-parent-connect-actions" aria-label="Соцмережі BLACK BEAR DOJO">
             ${instagramUrl ? `<a class="bb-parent-connect-button secondary" href="${instagramUrl}" target="_blank" rel="noopener noreferrer">Instagram</a>` : ''}
             ${facebookUrl ? `<a class="bb-parent-connect-button secondary" href="${facebookUrl}" target="_blank" rel="noopener noreferrer">Facebook</a>` : ''}
           </div>
