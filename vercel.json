@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/telegram/dispatch",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 8 * * *"
     }
   ],
   "headers": [
