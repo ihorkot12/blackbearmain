@@ -32,19 +32,19 @@
   "rewrites": [
     {
       "source": "/api/parent/telegram-link",
-      "destination": "/api/parent-telegram-link.ts"
+      "destination": "/api/mono-parent-status.ts?mode=telegram-link"
     },
     {
       "source": "/api/parent/social-links",
-      "destination": "/api/parent-social-links.ts"
+      "destination": "/api/mono-parent-status.ts?mode=parent-social-links"
     },
     {
       "source": "/api/telegram/parent-webhook",
-      "destination": "/api/telegram-parent-webhook.ts"
+      "destination": "/api/mono-parent-status.ts?mode=telegram-webhook"
     },
     {
       "source": "/api/telegram/dispatch",
-      "destination": "/api/telegram-dispatch.ts"
+      "destination": "/api/mono-parent-status.ts?mode=telegram-dispatch"
     },
     {
       "source": "/api/leads-public",
