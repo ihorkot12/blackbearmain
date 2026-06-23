@@ -47,6 +47,14 @@
       "destination": "/api/mono-parent-status.ts?mode=telegram-dispatch"
     },
     {
+      "source": "/api/telegram/webhook-status",
+      "destination": "/api/mono-parent-config.ts?mode=telegram-webhook-status"
+    },
+    {
+      "source": "/api/telegram/setup-webhook",
+      "destination": "/api/mono-parent-config.ts?mode=telegram-webhook-status"
+    },
+    {
       "source": "/api/leads-public",
       "destination": "/api/leads-public.ts"
     },
