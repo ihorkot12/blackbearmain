@@ -40,7 +40,7 @@
     },
     {
       "source": "/api/telegram/parent-webhook",
-      "destination": "/api/mono-parent-status.ts?mode=telegram-webhook"
+      "destination": "/api/mono-parent-config.ts?mode=telegram-parent-webhook"
     },
     {
       "source": "/api/telegram/dispatch",
@@ -57,6 +57,22 @@
     {
       "source": "/api/telegram/bot-info",
       "destination": "/api/mono-parent-config.ts?mode=telegram-bot-info"
+    },
+    {
+      "source": "/api/messages/:participantId",
+      "destination": "/api/mono-parent-config.ts?mode=message-list&participantId=:participantId"
+    },
+    {
+      "source": "/api/messages",
+      "destination": "/api/mono-parent-config.ts?mode=messages"
+    },
+    {
+      "source": "/api/admin/notify/mass",
+      "destination": "/api/mono-parent-config.ts?mode=admin-notify-mass"
+    },
+    {
+      "source": "/api/admin/notify",
+      "destination": "/api/mono-parent-config.ts?mode=admin-notify"
     },
     {
       "source": "/api/leads-public",
