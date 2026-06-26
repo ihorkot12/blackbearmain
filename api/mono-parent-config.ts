@@ -1024,11 +1024,65 @@ function mainReplyKeyboard() {
       [{ text: 'Оплата' }, { text: 'Прогрес' }],
       [{ text: 'Рейтинг' }, { text: 'Зв’язок з тренером' }],
       [{ text: 'Сповіщення' }, { text: 'Відкрити кабінет' }],
+      [{ text: 'Instagram' }, { text: 'Facebook' }],
       [{ text: 'Відключити Telegram' }],
     ],
     resize_keyboard: true,
     is_persistent: true,
   };
+}
+
+async function getClubSocialLinks() {
+  const instagram = await getConfiguredValue(
+    ['CLUB_INSTAGRAM_URL', 'VITE_CLUB_INSTAGRAM_URL', 'PUBLIC_CLUB_INSTAGRAM_URL'],
+    ['CLUB_INSTAGRAM_URL', 'club_instagram_url', 'social_instagram', 'instagram_url']
+  );
+  const facebook = await getConfiguredValue(
+    ['CLUB_FACEBOOK_URL', 'VITE_CLUB_FACEBOOK_URL', 'PUBLIC_CLUB_FACEBOOK_URL'],
+    ['CLUB_FACEBOOK_URL', 'club_facebook_url', 'social_facebook', 'facebook_url']
+  );
+  return { instagram, facebook };
+}
+
+function isHttpUrl(value: unknown) {
+  try {
+    const url = new URL(String(value || '').trim());
+    return url.protocol === 'https:' || url.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+async function socialInlineKeyboard() {
+  const { instagram, facebook } = await getClubSocialLinks();
+  const row: Array<{ text: string; url: string }> = [];
+  if (isHttpUrl(instagram)) row.push({ text: 'Instagram', url: String(instagram) });
+  if (isHttpUrl(facebook)) row.push({ text: 'Facebook', url: String(facebook) });
+  if (row.length === 0) return null;
+  return inlineRowsKeyboard([row]);
+}
+
+async function inlineUrlWithSocialKeyboard(label: string, url: string) {
+  const rows: Array<Array<{ text: string; url: string }>> = [[{ text: label, url }]];
+  const social = await socialInlineKeyboard();
+  const socialRow = social?.inline_keyboard?.[0];
+  if (Array.isArray(socialRow) && socialRow.length > 0) rows.push(socialRow);
+  return inlineRowsKeyboard(rows);
+}
+
+async function sendTelegramSocialLinks(chatId: string) {
+  const keyboard = await socialInlineKeyboard();
+  const text = [
+    '<b>Підпишіться на клуб BLACK BEAR DOJO</b>',
+    'Там публікуємо фото, відео, новини клубу, змагання, атестації та важливі оголошення.',
+  ].join('\n\n');
+
+  if (!keyboard) {
+    await sendParentTelegram(chatId, `${text}\n\nПосилання ще не додані в налаштування сайту.`);
+    return;
+  }
+
+  await sendParentTelegram(chatId, text, keyboard);
 }
 
 async function requireTelegramConnection(chatId: string) {
@@ -1082,7 +1136,11 @@ function homeworkStatusLabel(status: unknown) {
 }
 
 async function sendTelegramMenu(chatId: string, intro?: string) {
-  await sendParentTelegram(chatId, `${intro ? `${intro}\n\n` : ''}Оберіть потрібний розділ нижче.`, mainReplyKeyboard());
+  await sendParentTelegram(
+    chatId,
+    `${intro ? `${intro}\n\n` : ''}Оберіть потрібний розділ нижче.\n\nПідписуйтесь на клуб в Instagram і Facebook - там фото, відео, новини, змагання та атестації.`,
+    mainReplyKeyboard()
+  );
 }
 
 async function sendTelegramProfile(chatId: string) {
@@ -1100,7 +1158,7 @@ async function sendTelegramProfile(chatId: string) {
     `Бали: ${Number(p.rank_points || 0)}`,
     `Оплата: ${paymentLabel(p.payment_status)}`,
   ].join('\n'));
-  await sendParentTelegram(chatId, `${title}\n\n${lines.join('\n\n')}`, inlineUrlKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent`));
+  await sendParentTelegram(chatId, `${title}\n\n${lines.join('\n\n')}`, await inlineUrlWithSocialKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent`));
 }
 
 async function sendTelegramHomework(chatId: string) {
@@ -1403,9 +1461,10 @@ async function handleTelegramMessage(chatId: string, text: string, from: any) {
   if (normalized === 'Прогрес') return sendTelegramProgress(chatId);
   if (normalized === 'Рейтинг' || normalized === '/rating') return sendTelegramRatings(chatId);
   if (normalized === 'Зв’язок з тренером' || normalized === "Зв'язок з тренером" || normalized === '/coach') return sendTelegramCoachContact(chatId);
+  if (normalized === 'Instagram' || normalized === 'Facebook' || normalized === 'Соцмережі' || normalized === '/social') return sendTelegramSocialLinks(chatId);
   if (normalized === 'Сповіщення') return sendTelegramNotifications(chatId);
   if (normalized === 'Відкрити кабінет') {
-    await sendParentTelegram(chatId, 'Кабінет BLACK BEAR DOJO:', inlineUrlKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent`));
+    await sendParentTelegram(chatId, 'Кабінет BLACK BEAR DOJO:', await inlineUrlWithSocialKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent`));
     return;
   }
   await sendTelegramMenu(chatId, 'Не зовсім зрозумів команду.');
