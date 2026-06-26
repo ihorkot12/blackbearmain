@@ -193,6 +193,9 @@ async function ensureSchema() {
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_connected_at TIMESTAMP;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_enabled BOOLEAN DEFAULT TRUE;
+    ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_username TEXT;
+    ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 
     CREATE TABLE IF NOT EXISTS telegram_link_tokens (
       token_hash TEXT PRIMARY KEY,

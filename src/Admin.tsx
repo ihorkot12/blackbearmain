@@ -5332,6 +5332,7 @@ const CoachesEditor = () => {
   const [editingCoach, setEditingCoach] = useState<any | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ id: number, name: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const emptyCoach = { name: '', role: '', bio: '', achievements: [], photo: '', phone: '', telegram_username: '', telegram_chat_id: '' };
 
   const fetchCoaches = () => {
     const token = localStorage.getItem('admin_token');
@@ -5526,6 +5527,41 @@ const CoachesEditor = () => {
                   className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
                 />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Телефон</label>
+                  <input
+                    type="tel"
+                    value={editingCoach.phone || ''}
+                    onChange={e => setEditingCoach({...editingCoach, phone: e.target.value})}
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+                    placeholder="+380..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Telegram нік</label>
+                  <input
+                    type="text"
+                    value={editingCoach.telegram_username || ''}
+                    onChange={e => setEditingCoach({...editingCoach, telegram_username: e.target.value})}
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+                    placeholder="@username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Telegram ID</label>
+                  <input
+                    type="text"
+                    value={editingCoach.telegram_chat_id || ''}
+                    onChange={e => setEditingCoach({...editingCoach, telegram_chat_id: e.target.value})}
+                    className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-red-600 outline-none"
+                    placeholder="123456789"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-zinc-500">
+                Ці контакти використовують батьківський і тренерський Telegram-боти для зв’язку з правильним тренером групи.
+              </p>
               <div>
                 <label className="block text-sm font-bold text-zinc-300 mb-2">Біографія</label>
                 <textarea 
@@ -5565,7 +5601,7 @@ const CoachesEditor = () => {
           </button>
         </div>
         <button 
-          onClick={() => setEditingCoach({ name: '', role: '', bio: '', achievements: [], photo: '' })}
+          onClick={() => setEditingCoach(emptyCoach)}
           className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-xl font-bold transition-colors"
         >
           <Plus size={18} />
@@ -5593,6 +5629,22 @@ const CoachesEditor = () => {
             </div>
             <h3 className="text-xl font-bold mb-1">{coach.name}</h3>
             <p className="text-sm text-red-500 mb-4">{coach.role}</p>
+            <div className="grid grid-cols-1 gap-2 mb-5 text-xs">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-black/40 border border-white/5 px-4 py-3">
+                <span className="font-black uppercase tracking-widest text-zinc-600">Телефон</span>
+                <span className="font-bold text-zinc-300 truncate">{coach.phone || 'не вказано'}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-black/40 border border-white/5 px-4 py-3">
+                <span className="font-black uppercase tracking-widest text-zinc-600">Telegram</span>
+                <span className="font-bold text-zinc-300 truncate">
+                  {coach.telegram_username ? `@${String(coach.telegram_username).replace(/^@/, '')}` : 'не вказано'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-black/40 border border-white/5 px-4 py-3">
+                <span className="font-black uppercase tracking-widest text-zinc-600">Chat ID</span>
+                <span className="font-bold text-zinc-300 truncate">{coach.telegram_chat_id || 'не вказано'}</span>
+              </div>
+            </div>
             <button 
               onClick={() => setEditingCoach(coach)}
               className="mt-auto w-full py-3 bg-white/5 hover:bg-white/10 rounded-xl font-bold transition-colors"
@@ -5880,6 +5932,10 @@ const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null 
     setConfirmDelete(null);
   };
 
+  const selectedCoach = editingGroup
+    ? coaches.find(c => String(c.id) === String(editingGroup.coach_id))
+    : null;
+
   return (
     <div className="space-y-12">
       <div className="flex items-center justify-between">
@@ -5932,6 +5988,24 @@ const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null 
               </select>
             </div>
           </div>
+          {selectedCoach && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 rounded-3xl bg-black/30 border border-white/5 p-5">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Телефон тренера</p>
+                <p className="text-sm font-bold text-white">{selectedCoach.phone || 'не вказано'}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Telegram нік</p>
+                <p className="text-sm font-bold text-white">
+                  {selectedCoach.telegram_username ? `@${String(selectedCoach.telegram_username).replace(/^@/, '')}` : 'не вказано'}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-600 mb-1">Telegram ID</p>
+                <p className="text-sm font-bold text-white">{selectedCoach.telegram_chat_id || 'не вказано'}</p>
+              </div>
+            </div>
+          )}
           <div className="flex gap-4">
             <button 
               onClick={() => handleSaveGroup(editingGroup)}
@@ -5964,7 +6038,14 @@ const GroupsEditor = ({ role, coachId }: { role: string, coachId: number | null 
               <tr key={group.id} className="group hover:bg-white/[0.02] transition-colors">
                 <td className="px-10 py-8 font-bold">{group.name}</td>
                 <td className="px-10 py-8 text-zinc-400">{locations.find(l => l.id === group.location_id)?.name || '—'}</td>
-                <td className="px-10 py-8 text-zinc-400">{coaches.find(c => c.id === group.coach_id)?.name || '—'}</td>
+                <td className="px-10 py-8 text-zinc-400">
+                  <p className="font-bold text-white">{group.coach_name || coaches.find(c => c.id === group.coach_id)?.name || '—'}</p>
+                  {(group.coach_phone || group.coach_telegram_username) && (
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {[group.coach_phone, group.coach_telegram_username ? `@${String(group.coach_telegram_username).replace(/^@/, '')}` : ''].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
+                </td>
                 <td className="px-10 py-8 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button 

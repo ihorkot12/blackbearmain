@@ -5,7 +5,6 @@
 
   const state = {
     coaches: [],
-    settings: {},
     loading: false,
     loadedAt: 0,
   };
@@ -63,7 +62,7 @@
       }
       .bb-admin-coach-contact-copy {
         margin: 6px 0 0;
-        max-width: 720px;
+        max-width: 760px;
         color: #a1a1aa;
         font-size: 13px;
         line-height: 1.5;
@@ -136,7 +135,7 @@
       }
       .bb-admin-coach-contact-fields {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 10px;
         margin-top: 12px;
       }
@@ -202,12 +201,8 @@
 
     state.loading = true;
     try {
-      const [coaches, settings] = await Promise.all([
-        fetchJson('/api/coaches'),
-        fetchJson('/api/settings'),
-      ]);
+      const coaches = await fetchJson('/api/coaches');
       state.coaches = Array.isArray(coaches) ? coaches : [];
-      state.settings = settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {};
       state.loadedAt = Date.now();
     } finally {
       state.loading = false;
@@ -216,29 +211,17 @@
 
   function findCoachesHeading() {
     return Array.from(document.querySelectorAll('h1,h2,h3')).find((heading) => {
-      return heading.textContent && heading.textContent.trim() === 'Тренери';
+      const text = (heading.textContent || '').trim().toLowerCase();
+      return text === 'тренери' || text === 'тренеры';
     }) || null;
-  }
-
-  function getSettingValue(coach, key) {
-    const id = coach?.id;
-    if (!id) return '';
-    if (key === 'phone') {
-      return state.settings[`coach_${id}_phone`] || coach.phone || '';
-    }
-    return (
-      state.settings[`coach_${id}_telegram_username`] ||
-      state.settings[`coach_${id}_telegram`] ||
-      coach.telegram_username ||
-      ''
-    );
   }
 
   function renderCoachRow(coach) {
     const id = coach?.id;
     if (!id) return '';
-    const phone = escapeHtml(getSettingValue(coach, 'phone'));
-    const telegram = escapeHtml(normalizeTelegramUsername(getSettingValue(coach, 'telegram')));
+    const phone = escapeHtml(coach.phone || '');
+    const telegram = escapeHtml(normalizeTelegramUsername(coach.telegram_username || ''));
+    const chatId = escapeHtml(coach.telegram_chat_id || '');
     return `
       <div class="bb-admin-coach-contact-row" data-bb-coach-id="${escapeHtml(id)}">
         <div class="bb-admin-coach-contact-name">${escapeHtml(coach.name || 'Тренер')}</div>
@@ -252,6 +235,10 @@
             Telegram нік
             <input class="bb-admin-coach-contact-input" data-bb-coach-telegram autocomplete="off" value="${telegram}" placeholder="@username" />
           </label>
+          <label class="bb-admin-coach-contact-label">
+            Telegram ID
+            <input class="bb-admin-coach-contact-input" data-bb-coach-chat-id autocomplete="off" value="${chatId}" placeholder="123456789" />
+          </label>
         </div>
       </div>
     `;
@@ -264,8 +251,8 @@
     panel.innerHTML = `
       <div class="bb-admin-coach-contact-head">
         <div>
-          <div class="bb-admin-coach-contact-title">Зв’язок з тренером</div>
-          <p class="bb-admin-coach-contact-copy">Телефон і Telegram нік показуються батькам та дорослим учасникам у боті в кнопці “Зв’язок з тренером”. Для Telegram можна вводити з @ або без.</p>
+          <div class="bb-admin-coach-contact-title">Зв’язок з тренером для ботів</div>
+          <p class="bb-admin-coach-contact-copy">Телефон, Telegram нік і Telegram ID зберігаються в картці тренера. Батьківський бот показує ці контакти саме для тренера групи, а тренерський бот може отримувати персональні повідомлення.</p>
         </div>
         <div class="bb-admin-coach-contact-actions">
           <button type="button" class="bb-admin-coach-contact-button" data-bb-coach-contact-refresh>Оновити</button>
@@ -295,39 +282,42 @@
   }
 
   async function saveContacts(panel) {
-    const token = getAdminToken();
-    if (!token) {
+    if (!getAdminToken()) {
       showStatus(panel, 'Потрібно увійти в адмінку ще раз.', 'error');
       return;
     }
 
-    const updates = {};
-    panel.querySelectorAll('[data-bb-coach-id]').forEach((row) => {
+    const rows = Array.from(panel.querySelectorAll('[data-bb-coach-id]'));
+    const payloads = rows.map((row) => {
       const id = row.getAttribute('data-bb-coach-id');
-      if (!id) return;
       const phoneInput = row.querySelector('[data-bb-coach-phone]');
       const telegramInput = row.querySelector('[data-bb-coach-telegram]');
+      const chatInput = row.querySelector('[data-bb-coach-chat-id]');
       const phone = phoneInput instanceof HTMLInputElement ? phoneInput.value.trim() : '';
       const telegram = telegramInput instanceof HTMLInputElement ? normalizeTelegramUsername(telegramInput.value) : '';
-      updates[`coach_${id}_phone`] = phone;
-      updates[`coach_${id}_telegram_username`] = telegram;
+      const telegramChatId = chatInput instanceof HTMLInputElement ? chatInput.value.trim().replace(/\s+/g, '') : '';
       if (telegramInput instanceof HTMLInputElement) telegramInput.value = telegram;
-    });
+      if (chatInput instanceof HTMLInputElement) chatInput.value = telegramChatId;
+      return { id, phone, telegram_username: telegram, telegram_chat_id: telegramChatId };
+    }).filter((item) => item.id);
 
-    const payload = { ...state.settings, ...updates };
     const buttons = panel.querySelectorAll('button');
     buttons.forEach((button) => { button.disabled = true; });
-    showStatus(panel, 'Зберігаю контакти...', 'ok');
+    showStatus(panel, 'Зберігаю контакти тренерів...', 'ok');
 
     try {
-      await fetchJson('/api/settings', {
-        method: 'POST',
+      await Promise.all(payloads.map((item) => fetchJson(`/api/coaches/${item.id}/contact`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      state.settings = payload;
-      state.loadedAt = Date.now();
-      showStatus(panel, 'Контакти тренерів збережено. Бот вже може показувати їх у кнопці зв’язку.', 'ok');
+        body: JSON.stringify({
+          phone: item.phone,
+          telegram_username: item.telegram_username,
+          telegram_chat_id: item.telegram_chat_id,
+        }),
+      })));
+      state.loadedAt = 0;
+      await loadData(true);
+      showStatus(panel, 'Контакти збережено. Боти вже можуть брати їх з картки тренера.', 'ok');
     } catch (error) {
       console.error('Coach contact save failed:', error);
       showStatus(panel, 'Не вдалося зберегти контакти. Оновіть сторінку і спробуйте ще раз.', 'error');

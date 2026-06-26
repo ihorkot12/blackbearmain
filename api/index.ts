@@ -144,10 +144,14 @@ async function initDb() {
         bio TEXT,
         photo TEXT,
         achievements TEXT, -- JSON string
+        phone TEXT,
+        telegram_username TEXT,
         telegram_chat_id TEXT,
         order_index INTEGER DEFAULT 0
       );
 
+      ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT;
+      ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_username TEXT;
       ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
 
       CREATE TABLE IF NOT EXISTS locations (
@@ -797,10 +801,26 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '10mb', extended: true }));
   app.set('trust proxy', 1);
 
-  const normalizePhone = (phone: string) => {
-    if (!phone) return phone;
+  const normalizePhone = (phone: unknown) => {
+    if (!phone) return '';
     // Remove all non-digits except +
-    return phone.replace(/[^\d+]/g, '');
+    return String(phone).replace(/[^\d+]/g, '');
+  };
+
+  const normalizeTelegramUsername = (value: unknown) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    return raw
+      .replace(/^https?:\/\/t\.me\//i, '')
+      .replace(/^t\.me\//i, '')
+      .replace(/^@+/, '')
+      .split(/[/?#]/)[0]
+      .trim();
+  };
+
+  const cleanTelegramChatId = (value: unknown) => {
+    const raw = String(value ?? '').trim();
+    return raw.replace(/\s+/g, '');
   };
 
   const normalizeLogin = (login: unknown) => String(login ?? '').trim();
@@ -2213,7 +2233,7 @@ async function startServer() {
           FROM site_content
         `),
         pool.query(`
-          SELECT id, name, role, bio, achievements, order_index,
+          SELECT id, name, role, bio, achievements, phone, telegram_username, order_index,
                  CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
                  CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
           FROM coaches
@@ -2227,7 +2247,7 @@ async function startServer() {
           LEFT JOIN locations l ON s.location_id = l.id
         `),
         pool.query(`
-          SELECT g.*, l.name as location_name, c.name as coach_name
+          SELECT g.*, l.name as location_name, c.name as coach_name, c.phone as coach_phone, c.telegram_username as coach_telegram_username
           FROM groups g
           LEFT JOIN locations l ON g.location_id = l.id
           LEFT JOIN coaches c ON g.coach_id = c.id
@@ -2345,8 +2365,16 @@ async function startServer() {
   app.get("/api/coaches", async (req, res) => {
     if (!pool) return res.json([]);
     try {
+      const authHeader = req.headers.authorization;
+      const tokenPayload = authHeader?.startsWith('Bearer ') ? verifyAuthToken(authHeader.slice('Bearer '.length)) : null;
+      const canSeePrivateContacts = Boolean(
+        authHeader === `Bearer ${ADMIN_TOKEN}` ||
+        tokenPayload?.role === 'admin' ||
+        tokenPayload?.role === 'coach' ||
+        (req.session as any).userId
+      );
       const result = await pool.query(`
-        SELECT id, name, role, bio, achievements, order_index,
+        SELECT id, name, role, bio, achievements, phone, telegram_username, telegram_chat_id, order_index,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
         FROM coaches
@@ -2371,6 +2399,9 @@ async function startServer() {
           coach.photo = `/api/images/coaches/${coach.id}?v=${lastInitUpdate}`;
         }
         delete coach.photo_type;
+        if (!canSeePrivateContacts) {
+          delete coach.telegram_chat_id;
+        }
         return coach;
       }));
     } catch (e: any) {
@@ -2395,11 +2426,23 @@ async function startServer() {
 
   app.post("/api/coaches", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, role, bio, achievements, photo } = req.body;
+    const { name, role, bio, achievements, photo, phone, telegram_username, telegram_chat_id } = req.body;
     try {
       const result = await pool.query(
-        "INSERT INTO coaches (name, role, bio, photo, achievements) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-        [name, role, bio, photo, JSON.stringify(achievements || [])]
+        `INSERT INTO coaches
+          (name, role, bio, photo, achievements, phone, telegram_username, telegram_chat_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id`,
+        [
+          name,
+          role,
+          bio,
+          photo,
+          JSON.stringify(achievements || []),
+          normalizePhone(phone) || null,
+          normalizeTelegramUsername(telegram_username) || null,
+          cleanTelegramChatId(telegram_chat_id) || null
+        ]
       );
       // Invalidate cache
       invalidateInitCache();
@@ -2434,19 +2477,70 @@ async function startServer() {
     }
   });
 
-  app.put('/api/coaches/:id', requireAuth, async (req, res) => {
-    const { name, role, bio, achievements, photo } = req.body;
+  app.put('/api/coaches/:id/contact', requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    const coachId = Number(req.params.id);
+    if (!Number.isInteger(coachId) || coachId <= 0) {
+      return res.status(400).json({ error: 'Invalid coach id' });
+    }
+    if (user?.role === 'coach' && Number(user.coach_id) !== coachId) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { phone, telegram_username, telegram_chat_id } = req.body || {};
     try {
-      let query = 'UPDATE coaches SET name = $1, role = $2, bio = $3, achievements = $4';
-      let params = [name, role, bio, JSON.stringify(achievements || [])];
+      const result = await pool.query(
+        `UPDATE coaches
+         SET phone = $1,
+             telegram_username = $2,
+             telegram_chat_id = $3
+         WHERE id = $4
+         RETURNING id, name, phone, telegram_username, telegram_chat_id`,
+        [
+          normalizePhone(phone) || null,
+          normalizeTelegramUsername(telegram_username) || null,
+          cleanTelegramChatId(telegram_chat_id) || null,
+          coachId
+        ]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Coach not found' });
+      invalidateInitCache();
+      res.json({ success: true, coach: result.rows[0] });
+    } catch (e) {
+      console.error('Failed to update coach contacts', e);
+      res.status(500).json({ error: 'Failed to update coach contacts' });
+    }
+  });
+
+  app.put('/api/coaches/:id', requireAuth, async (req, res) => {
+    const { name, role, bio, achievements, photo, phone, telegram_username, telegram_chat_id } = req.body;
+    try {
+      let query = `UPDATE coaches
+        SET name = $1,
+            role = $2,
+            bio = $3,
+            achievements = $4,
+            phone = $5,
+            telegram_username = $6,
+            telegram_chat_id = $7`;
+      const params: any[] = [
+        name,
+        role,
+        bio,
+        JSON.stringify(achievements || []),
+        normalizePhone(phone) || null,
+        normalizeTelegramUsername(telegram_username) || null,
+        cleanTelegramChatId(telegram_chat_id) || null
+      ];
 
       // Only update photo if it's not a generated URL that points back to the base64 data
       // This prevents overwriting the base64 data with its own serving URL
       if (photo && !photo.startsWith('/api/images/coaches/')) {
-        query += ', photo = $5 WHERE id = $6';
+        query += ', photo = $8 WHERE id = $9';
         params.push(photo, req.params.id);
       } else {
-        query += ' WHERE id = $5';
+        query += ' WHERE id = $8';
         params.push(req.params.id);
       }
 
@@ -4509,13 +4603,23 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (!pool) return res.json([]);
     const user = (req as any).user;
     try {
-      let query = "SELECT * FROM groups";
+      let query = `
+        SELECT g.*,
+               l.name as location_name,
+               c.name as coach_name,
+               c.phone as coach_phone,
+               c.telegram_username as coach_telegram_username,
+               c.telegram_chat_id as coach_telegram_chat_id
+        FROM groups g
+        LEFT JOIN locations l ON g.location_id = l.id
+        LEFT JOIN coaches c ON g.coach_id = c.id
+      `;
       let params: any[] = [];
       if (user.role === 'coach' && user.coach_id) {
-        query += " WHERE coach_id = $1";
+        query += " WHERE g.coach_id = $1";
         params.push(user.coach_id);
       }
-      query += " ORDER BY order_index ASC";
+      query += " ORDER BY g.order_index ASC";
       const result = await pool.query(query, params);
       res.json(result.rows);
     } catch (e: any) {
@@ -6685,9 +6789,15 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         const { name: groupName, location_id: locId, coach_id: coachId } = gRes.rows[0];
 
         const sRes = await pool.query(`
-          SELECT s.*, c.name as coach_name, l.name as location_name, l.address as location_address, l.map_link as location_map_link
+          SELECT s.*,
+                 c.name as coach_name,
+                 c.phone as coach_phone,
+                 c.telegram_username as coach_telegram_username,
+                 l.name as location_name,
+                 l.address as location_address,
+                 l.map_link as location_map_link
           FROM schedule s
-          LEFT JOIN coaches c ON s.coach_id = c.id
+          LEFT JOIN coaches c ON c.id = COALESCE(s.coach_id, $3::int)
           LEFT JOIN locations l ON s.location_id = l.id
           WHERE s.group_name IS NOT NULL
             AND (
