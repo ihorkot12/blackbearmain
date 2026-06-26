@@ -776,10 +776,12 @@ async function handleParentSocialLinks(req: any, res: any) {
 
   const instagramUrl =
     isHttpUrl(process.env.CLUB_INSTAGRAM_URL) ||
-    isHttpUrl(await getSettingsValue(['CLUB_INSTAGRAM_URL', 'club_instagram_url', 'social_instagram', 'instagram_url']));
+    isHttpUrl(await getSettingsValue(['CLUB_INSTAGRAM_URL', 'club_instagram_url', 'social_instagram', 'instagram_url'])) ||
+    'https://instagram.com/karate_kyiv';
   const facebookUrl =
     isHttpUrl(process.env.CLUB_FACEBOOK_URL) ||
-    isHttpUrl(await getSettingsValue(['CLUB_FACEBOOK_URL', 'club_facebook_url', 'social_facebook', 'facebook_url']));
+    isHttpUrl(await getSettingsValue(['CLUB_FACEBOOK_URL', 'club_facebook_url', 'social_facebook', 'facebook_url'])) ||
+    'https://www.facebook.com/karatee.kyiv/';
 
   res.setHeader('Cache-Control', 'public, max-age=300');
   return res.status(200).json({ instagramUrl, facebookUrl });

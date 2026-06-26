@@ -1041,7 +1041,10 @@ async function getClubSocialLinks() {
     ['CLUB_FACEBOOK_URL', 'VITE_CLUB_FACEBOOK_URL', 'PUBLIC_CLUB_FACEBOOK_URL'],
     ['CLUB_FACEBOOK_URL', 'club_facebook_url', 'social_facebook', 'facebook_url']
   );
-  return { instagram, facebook };
+  return {
+    instagram: instagram || 'https://instagram.com/karate_kyiv',
+    facebook: facebook || 'https://www.facebook.com/karatee.kyiv/',
+  };
 }
 
 function isHttpUrl(value: unknown) {
@@ -1453,6 +1456,7 @@ async function handleTelegramMessage(chatId: string, text: string, from: any) {
     return;
   }
 
+  if (normalized === '/menu' || normalized === 'Меню') return sendTelegramMenu(chatId);
   if (normalized === 'Мої діти / Мій профіль') return sendTelegramProfile(chatId);
   if (normalized === 'Домашні завдання') return sendTelegramHomework(chatId);
   if (normalized === 'Методичка') return sendTelegramManual(chatId);
