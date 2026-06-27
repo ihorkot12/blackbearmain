@@ -82,7 +82,7 @@ const getAppBaseUrl = (req?: express.Request) => {
 };
 
 const getTelegramBotUsername = () =>
-  (process.env.TELEGRAM_BOT_USERNAME || 'BlackBearDojoBot').replace(/^@+/, '').trim();
+  (process.env.TELEGRAM_BOT_USERNAME || 'blackbear_dojo_bot').replace(/^@+/, '').trim();
 
 const escapeTelegramHtml = (value: unknown) =>
   String(value ?? '')

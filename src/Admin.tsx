@@ -932,7 +932,7 @@ export const AdminPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
+  const [botUsername, setBotUsername] = useState('blackbear_dojo_bot');
   const [coachData, setCoachData] = useState<any>(null);
   const [isInstagramConnected, setIsInstagramConnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
@@ -943,7 +943,9 @@ export const AdminPage = () => {
   useEffect(() => {
     if (!authChecked) return;
 
-    fetch('/api/telegram/bot-info')
+    fetch('/api/admin/coach-telegram', {
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('admin_token') || ''}` }
+    })
       .then(r => r.json())
       .then(data => setBotUsername(data.botUsername))
       .catch(e => console.log(e));
