@@ -84,6 +84,18 @@ const getAppBaseUrl = (req?: express.Request) => {
 const getTelegramBotUsername = () =>
   (process.env.TELEGRAM_BOT_USERNAME || 'blackbear_dojo_bot').replace(/^@+/, '').trim();
 
+const getCoachTelegramBotUsername = () =>
+  (process.env.TELEGRAM_COACH_BOT_USERNAME || process.env.COACH_TELEGRAM_BOT_USERNAME || 'karatekyivbot')
+    .replace(/^@+/, '')
+    .trim();
+
+const getCoachTelegramBotToken = () =>
+  (
+    process.env.TELEGRAM_COACH_BOT_TOKEN ||
+    process.env.COACH_TELEGRAM_BOT_TOKEN ||
+    ''
+  ).trim();
+
 const escapeTelegramHtml = (value: unknown) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -1528,8 +1540,37 @@ async function startServer() {
     };
   };
 
-  async function sendTelegramBotMessage(chatId: string | number, text: string, replyMarkup?: any) {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+  const buildCoachTelegramReplyKeyboard = () => ({
+    keyboard: [
+      [{ text: 'Сьогодні' }, { text: 'Відвідуваність' }],
+      [{ text: 'Оплати' }, { text: 'Дні народження' }],
+      [{ text: 'Портал' }]
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+    input_field_placeholder: 'Оберіть дію тренера'
+  });
+
+  const getCoachTelegramAction = (req: express.Request, text: string) => {
+    const adminUrl = `${getAppBaseUrl(req)}/admin`;
+    const normalized = text.trim().toLowerCase();
+    const actions: Record<string, { title: string; url: string }> = {
+      'сьогодні': { title: 'Сьогодні', url: `${adminUrl}?tab=today` },
+      'відвідуваність': { title: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` },
+      'журнал': { title: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` },
+      'оплати': { title: 'Оплати', url: `${adminUrl}?tab=crm&action=add_payment` },
+      'дні народження': { title: 'Дні народження', url: `${adminUrl}?tab=dashboard` },
+      'др': { title: 'Дні народження', url: `${adminUrl}?tab=dashboard` },
+      'портал': { title: 'Портал', url: adminUrl },
+      'відкрити портал': { title: 'Портал', url: adminUrl },
+      '/menu': { title: 'Портал', url: adminUrl },
+      '/меню': { title: 'Портал', url: adminUrl }
+    };
+    return actions[normalized] || null;
+  };
+
+  async function sendCoachTelegramBotMessage(chatId: string | number, text: string, replyMarkup?: any) {
+    const token = getCoachTelegramBotToken();
     if (!token || !chatId) return false;
 
     try {
@@ -1547,12 +1588,12 @@ async function startServer() {
 
       if (!response.ok) {
         const body = await response.text().catch(() => '');
-        console.warn('Telegram bot message failed:', response.status, body.slice(0, 180));
+        console.warn('Coach Telegram bot message failed:', response.status, body.slice(0, 180));
         return false;
       }
       return true;
     } catch (e) {
-      console.error('Telegram bot message error:', e);
+      console.error('Coach Telegram bot message error:', e);
       return false;
     }
   }
@@ -1572,7 +1613,8 @@ async function startServer() {
     return coachId;
   };
 
-  // Telegram Webhook
+  // Existing notifier bot webhook. Keep this limited to legacy notification flows
+  // so the lead/request bot does not become the coach portal bot by accident.
   app.post("/api/telegram/webhook", async (req, res) => {
     const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
     if (configuredSecret) {
@@ -1603,31 +1645,60 @@ async function startServer() {
             } else {
               await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [String(chatId), id]);
             }
-            await sendTelegramBotMessage(
-              chatId,
-              'Telegram підключено до кабінету. Важливі повідомлення клубу приходитимуть сюди.'
-            );
+            await sendTelegramMessage('Telegram підключено до кабінету. Важливі повідомлення клубу приходитимуть сюди.', String(chatId));
             return res.sendStatus(200);
           }
+        }
+      }
+    } catch (e) {
+      console.error("Telegram notifier webhook error:", e);
+    }
 
-          const coachId = parseCoachStartToken(token);
-          if (coachId) {
-            const result = await pool.query(
-              "UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2 RETURNING id, name",
-              [String(chatId), coachId]
+    res.sendStatus(200);
+  });
+
+  app.post("/api/telegram/coach-webhook", async (req, res) => {
+    const configuredSecret = process.env.TELEGRAM_COACH_WEBHOOK_SECRET?.trim();
+    if (configuredSecret) {
+      const headerSecret = req.headers['x-telegram-bot-api-secret-token'];
+      if (headerSecret !== configuredSecret) return res.sendStatus(401);
+    }
+
+    const { message } = req.body || {};
+    if (!message || !message.text) return res.sendStatus(200);
+
+    const text = String(message.text || '');
+    const chatId = message.chat?.id;
+    const chatType = message.chat?.type;
+    if (!chatId || chatType !== 'private') return res.sendStatus(200);
+
+    try {
+      if (text.startsWith("/start")) {
+        const parts = text.trim().split(/\s+/);
+        const token = parts[1] || '';
+        const coachId = token ? parseCoachStartToken(token) : null;
+
+        if (coachId) {
+          const result = await pool.query(
+            "UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2 RETURNING id, name",
+            [String(chatId), coachId]
+          );
+          const coach = result.rows[0];
+          if (coach) {
+            await sendCoachTelegramBotMessage(
+              chatId,
+              `<b>Telegram тренера підключено</b>\n\n${escapeTelegramHtml(coach.name)}, тепер цей бот веде вас у тренерський портал: відмітки, групи, оплати, дні народження і повідомлення батьків.`,
+              buildCoachTelegramReplyKeyboard()
             );
-            const coach = result.rows[0];
-            if (coach) {
-              await sendTelegramBotMessage(
-                chatId,
-                `<b>Telegram тренера підключено</b>\n\n${escapeTelegramHtml(coach.name)}, тепер цей бот веде вас у тренерський портал: відмітки, групи, оплати, дні народження і повідомлення батьків.`,
-                buildCoachTelegramKeyboard(req)
-              );
-            } else {
-              await sendTelegramBotMessage(chatId, 'Не знайшов тренера для цього посилання. Відкрийте підключення з порталу ще раз.');
-            }
-            return res.sendStatus(200);
+            await sendCoachTelegramBotMessage(
+              chatId,
+              'Швидкі посилання на портал:',
+              buildCoachTelegramKeyboard(req)
+            );
+          } else {
+            await sendCoachTelegramBotMessage(chatId, 'Не знайшов тренера для цього посилання. Відкрийте підключення з порталу ще раз.');
           }
+          return res.sendStatus(200);
         }
 
         const existingCoach = await pool.query(
@@ -1636,22 +1707,50 @@ async function startServer() {
         );
         if (existingCoach.rows.length > 0) {
           const coach = existingCoach.rows[0];
-          await sendTelegramBotMessage(
+          await sendCoachTelegramBotMessage(
             chatId,
-            `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, швидкі кнопки нижче відкривають потрібний розділ порталу.`,
+            `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, кнопки нижче відкривають потрібний розділ порталу.`,
+            buildCoachTelegramReplyKeyboard()
+          );
+          await sendCoachTelegramBotMessage(
+            chatId,
+            'Швидкі посилання на портал:',
             buildCoachTelegramKeyboard(req)
           );
         } else {
-          await sendTelegramBotMessage(
+          await sendCoachTelegramBotMessage(
             chatId,
-            `<b>Black Bear Dojo</b>\n\nЦей бот використовується для тренерського порталу. Щоб підключити його, відкрийте портал і натисніть “Підключити Telegram” у кабінеті тренера.`,
+            `<b>Black Bear Dojo</b>\n\nЦе окремий бот тренерського порталу. Щоб підключити його, відкрийте портал і натисніть “Підключити Telegram” у кабінеті тренера.`,
             { inline_keyboard: [[{ text: 'Відкрити портал', url: `${getAppBaseUrl(req)}/admin` }]] }
           );
         }
+      } else {
+        const existingCoach = await pool.query(
+          "SELECT id, name FROM coaches WHERE telegram_chat_id = $1 LIMIT 1",
+          [String(chatId)]
+        );
+        if (existingCoach.rows.length > 0) {
+          const action = getCoachTelegramAction(req, text);
+          if (action) {
+            await sendCoachTelegramBotMessage(
+              chatId,
+              `<b>${escapeTelegramHtml(action.title)}</b>\nВідкрийте потрібний розділ у тренерському порталі.`,
+              {
+                inline_keyboard: [[{ text: `Відкрити: ${action.title}`, url: action.url }]]
+              }
+            );
+          } else {
+            await sendCoachTelegramBotMessage(
+              chatId,
+              'Оберіть дію з меню тренера нижче.',
+              buildCoachTelegramReplyKeyboard()
+            );
+          }
+        }
       }
     } catch (e) {
-      console.error("Telegram connection error:", e);
-      await sendTelegramBotMessage(chatId, 'Сталася помилка підключення. Відкрийте портал і спробуйте ще раз.');
+      console.error("Coach Telegram webhook error:", e);
+      await sendCoachTelegramBotMessage(chatId, 'Сталася помилка підключення. Відкрийте портал і спробуйте ще раз.');
     }
 
     res.sendStatus(200);
@@ -1669,7 +1768,7 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
 
     const user = (req as any).user;
-    const botUsername = getTelegramBotUsername();
+    const botUsername = getCoachTelegramBotUsername();
     const portalUrl = `${getAppBaseUrl(req)}/admin`;
 
     try {

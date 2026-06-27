@@ -932,7 +932,7 @@ export const AdminPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [botUsername, setBotUsername] = useState('blackbear_dojo_bot');
+  const [botUsername, setBotUsername] = useState('karatekyivbot');
   const [coachData, setCoachData] = useState<any>(null);
   const [isInstagramConnected, setIsInstagramConnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
