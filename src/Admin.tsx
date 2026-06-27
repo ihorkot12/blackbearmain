@@ -485,6 +485,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
       </div>
 
       <div className="grid lg:grid-cols-3 gap-8">
+        {role !== 'coach' && (
         <div 
           onClick={() => onQuickAction('leads')}
           className="lg:col-span-2 bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
@@ -520,10 +521,11 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             </AreaChart>
           </ChartFrame>
         </div>
+        )}
 
         <div 
           onClick={() => onQuickAction('groups')}
-          className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group"
+          className={`${role === 'coach' ? 'lg:col-span-3' : ''} bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5 cursor-pointer hover:bg-zinc-900/50 transition-all group`}
         >
           <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight mb-6 lg:mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -667,6 +669,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
           </div>
         )}
 
+        {role !== 'coach' && (
         <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
           <div className="flex items-center justify-between mb-6 lg:mb-10">
             <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight flex items-center gap-3">
@@ -713,6 +716,7 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
             )}
           </div>
         </div>
+        )}
 
         <div className="bg-zinc-900/30 backdrop-blur-md p-6 lg:p-10 rounded-[2rem] lg:rounded-[3rem] border border-white/5">
           <div className="flex items-center justify-between mb-6 lg:mb-10">
@@ -887,9 +891,39 @@ const Dashboard = ({ onQuickAction, role, coachId }: { onQuickAction: (tab: stri
   );
 };
 
+const ADMIN_LAUNCH_TABS = new Set([
+  'dashboard',
+  'today',
+  'attendance',
+  'participants',
+  'crm',
+  'groups',
+  'parent_messages',
+  'schedule',
+  'rating',
+  'rank_management',
+  'homework',
+  'manual',
+  'locations'
+]);
+
+const getAdminLaunchParams = () => {
+  if (typeof window === 'undefined') {
+    return { tab: 'dashboard', action: null as string | null };
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const tab = params.get('tab') || 'dashboard';
+  return {
+    tab: ADMIN_LAUNCH_TABS.has(tab) ? tab : 'dashboard',
+    action: params.get('action')
+  };
+};
+
 export const AdminPage = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [initialAction, setInitialAction] = useState<string | null>(null);
+  const launchParams = getAdminLaunchParams();
+  const [activeTab, setActiveTab] = useState(launchParams.tab);
+  const [initialAction, setInitialAction] = useState<string | null>(launchParams.action);
   const mainContentRef = useRef<HTMLElement | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState<string>('admin');
@@ -990,10 +1024,25 @@ export const AdminPage = () => {
     }
   }, [coachId]);
 
-  const handleConnectTelegram = () => {
+  const handleConnectTelegram = async () => {
     if (!coachId) return;
-    const token = `c_${coachId}`;
-    window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
+    const token = localStorage.getItem('admin_token');
+    try {
+      const res = await fetch('/api/admin/coach-telegram', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const coach = Array.isArray(data.coaches)
+        ? data.coaches.find((item: any) => Number(item.id) === Number(coachId)) || data.coaches[0]
+        : null;
+      if (coach?.connectUrl) {
+        window.open(coach.connectUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to load Telegram link', e);
+    }
+    window.open(`https://t.me/${botUsername}?start=c_${coachId}`, '_blank', 'noopener,noreferrer');
   };
 
   const navigate = useNavigate();
@@ -1043,7 +1092,7 @@ export const AdminPage = () => {
         setAuthChecked(true);
         
         // If coach and activeTab is restricted, switch to first allowed tab
-        if (data.role === 'coach' && ['leads', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
+        if (data.role === 'coach' && ['leads', 'registrations', 'content', 'coaches', 'settings', 'admin_users'].includes(activeTab)) {
           setActiveTab('today');
         }
       } catch (e) {
@@ -1055,6 +1104,12 @@ export const AdminPage = () => {
   }, [navigate]);
 
   const handleQuickAction = (tab: string, action?: string) => {
+    if (role === 'coach' && ['leads', 'registrations', 'content', 'coaches', 'settings', 'admin_users', 'smm', 'notifications', 'audit_logs'].includes(tab)) {
+      setInitialAction(null);
+      setActiveTab('today');
+      setIsMobileMenuOpen(false);
+      return;
+    }
     setInitialAction(null);
     setActiveTab(tab);
     setIsMobileMenuOpen(false);
@@ -1125,7 +1180,7 @@ export const AdminPage = () => {
         { id: 'homework', label: 'Домашні завдання', icon: FileText, roles: ['admin', 'coach'] },
         { id: 'manual', label: 'Методичка', icon: Book, roles: ['admin', 'coach'] },
         { id: 'participants', label: 'Учасники', icon: UserCheck, roles: ['admin', 'coach'] },
-        { id: 'registrations', label: 'Реєстрації', icon: UserPlus, roles: ['admin', 'coach'] },
+        { id: 'registrations', label: 'Реєстрації', icon: UserPlus, roles: ['admin'] },
         { id: 'groups', label: 'Групи', icon: Users, roles: ['admin', 'coach'] },
         { id: 'parent_messages', label: 'Повідомлення батьків', icon: MessageSquare, roles: ['admin', 'coach'] },
         { id: 'audit_logs', label: 'Журнал подій', icon: FileText, roles: ['admin'] },
@@ -1135,7 +1190,7 @@ export const AdminPage = () => {
     {
       title: 'Управління',
       items: [
-        { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin', 'coach'] },
+        { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin'] },
         { id: 'crm', label: 'CRM & Фінанси', icon: BarChart3, roles: ['admin', 'coach'] },
         { id: 'smm', label: 'SMM Agency', icon: Sparkles, roles: ['admin'] },
         { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },

@@ -70,6 +70,36 @@ const createAuthToken = (params: { id: number | string; role: AuthTokenRole; acc
   return `${AUTH_TOKEN_PREFIX}.${encodedPayload}.${signAuthTokenPayload(encodedPayload)}`;
 };
 
+const getAppBaseUrl = (req?: express.Request) => {
+  const configuredUrl = process.env.APP_URL?.trim();
+  const fallbackUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : req
+      ? `${req.protocol}://${req.get('host')}`
+      : 'https://shin-karate.kyiv.ua';
+
+  return (configuredUrl || fallbackUrl).replace(/\/+$/, '');
+};
+
+const getTelegramBotUsername = () =>
+  (process.env.TELEGRAM_BOT_USERNAME || 'BlackBearDojoBot').replace(/^@+/, '').trim();
+
+const escapeTelegramHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const createTelegramStartSignature = (type: string, id: number | string) =>
+  crypto
+    .createHmac('sha256', SESSION_SECRET)
+    .update(`${type}:${id}`)
+    .digest('base64url')
+    .slice(0, 18);
+
+const createCoachStartPayload = (coachId: number | string) =>
+  `coach_${coachId}_${createTelegramStartSignature('coach', coachId)}`;
+
 const verifyAuthToken = (token: string): AuthTokenPayload | null => {
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== AUTH_TOKEN_PREFIX) return null;
@@ -1481,45 +1511,208 @@ async function startServer() {
     }
   }
 
+  const buildCoachTelegramKeyboard = (req: express.Request) => {
+    const adminUrl = `${getAppBaseUrl(req)}/admin`;
+    return {
+      inline_keyboard: [
+        [
+          { text: 'Сьогодні', url: `${adminUrl}?tab=today` },
+          { text: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` }
+        ],
+        [
+          { text: 'Оплати', url: `${adminUrl}?tab=crm&action=add_payment` },
+          { text: 'Дні народження', url: `${adminUrl}?tab=dashboard` }
+        ],
+        [{ text: 'Відкрити портал', url: adminUrl }]
+      ]
+    };
+  };
+
+  async function sendTelegramBotMessage(chatId: string | number, text: string, replyMarkup?: any) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token || !chatId) return false;
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        console.warn('Telegram bot message failed:', response.status, body.slice(0, 180));
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Telegram bot message error:', e);
+      return false;
+    }
+  }
+
+  const parseCoachStartToken = (token: string) => {
+    const [type, rawId, signature] = token.split('_');
+    if (!['c', 'coach'].includes(type)) return null;
+
+    const coachId = Number(rawId);
+    if (!Number.isInteger(coachId) || coachId <= 0) return null;
+
+    if (type === 'coach') {
+      const expectedSignature = createTelegramStartSignature('coach', coachId);
+      if (signature !== expectedSignature) return null;
+    }
+
+    return coachId;
+  };
+
   // Telegram Webhook
   app.post("/api/telegram/webhook", async (req, res) => {
-    const { message } = req.body;
+    const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+    if (configuredSecret) {
+      const headerSecret = req.headers['x-telegram-bot-api-secret-token'];
+      if (headerSecret !== configuredSecret) return res.sendStatus(401);
+    }
+
+    const { message } = req.body || {};
     if (!message || !message.text) return res.sendStatus(200);
 
-    const text = message.text;
-    const chatId = message.chat.id;
+    const text = String(message.text || '');
+    const chatId = message.chat?.id;
+    if (!chatId) return res.sendStatus(200);
 
-    if (text.startsWith("/start")) {
-      const parts = text.split(" ");
-      if (parts.length > 1) {
-        const token = parts[1];
-        const [type, id] = token.split("_");
+    try {
+      if (text.startsWith("/start")) {
+        const parts = text.trim().split(/\s+/);
+        const token = parts[1] || '';
 
-        try {
+        if (token) {
+          const [type, id] = token.split("_");
+
           if (type === "p") {
             const participantRes = await pool.query("SELECT parent_login FROM participants WHERE id = $1", [id]);
             const parentLogin = participantRes.rows[0]?.parent_login;
             if (parentLogin) {
-              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE parent_login = $2", [chatId, parentLogin]);
+              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE parent_login = $2", [String(chatId), parentLogin]);
             } else {
-              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+              await pool.query("UPDATE participants SET telegram_chat_id = $1 WHERE id = $2", [String(chatId), id]);
             }
-          } else if (type === "c") {
-            await pool.query("UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2", [chatId, id]);
+            await sendTelegramBotMessage(
+              chatId,
+              'Telegram підключено до кабінету. Важливі повідомлення клубу приходитимуть сюди.'
+            );
+            return res.sendStatus(200);
           }
-        } catch (e) {
-          console.error("Telegram connection error:", e);
+
+          const coachId = parseCoachStartToken(token);
+          if (coachId) {
+            const result = await pool.query(
+              "UPDATE coaches SET telegram_chat_id = $1 WHERE id = $2 RETURNING id, name",
+              [String(chatId), coachId]
+            );
+            const coach = result.rows[0];
+            if (coach) {
+              await sendTelegramBotMessage(
+                chatId,
+                `<b>Telegram тренера підключено</b>\n\n${escapeTelegramHtml(coach.name)}, тепер цей бот веде вас у тренерський портал: відмітки, групи, оплати, дні народження і повідомлення батьків.`,
+                buildCoachTelegramKeyboard(req)
+              );
+            } else {
+              await sendTelegramBotMessage(chatId, 'Не знайшов тренера для цього посилання. Відкрийте підключення з порталу ще раз.');
+            }
+            return res.sendStatus(200);
+          }
+        }
+
+        const existingCoach = await pool.query(
+          "SELECT id, name FROM coaches WHERE telegram_chat_id = $1 LIMIT 1",
+          [String(chatId)]
+        );
+        if (existingCoach.rows.length > 0) {
+          const coach = existingCoach.rows[0];
+          await sendTelegramBotMessage(
+            chatId,
+            `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, швидкі кнопки нижче відкривають потрібний розділ порталу.`,
+            buildCoachTelegramKeyboard(req)
+          );
+        } else {
+          await sendTelegramBotMessage(
+            chatId,
+            `<b>Black Bear Dojo</b>\n\nЦей бот використовується для тренерського порталу. Щоб підключити його, відкрийте портал і натисніть “Підключити Telegram” у кабінеті тренера.`,
+            { inline_keyboard: [[{ text: 'Відкрити портал', url: `${getAppBaseUrl(req)}/admin` }]] }
+          );
         }
       }
+    } catch (e) {
+      console.error("Telegram connection error:", e);
+      await sendTelegramBotMessage(chatId, 'Сталася помилка підключення. Відкрийте портал і спробуйте ще раз.');
     }
 
     res.sendStatus(200);
   });
 
   app.get("/api/telegram/bot-info", (req, res) => {
+    const botUsername = getTelegramBotUsername();
     res.json({
-      botUsername: process.env.TELEGRAM_BOT_USERNAME || 'BlackBearDojoBot'
+      botUsername,
+      portalUrl: `${getAppBaseUrl(req)}/admin`
     });
+  });
+
+  app.get("/api/admin/coach-telegram", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+
+    const user = (req as any).user;
+    const botUsername = getTelegramBotUsername();
+    const portalUrl = `${getAppBaseUrl(req)}/admin`;
+
+    try {
+      const params: any[] = [];
+      let where = '';
+      if (user?.role === 'coach') {
+        if (!user.coach_id) {
+          return res.json({
+            botUsername,
+            portalUrl,
+            coaches: [],
+            needsCoachLink: true
+          });
+        }
+        params.push(user.coach_id);
+        where = 'WHERE id = $1';
+      }
+
+      const result = await pool.query(
+        `SELECT id, name, role, telegram_username, telegram_chat_id
+         FROM coaches
+         ${where}
+         ORDER BY order_index ASC, id ASC`,
+        params
+      );
+
+      res.json({
+        botUsername,
+        portalUrl,
+        coaches: result.rows.map((coach: any) => ({
+          id: coach.id,
+          name: coach.name,
+          role: coach.role,
+          telegram_username: coach.telegram_username,
+          connected: Boolean(coach.telegram_chat_id),
+          telegram_chat_id: user?.role === 'admin' ? coach.telegram_chat_id : undefined,
+          connectUrl: `https://t.me/${botUsername}?start=${createCoachStartPayload(coach.id)}`
+        }))
+      });
+    } catch (e) {
+      console.error('Failed to build coach Telegram links:', e);
+      res.status(500).json({ error: "Failed to fetch coach Telegram links" });
+    }
   });
 
   async function sendTelegramMessage(text: string, customChatId?: string) {
@@ -2808,7 +3001,7 @@ async function startServer() {
 
       if (!user) {
         const adminResult = await pool.query(
-          `SELECT id, name, password as admin_password, role FROM admin_users WHERE login = $1 LIMIT 1`,
+          `SELECT id, name, password as admin_password, role, coach_id FROM admin_users WHERE login = $1 LIMIT 1`,
           [loginValue]
         );
         if (adminResult.rows.length > 0) {
@@ -2892,7 +3085,8 @@ async function startServer() {
         await setFreshSession(req, {
           userId: user.id,
           role,
-          userName: user.name
+          userName: user.name,
+          coachId: user.coach_id || null
         });
 
         return res.json({
@@ -2900,6 +3094,7 @@ async function startServer() {
           role,
           name: user.name,
           id: user.id,
+          coach_id: user.coach_id || null,
           token: createAuthToken({ id: user.id, role }),
           redirect: '/admin'
         });
@@ -2931,7 +3126,12 @@ async function startServer() {
 
   app.get('/api/check-auth', requireAuth, (req, res) => {
     const user = (req as any).user;
-    res.json({ isAdmin: true, role: user?.role || 'admin', name: user?.name });
+    res.json({
+      isAdmin: true,
+      role: user?.role || 'admin',
+      name: user?.name,
+      coach_id: user?.coach_id || null
+    });
   });
 
   // Admin Users Management
