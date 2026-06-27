@@ -71,11 +71,23 @@ const createAuthToken = (params: { id: number | string; role: AuthTokenRole; acc
 };
 
 const getAppBaseUrl = (req?: express.Request) => {
-  const configuredUrl = process.env.APP_URL?.trim();
+  const configuredUrl = (
+    process.env.APP_URL ||
+    process.env.PUBLIC_APP_URL ||
+    (process.env.VERCEL_ENV === 'production' ? 'https://shin-karate.kyiv.ua' : '')
+  ).trim();
+  const forwardedHost = req?.headers['x-forwarded-host'];
+  const forwardedProto = req?.headers['x-forwarded-proto'];
+  const requestHost = Array.isArray(forwardedHost)
+    ? forwardedHost[0]
+    : forwardedHost || req?.get('host');
+  const requestProtocol = Array.isArray(forwardedProto)
+    ? forwardedProto[0]
+    : forwardedProto || req?.protocol;
   const fallbackUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : req
-      ? `${req.protocol}://${req.get('host')}`
+      ? `${requestProtocol || 'https'}://${requestHost}`
       : 'https://shin-karate.kyiv.ua';
 
   return (configuredUrl || fallbackUrl).replace(/\/+$/, '');
