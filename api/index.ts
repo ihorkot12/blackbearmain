@@ -1523,27 +1523,107 @@ async function startServer() {
     }
   }
 
-  const buildCoachTelegramKeyboard = (req: express.Request) => {
-    const adminUrl = `${getAppBaseUrl(req)}/admin`;
-    return {
-      inline_keyboard: [
-        [
-          { text: 'Сьогодні', url: `${adminUrl}?tab=today` },
-          { text: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` }
-        ],
-        [
-          { text: 'Оплати', url: `${adminUrl}?tab=crm&action=add_payment` },
-          { text: 'Дні народження', url: `${adminUrl}?tab=dashboard` }
-        ],
-        [{ text: 'Відкрити портал', url: adminUrl }]
-      ]
-    };
+  type CoachTelegramCoach = { id: number; name: string };
+  type CoachAttendanceStatus = 'present' | 'absent' | 'excused';
+
+  const coachStatusLabels: Record<CoachAttendanceStatus, string> = {
+    present: 'Присутній',
+    absent: 'Відсутній',
+    excused: 'Поважна причина'
   };
+
+  const coachStatusSymbols: Record<string, string> = {
+    present: 'OK',
+    absent: 'X',
+    excused: 'P',
+    unmarked: '-'
+  };
+
+  const getCoachPortalUrl = (
+    req: express.Request,
+    tab = 'dashboard',
+    action?: string,
+    params: Record<string, string | number | undefined | null> = {}
+  ) => {
+    const url = new URL(`${getAppBaseUrl(req)}/admin`);
+    if (tab) url.searchParams.set('tab', tab);
+    if (action) url.searchParams.set('action', action);
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        url.searchParams.set(key, String(value));
+      }
+    });
+    return url.toString();
+  };
+
+  const getKyivDateString = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Europe/Kyiv',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  };
+
+  const formatCoachDate = (dateString: string) => {
+    const [year, month, day] = String(dateString || '').split('-');
+    if (!year || !month || !day) return dateString;
+    return `${day}.${month}.${year}`;
+  };
+
+  const getCoachDayAliases = (dateString: string) => {
+    const day = new Date(`${dateString}T12:00:00Z`).getUTCDay();
+    const aliases = [
+      ['нд', 'неділя', 'sunday', 'sun'],
+      ['пн', 'понеділок', 'monday', 'mon'],
+      ['вт', 'вівторок', 'tuesday', 'tue'],
+      ['ср', 'середа', 'wednesday', 'wed'],
+      ['чт', 'четвер', 'thursday', 'thu'],
+      ['пт', 'пʼятниця', "п'ятниця", 'пятниця', 'friday', 'fri'],
+      ['сб', 'субота', 'saturday', 'sat']
+    ];
+    return aliases[day] || [];
+  };
+
+  const shortenCoachName = (name: unknown, maxLength = 22) => {
+    const value = String(name || '').trim();
+    if (value.length <= maxLength) return value || 'Учасник';
+    return `${value.slice(0, maxLength - 1).trim()}…`;
+  };
+
+  const getCoachByTelegramChatId = async (chatId: string | number): Promise<CoachTelegramCoach | null> => {
+    if (!pool || !chatId) return null;
+    const result = await pool.query(
+      "SELECT id, name FROM coaches WHERE telegram_chat_id = $1 LIMIT 1",
+      [String(chatId)]
+    );
+    return result.rows[0] || null;
+  };
+
+  const buildCoachTelegramKeyboard = (req: express.Request) => ({
+    inline_keyboard: [
+      [
+        { text: 'Сьогодні', callback_data: 'c:today' },
+        { text: 'Відмітити групу', callback_data: 'c:groups' }
+      ],
+      [
+        { text: 'Оплати', callback_data: 'c:payments' },
+        { text: 'Дні народження', callback_data: 'c:birthdays' }
+      ],
+      [
+        { text: 'Моніторинг', callback_data: 'c:monitor' },
+        { text: 'Відкрити портал', url: getCoachPortalUrl(req) }
+      ]
+    ]
+  });
 
   const buildCoachTelegramReplyKeyboard = () => ({
     keyboard: [
       [{ text: 'Сьогодні' }, { text: 'Відвідуваність' }],
       [{ text: 'Оплати' }, { text: 'Дні народження' }],
+      [{ text: 'Моніторинг' }, { text: 'Групи' }],
       [{ text: 'Портал' }]
     ],
     resize_keyboard: true,
@@ -1552,19 +1632,25 @@ async function startServer() {
   });
 
   const getCoachTelegramAction = (req: express.Request, text: string) => {
-    const adminUrl = `${getAppBaseUrl(req)}/admin`;
     const normalized = text.trim().toLowerCase();
-    const actions: Record<string, { title: string; url: string }> = {
-      'сьогодні': { title: 'Сьогодні', url: `${adminUrl}?tab=today` },
-      'відвідуваність': { title: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` },
-      'журнал': { title: 'Відвідуваність', url: `${adminUrl}?tab=attendance&action=mark_attendance` },
-      'оплати': { title: 'Оплати', url: `${adminUrl}?tab=crm&action=add_payment` },
-      'дні народження': { title: 'Дні народження', url: `${adminUrl}?tab=dashboard` },
-      'др': { title: 'Дні народження', url: `${adminUrl}?tab=dashboard` },
-      'портал': { title: 'Портал', url: adminUrl },
-      'відкрити портал': { title: 'Портал', url: adminUrl },
-      '/menu': { title: 'Портал', url: adminUrl },
-      '/меню': { title: 'Портал', url: adminUrl }
+    const actions: Record<string, { type: string; title: string; url: string }> = {
+      'сьогодні': { type: 'today', title: 'Сьогодні', url: getCoachPortalUrl(req, 'today') },
+      '/today': { type: 'today', title: 'Сьогодні', url: getCoachPortalUrl(req, 'today') },
+      'відвідуваність': { type: 'groups', title: 'Відмітити групу', url: getCoachPortalUrl(req, 'attendance', 'mark_attendance') },
+      '/attendance': { type: 'groups', title: 'Відмітити групу', url: getCoachPortalUrl(req, 'attendance', 'mark_attendance') },
+      'журнал': { type: 'groups', title: 'Відмітити групу', url: getCoachPortalUrl(req, 'attendance', 'mark_attendance') },
+      'групи': { type: 'groups', title: 'Групи', url: getCoachPortalUrl(req, 'groups') },
+      'оплати': { type: 'payments', title: 'Оплати', url: getCoachPortalUrl(req, 'crm', 'add_payment') },
+      '/payments': { type: 'payments', title: 'Оплати', url: getCoachPortalUrl(req, 'crm', 'add_payment') },
+      'дні народження': { type: 'birthdays', title: 'Дні народження', url: getCoachPortalUrl(req, 'dashboard') },
+      '/birthdays': { type: 'birthdays', title: 'Дні народження', url: getCoachPortalUrl(req, 'dashboard') },
+      'др': { type: 'birthdays', title: 'Дні народження', url: getCoachPortalUrl(req, 'dashboard') },
+      'моніторинг': { type: 'monitor', title: 'Моніторинг', url: getCoachPortalUrl(req, 'dashboard') },
+      '/monitor': { type: 'monitor', title: 'Моніторинг', url: getCoachPortalUrl(req, 'dashboard') },
+      'портал': { type: 'menu', title: 'Портал', url: getCoachPortalUrl(req) },
+      'відкрити портал': { type: 'menu', title: 'Портал', url: getCoachPortalUrl(req) },
+      '/menu': { type: 'menu', title: 'Портал', url: getCoachPortalUrl(req) },
+      '/меню': { type: 'menu', title: 'Портал', url: getCoachPortalUrl(req) }
     };
     return actions[normalized] || null;
   };
@@ -1598,6 +1684,69 @@ async function startServer() {
     }
   }
 
+  async function editCoachTelegramBotMessage(chatId: string | number, messageId: number, text: string, replyMarkup?: any) {
+    const token = getCoachTelegramBotToken();
+    if (!token || !chatId || !messageId) return false;
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/editMessageText`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {})
+        })
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        console.warn('Coach Telegram bot edit failed:', response.status, body.slice(0, 180));
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.error('Coach Telegram bot edit error:', e);
+      return false;
+    }
+  }
+
+  async function sendOrEditCoachTelegramMessage(
+    chatId: string | number,
+    text: string,
+    replyMarkup?: any,
+    messageId?: number
+  ) {
+    if (messageId) {
+      const edited = await editCoachTelegramBotMessage(chatId, messageId, text, replyMarkup);
+      if (edited) return true;
+    }
+    return sendCoachTelegramBotMessage(chatId, text, replyMarkup);
+  }
+
+  async function answerCoachTelegramCallback(callbackQueryId: string, text?: string) {
+    const token = getCoachTelegramBotToken();
+    if (!token || !callbackQueryId) return false;
+
+    try {
+      await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callback_query_id: callbackQueryId,
+          ...(text ? { text } : {})
+        })
+      });
+      return true;
+    } catch (e) {
+      console.error('Coach Telegram callback answer error:', e);
+      return false;
+    }
+  }
+
   const parseCoachStartToken = (token: string) => {
     const [type, rawId, signature] = token.split('_');
     if (!['c', 'coach'].includes(type)) return null;
@@ -1612,6 +1761,776 @@ async function startServer() {
 
     return coachId;
   };
+
+  const buildCoachPortalBackRow = (req: express.Request, tab = 'today', action?: string, params: Record<string, string | number> = {}) => ([
+    { text: 'Оновити', callback_data: tab === 'today' ? 'c:today' : 'c:groups' },
+    { text: 'Портал', url: getCoachPortalUrl(req, tab, action, params) }
+  ]);
+
+  async function fetchCoachGroupSummaries(coachId: number, date = getKyivDateString()) {
+    const result = await pool.query(`
+      SELECT
+        g.id,
+        g.name,
+        l.name as location_name,
+        COUNT(p.id)::int as total_count,
+        COUNT(a.participant_id) FILTER (WHERE a.status = 'present')::int as present_count,
+        COUNT(a.participant_id) FILTER (WHERE a.status = 'absent')::int as absent_count,
+        COUNT(a.participant_id) FILTER (WHERE a.status = 'excused')::int as excused_count,
+        COUNT(p.id)::int - COUNT(a.participant_id)::int as unmarked_count
+      FROM groups g
+      LEFT JOIN locations l ON g.location_id = l.id
+      LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') = 'active'
+      LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
+      WHERE g.coach_id = $1
+      GROUP BY g.id, g.name, l.name, g.order_index
+      ORDER BY g.order_index ASC, g.name ASC
+    `, [coachId, date]);
+    return result.rows;
+  }
+
+  async function fetchCoachTodaySchedule(coachId: number, date = getKyivDateString()) {
+    const aliases = getCoachDayAliases(date);
+    if (aliases.length === 0) return [];
+
+    const result = await pool.query(`
+      SELECT s.*, l.name as location_name
+      FROM schedule s
+      LEFT JOIN locations l ON s.location_id = l.id
+      WHERE s.coach_id = $1
+      AND LOWER(TRIM(COALESCE(s.day_of_week, ''))) = ANY($2::text[])
+      ORDER BY s.start_time ASC, s.order_index ASC
+    `, [coachId, aliases]);
+    return result.rows;
+  }
+
+  async function sendCoachMainMenu(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, оберіть дію. Дані беруться з порталу і оновлюються одразу після змін.`,
+      buildCoachTelegramKeyboard(req),
+      messageId
+    );
+  }
+
+  async function sendCoachTodaySummary(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    const date = getKyivDateString();
+    const [schedule, groups] = await Promise.all([
+      fetchCoachTodaySchedule(coach.id, date),
+      fetchCoachGroupSummaries(coach.id, date)
+    ]);
+
+    let text = `<b>Сьогодні ${formatCoachDate(date)}</b>\n`;
+    text += `Тренер: ${escapeTelegramHtml(coach.name)}\n\n`;
+
+    if (schedule.length > 0) {
+      text += `<b>Розклад</b>\n`;
+      schedule.slice(0, 8).forEach((entry: any) => {
+        const time = [entry.start_time, entry.end_time].filter(Boolean).join('-');
+        text += `• ${escapeTelegramHtml(time || 'час не вказано')} — ${escapeTelegramHtml(entry.group_name || 'група')}`;
+        if (entry.location_name) text += `, ${escapeTelegramHtml(entry.location_name)}`;
+        text += `\n`;
+      });
+      if (schedule.length > 8) text += `• +${schedule.length - 8} ще\n`;
+      text += `\n`;
+    } else {
+      text += `Сьогодні в розкладі тренувань для вас не знайдено.\n\n`;
+    }
+
+    text += `<b>Відмітки по групах</b>\n`;
+    if (groups.length === 0) {
+      text += `Групи за вами ще не закріплені.\n`;
+    } else {
+      groups.slice(0, 10).forEach((group: any) => {
+        text += `• ${escapeTelegramHtml(group.name)}: ${group.present_count || 0}/${group.total_count || 0} присутні`;
+        if (group.unmarked_count > 0) text += `, без відмітки ${group.unmarked_count}`;
+        text += `\n`;
+      });
+      if (groups.length > 10) text += `• +${groups.length - 10} груп\n`;
+    }
+
+    const groupRows = groups.slice(0, 8).map((group: any) => ([{
+      text: `${shortenCoachName(group.name, 26)} ${group.present_count || 0}/${group.total_count || 0}`,
+      callback_data: `c:g:${group.id}`
+    }]));
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          ...groupRows,
+          [
+            { text: 'Групи', callback_data: 'c:groups' },
+            { text: 'Моніторинг', callback_data: 'c:monitor' }
+          ],
+          [
+            { text: 'Оновити', callback_data: 'c:today' },
+            { text: 'Портал сьогодні', url: getCoachPortalUrl(req, 'today') }
+          ],
+          [{ text: 'Меню', callback_data: 'c:menu' }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function sendCoachGroupsList(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    const date = getKyivDateString();
+    const groups = await fetchCoachGroupSummaries(coach.id, date);
+
+    let text = `<b>Відмічання груп</b>\n${formatCoachDate(date)}\n\n`;
+    if (groups.length === 0) {
+      text += `За вами ще не закріплено груп. Додайте або привʼяжіть групу в порталі.`;
+    } else {
+      text += `Оберіть групу, щоб швидко відмітити дітей прямо в Telegram.\n\n`;
+      groups.forEach((group: any) => {
+        text += `• ${escapeTelegramHtml(group.name)}: ${group.total_count || 0} учасників, ${group.unmarked_count || 0} без відмітки\n`;
+      });
+    }
+
+    const rows = groups.map((group: any) => ([{
+      text: `${shortenCoachName(group.name, 30)} (${group.unmarked_count || 0} без відмітки)`,
+      callback_data: `c:g:${group.id}`
+    }]));
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          ...rows.slice(0, 20),
+          buildCoachPortalBackRow(req, 'attendance', 'mark_attendance'),
+          [{ text: 'Меню', callback_data: 'c:menu' }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function sendCoachGroupAttendance(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    groupId: number,
+    messageId?: number
+  ) {
+    const date = getKyivDateString();
+    const groupResult = await pool.query(
+      `SELECT g.id, g.name, l.name as location_name
+       FROM groups g
+       LEFT JOIN locations l ON g.location_id = l.id
+       WHERE g.id = $1 AND g.coach_id = $2
+       LIMIT 1`,
+      [groupId, coach.id]
+    );
+    const group = groupResult.rows[0];
+    if (!group) {
+      await sendOrEditCoachTelegramMessage(chatId, 'Ця група не закріплена за вами або вже видалена.', buildCoachTelegramKeyboard(req), messageId);
+      return;
+    }
+
+    const participantsResult = await pool.query(`
+      SELECT p.id, p.name, p.belt, COALESCE(a.status, '') as attendance_status
+      FROM participants p
+      LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
+      WHERE p.group_id = $1
+      AND COALESCE(p.status, 'active') = 'active'
+      ORDER BY p.name ASC
+    `, [groupId, date]);
+    const participants = participantsResult.rows;
+
+    let text = `<b>${escapeTelegramHtml(group.name)}</b>\n`;
+    text += `${formatCoachDate(date)}${group.location_name ? ` • ${escapeTelegramHtml(group.location_name)}` : ''}\n\n`;
+
+    if (participants.length === 0) {
+      text += `У цій групі поки немає активних учасників.`;
+    } else {
+      const present = participants.filter((p: any) => p.attendance_status === 'present').length;
+      const absent = participants.filter((p: any) => p.attendance_status === 'absent').length;
+      const excused = participants.filter((p: any) => p.attendance_status === 'excused').length;
+      const unmarked = participants.filter((p: any) => !p.attendance_status).length;
+      text += `Присутні: ${present}/${participants.length} • Відсутні: ${absent} • Поважна: ${excused} • Без відмітки: ${unmarked}\n\n`;
+      participants.slice(0, 25).forEach((participant: any) => {
+        const status = participant.attendance_status || 'unmarked';
+        text += `${coachStatusSymbols[status] || '-'} ${escapeTelegramHtml(participant.name)}\n`;
+      });
+      if (participants.length > 25) text += `+${participants.length - 25} учасників відкрийте в порталі\n`;
+    }
+
+    const participantRows = participants.slice(0, 25).map((participant: any) => ([
+      { text: `OK ${shortenCoachName(participant.name, 18)}`, callback_data: `c:a:${groupId}:${participant.id}:p` },
+      { text: 'X', callback_data: `c:a:${groupId}:${participant.id}:a` },
+      { text: 'P', callback_data: `c:a:${groupId}:${participant.id}:e` }
+    ]));
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          [{ text: 'Всі присутні', callback_data: `c:all:${groupId}:p` }],
+          ...participantRows,
+          [
+            { text: 'Оновити', callback_data: `c:g:${groupId}` },
+            { text: 'Всі групи', callback_data: 'c:groups' }
+          ],
+          [{ text: 'Редагувати в порталі', url: getCoachPortalUrl(req, 'today', 'mark_attendance', { groupId }) }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function markCoachAttendance(
+    coachId: number,
+    groupId: number,
+    participantId: number,
+    status: CoachAttendanceStatus,
+    date = getKyivDateString()
+  ) {
+    const participantResult = await pool.query(`
+      SELECT p.id, p.name, p.streak, p.last_attendance_date, g.name as group_name
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE p.id = $1 AND p.group_id = $2 AND g.coach_id = $3
+      LIMIT 1
+    `, [participantId, groupId, coachId]);
+    const participant = participantResult.rows[0];
+    if (!participant) return null;
+
+    try {
+      await pool.query("BEGIN");
+
+      const existing = await pool.query(
+        "SELECT status FROM attendance WHERE participant_id = $1 AND date = $2",
+        [participantId, date]
+      );
+      const previousStatus = existing.rows[0]?.status || '';
+
+      await pool.query(
+        "INSERT INTO attendance (participant_id, date, status, notes, coach_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT(participant_id, date) DO UPDATE SET status=EXCLUDED.status, notes=EXCLUDED.notes, coach_id=EXCLUDED.coach_id",
+        [participantId, date, status, null, coachId]
+      );
+
+      if (status === 'present' && previousStatus !== 'present') {
+        await pool.query(
+          "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+          [participantId, 1, 'attendance', date]
+        );
+
+        let newStreak = 1;
+        if (participant.last_attendance_date) {
+          const lastDate = new Date(participant.last_attendance_date);
+          const currentDate = new Date(date);
+          const diffDays = Math.floor((currentDate.getTime() - lastDate.getTime()) / (1000 * 3600 * 24));
+          if (diffDays <= 4 && diffDays > 0) newStreak = (participant.streak || 0) + 1;
+          else if (diffDays <= 0) newStreak = participant.streak || 1;
+        }
+
+        const updateQuery = participant.last_attendance_date && new Date(date) <= new Date(participant.last_attendance_date)
+          ? "UPDATE participants SET rank_points = rank_points + 1, streak = $1 WHERE id = $2"
+          : "UPDATE participants SET rank_points = rank_points + 1, streak = $1, last_attendance_date = $2 WHERE id = $3";
+        const updateParams = participant.last_attendance_date && new Date(date) <= new Date(participant.last_attendance_date)
+          ? [newStreak, participantId]
+          : [newStreak, date, participantId];
+        await pool.query(updateQuery, updateParams);
+      } else if (previousStatus === 'present' && status !== 'present') {
+        await pool.query(
+          "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+          [participantId, -1, 'attendance_removal', date]
+        );
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [participantId]);
+      }
+
+      await pool.query("COMMIT");
+      await logAuditAction(coachId, 'coach', `Telegram відвідуваність: ${status}`, 'attendance', participantId, { date, groupId });
+      return participant;
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      throw e;
+    }
+  }
+
+  async function markCoachGroupAttendance(
+    coachId: number,
+    groupId: number,
+    status: CoachAttendanceStatus,
+    date = getKyivDateString()
+  ) {
+    const participantsResult = await pool.query(`
+      SELECT p.id
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE p.group_id = $1
+      AND g.coach_id = $2
+      AND COALESCE(p.status, 'active') = 'active'
+      ORDER BY p.name ASC
+    `, [groupId, coachId]);
+
+    for (const participant of participantsResult.rows) {
+      await markCoachAttendance(coachId, groupId, Number(participant.id), status, date);
+    }
+    return participantsResult.rows.length;
+  }
+
+  async function sendCoachPaymentsSummary(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    const result = await pool.query(`
+      SELECT
+        p.id,
+        p.name,
+        p.payment_status,
+        g.name as group_name,
+        (
+          SELECT MAX(pay.date)
+          FROM payments pay
+          WHERE pay.participant_id = p.id
+        ) as last_payment_date
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE g.coach_id = $1
+      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
+      ORDER BY g.name ASC, p.name ASC
+      LIMIT 50
+    `, [coach.id]);
+    const debtors = result.rows;
+
+    let text = `<b>Оплати</b>\n`;
+    text += `Тренер: ${escapeTelegramHtml(coach.name)}\n\n`;
+    if (debtors.length === 0) {
+      text += `У ваших групах немає активних боржників за статусом оплати.`;
+    } else {
+      text += `Потрібно перевірити оплату: ${debtors.length}\n\n`;
+      debtors.slice(0, 20).forEach((participant: any) => {
+        text += `• ${escapeTelegramHtml(participant.name)}`;
+        if (participant.group_name) text += ` — ${escapeTelegramHtml(participant.group_name)}`;
+        if (participant.last_payment_date) text += `, остання ${formatCoachDate(String(participant.last_payment_date).slice(0, 10))}`;
+        text += `\n`;
+      });
+      if (debtors.length > 20) text += `• +${debtors.length - 20} ще\n`;
+    }
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          [
+            { text: 'Додати оплату', url: getCoachPortalUrl(req, 'crm', 'add_payment') },
+            { text: 'Оновити', callback_data: 'c:payments' }
+          ],
+          [{ text: 'Меню', callback_data: 'c:menu' }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function sendCoachBirthdaysSummary(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.birthday, g.name as group_name
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE g.coach_id = $1
+      AND p.birthday IS NOT NULL
+      AND COALESCE(p.status, 'active') = 'active'
+      ORDER BY p.name ASC
+    `, [coach.id]);
+
+    const todayString = getKyivDateString();
+    const today = new Date(`${todayString}T12:00:00Z`);
+    const birthdays = result.rows.map((participant: any) => {
+      const birthdayDate = new Date(participant.birthday);
+      let nextBirthday = new Date(Date.UTC(today.getUTCFullYear(), birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
+      if (nextBirthday < today) {
+        nextBirthday = new Date(Date.UTC(today.getUTCFullYear() + 1, birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
+      }
+      const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
+      return { ...participant, daysUntil, nextBirthday: nextBirthday.toISOString().slice(0, 10) };
+    }).filter((participant: any) => participant.daysUntil <= 30)
+      .sort((a: any, b: any) => a.daysUntil - b.daysUntil || String(a.name).localeCompare(String(b.name), 'uk'));
+
+    let text = `<b>Дні народження</b>\nНаступні 30 днів\n\n`;
+    if (birthdays.length === 0) {
+      text += `У ваших групах немає днів народження найближчі 30 днів.`;
+    } else {
+      birthdays.slice(0, 20).forEach((participant: any) => {
+        const prefix = participant.daysUntil === 0
+          ? 'сьогодні'
+          : participant.daysUntil === 1
+            ? 'завтра'
+            : `через ${participant.daysUntil} дн.`;
+        text += `• ${escapeTelegramHtml(participant.name)} — ${prefix}`;
+        if (participant.group_name) text += `, ${escapeTelegramHtml(participant.group_name)}`;
+        text += `\n`;
+      });
+      if (birthdays.length > 20) text += `• +${birthdays.length - 20} ще\n`;
+    }
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          [
+            { text: 'Оновити', callback_data: 'c:birthdays' },
+            { text: 'Портал', url: getCoachPortalUrl(req, 'dashboard') }
+          ],
+          [{ text: 'Меню', callback_data: 'c:menu' }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function sendCoachMonitoringSummary(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    messageId?: number
+  ) {
+    const date = getKyivDateString();
+    const [absenceResult, unmarkedResult, debtorsResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          p.name,
+          g.name as group_name,
+          COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999)::int as days_since_last,
+          COUNT(a.id) FILTER (
+            WHERE a.status = 'absent'
+            AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+          )::int as absent_count
+        FROM participants p
+        JOIN groups g ON p.group_id = g.id
+        LEFT JOIN attendance a ON a.participant_id = p.id
+        WHERE g.coach_id = $1
+        AND COALESCE(p.status, 'active') = 'active'
+        GROUP BY p.id, p.name, g.name, p.last_attendance_date, p.created_at
+        HAVING
+          COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
+          OR COUNT(a.id) FILTER (
+            WHERE a.status = 'absent'
+            AND a.date >= CURRENT_DATE - INTERVAL '30 days'
+          ) >= 3
+        ORDER BY days_since_last DESC, absent_count DESC, p.name ASC
+        LIMIT 20
+      `, [coach.id]),
+      pool.query(`
+        SELECT g.name, COUNT(p.id)::int as unmarked_count
+        FROM groups g
+        LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') = 'active'
+        LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
+        WHERE g.coach_id = $1
+        AND a.participant_id IS NULL
+        GROUP BY g.id, g.name, g.order_index
+        HAVING COUNT(p.id) > 0
+        ORDER BY g.order_index ASC, g.name ASC
+        LIMIT 10
+      `, [coach.id, date]),
+      pool.query(`
+        SELECT COUNT(*)::int as count
+        FROM participants p
+        JOIN groups g ON p.group_id = g.id
+        WHERE g.coach_id = $1
+        AND COALESCE(p.status, 'active') = 'active'
+        AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
+      `, [coach.id])
+    ]);
+
+    let text = `<b>Моніторинг тренера</b>\n`;
+    text += `${formatCoachDate(date)}\n\n`;
+    text += `Оплати до перевірки: ${debtorsResult.rows[0]?.count || 0}\n`;
+    text += `Групи з невідміченими сьогодні: ${unmarkedResult.rows.length}\n`;
+    text += `Ризик по відвідуваності: ${absenceResult.rows.length}\n\n`;
+
+    if (unmarkedResult.rows.length > 0) {
+      text += `<b>Без відмітки сьогодні</b>\n`;
+      unmarkedResult.rows.forEach((group: any) => {
+        text += `• ${escapeTelegramHtml(group.name)}: ${group.unmarked_count}\n`;
+      });
+      text += `\n`;
+    }
+
+    if (absenceResult.rows.length > 0) {
+      text += `<b>Давно не були / багато пропусків</b>\n`;
+      absenceResult.rows.slice(0, 10).forEach((participant: any) => {
+        text += `• ${escapeTelegramHtml(participant.name)}`;
+        if (participant.group_name) text += ` — ${escapeTelegramHtml(participant.group_name)}`;
+        text += `: ${participant.days_since_last} дн., пропусків ${participant.absent_count || 0}\n`;
+      });
+    }
+
+    await sendOrEditCoachTelegramMessage(
+      chatId,
+      text,
+      {
+        inline_keyboard: [
+          [
+            { text: 'Відмітити групу', callback_data: 'c:groups' },
+            { text: 'Оплати', callback_data: 'c:payments' }
+          ],
+          [
+            { text: 'Оновити', callback_data: 'c:monitor' },
+            { text: 'Портал', url: getCoachPortalUrl(req, 'dashboard') }
+          ],
+          [{ text: 'Меню', callback_data: 'c:menu' }]
+        ]
+      },
+      messageId
+    );
+  }
+
+  async function fetchCoachBirthdaysWithinDays(coachId: number, days: number) {
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.birthday, g.name as group_name
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE g.coach_id = $1
+      AND p.birthday IS NOT NULL
+      AND COALESCE(p.status, 'active') = 'active'
+      ORDER BY p.name ASC
+    `, [coachId]);
+
+    const todayString = getKyivDateString();
+    const today = new Date(`${todayString}T12:00:00Z`);
+    return result.rows.map((participant: any) => {
+      const birthdayDate = new Date(participant.birthday);
+      let nextBirthday = new Date(Date.UTC(today.getUTCFullYear(), birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
+      if (nextBirthday < today) {
+        nextBirthday = new Date(Date.UTC(today.getUTCFullYear() + 1, birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
+      }
+      const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
+      return { ...participant, daysUntil, nextBirthday: nextBirthday.toISOString().slice(0, 10) };
+    }).filter((participant: any) => participant.daysUntil <= days)
+      .sort((a: any, b: any) => a.daysUntil - b.daysUntil || String(a.name).localeCompare(String(b.name), 'uk'));
+  }
+
+  const shouldIncludeCoachPaymentsDigest = (dateString = getKyivDateString()) => {
+    const dayOfMonth = Number(dateString.split('-')[2]);
+    const dayOfWeek = new Date(`${dateString}T12:00:00Z`).getUTCDay();
+    return dayOfWeek === 1 || [5, 15, 25].includes(dayOfMonth);
+  };
+
+  const shouldIncludeCoachAbsenceDigest = (dateString = getKyivDateString()) =>
+    new Date(`${dateString}T12:00:00Z`).getUTCDay() === 1;
+
+  async function sendCoachMorningDigests(req: express.Request) {
+    const date = getKyivDateString();
+    const coachesResult = await pool.query(`
+      SELECT id, name, telegram_chat_id
+      FROM coaches
+      WHERE telegram_chat_id IS NOT NULL
+      AND TRIM(telegram_chat_id) <> ''
+      ORDER BY order_index ASC, id ASC
+    `);
+
+    const includePayments = shouldIncludeCoachPaymentsDigest(date);
+    const includeAbsence = shouldIncludeCoachAbsenceDigest(date);
+    let sent = 0;
+
+    for (const coach of coachesResult.rows) {
+      const [schedule, birthdays, groups, debtorsResult, absenceResult] = await Promise.all([
+        fetchCoachTodaySchedule(coach.id, date),
+        fetchCoachBirthdaysWithinDays(coach.id, 0),
+        fetchCoachGroupSummaries(coach.id, date),
+        includePayments
+          ? pool.query(`
+              SELECT COUNT(*)::int as count
+              FROM participants p
+              JOIN groups g ON p.group_id = g.id
+              WHERE g.coach_id = $1
+              AND COALESCE(p.status, 'active') = 'active'
+              AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
+            `, [coach.id])
+          : Promise.resolve({ rows: [{ count: 0 }] } as any),
+        includeAbsence
+          ? pool.query(`
+              SELECT COUNT(*)::int as count
+              FROM participants p
+              JOIN groups g ON p.group_id = g.id
+              WHERE g.coach_id = $1
+              AND COALESCE(p.status, 'active') = 'active'
+              AND COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
+            `, [coach.id])
+          : Promise.resolve({ rows: [{ count: 0 }] } as any)
+      ]);
+
+      const debtorCount = Number(debtorsResult.rows[0]?.count || 0);
+      const absenceCount = Number(absenceResult.rows[0]?.count || 0);
+      const hasTraining = schedule.length > 0;
+      const hasBirthdays = birthdays.length > 0;
+      const shouldSend = hasTraining || hasBirthdays || (includePayments && debtorCount > 0) || (includeAbsence && absenceCount > 0);
+      if (!shouldSend) continue;
+
+      let text = `<b>Ранкова картка тренера</b>\n${formatCoachDate(date)}\n\n`;
+      if (hasTraining) {
+        text += `<b>Тренування</b>\n`;
+        schedule.slice(0, 6).forEach((entry: any) => {
+          const time = [entry.start_time, entry.end_time].filter(Boolean).join('-');
+          text += `• ${escapeTelegramHtml(time || 'час')} — ${escapeTelegramHtml(entry.group_name || 'група')}`;
+          if (entry.location_name) text += `, ${escapeTelegramHtml(entry.location_name)}`;
+          text += `\n`;
+        });
+        const unmarkedTotal = groups.reduce((sum: number, group: any) => sum + Number(group.unmarked_count || 0), 0);
+        text += `Без відмітки сьогодні: ${unmarkedTotal}\n\n`;
+      }
+
+      if (hasBirthdays) {
+        text += `<b>День народження сьогодні</b>\n`;
+        birthdays.forEach((participant: any) => {
+          text += `• ${escapeTelegramHtml(participant.name)}`;
+          if (participant.group_name) text += ` — ${escapeTelegramHtml(participant.group_name)}`;
+          text += `\n`;
+        });
+        text += `\n`;
+      }
+
+      if (includePayments && debtorCount > 0) {
+        text += `<b>Оплати</b>\nДо перевірки: ${debtorCount}. Це контрольний день, не щоденний спам.\n\n`;
+      }
+
+      if (includeAbsence && absenceCount > 0) {
+        text += `<b>Відвідуваність</b>\nДавно не були: ${absenceCount}. Перевірте раз на тиждень.\n\n`;
+      }
+
+      const ok = await sendCoachTelegramBotMessage(
+        coach.telegram_chat_id,
+        text.trim(),
+        buildCoachTelegramKeyboard(req)
+      );
+      if (ok) sent += 1;
+    }
+
+    return { sent, coaches: coachesResult.rows.length };
+  }
+
+  async function handleCoachTelegramCallback(req: express.Request, callbackQuery: any) {
+    const callbackId = String(callbackQuery?.id || '');
+    const data = String(callbackQuery?.data || '');
+    const chatId = callbackQuery?.message?.chat?.id;
+    const messageId = Number(callbackQuery?.message?.message_id || 0);
+    if (!chatId) return;
+
+    const coach = await getCoachByTelegramChatId(chatId);
+    if (!coach) {
+      await answerCoachTelegramCallback(callbackId, 'Спочатку підключіть бот у порталі тренера.');
+      await sendCoachTelegramBotMessage(
+        chatId,
+        '<b>Бот ще не підключено</b>\n\nВідкрийте портал тренера і натисніть “Підключити Telegram”.',
+        { inline_keyboard: [[{ text: 'Відкрити портал', url: getCoachPortalUrl(req) }]] }
+      );
+      return;
+    }
+
+    if (data === 'c:menu') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachMainMenu(chatId, coach, req, messageId);
+      return;
+    }
+    if (data === 'c:today') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachTodaySummary(chatId, coach, req, messageId);
+      return;
+    }
+    if (data === 'c:groups') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachGroupsList(chatId, coach, req, messageId);
+      return;
+    }
+    if (data === 'c:payments') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachPaymentsSummary(chatId, coach, req, messageId);
+      return;
+    }
+    if (data === 'c:birthdays') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachBirthdaysSummary(chatId, coach, req, messageId);
+      return;
+    }
+    if (data === 'c:monitor') {
+      await answerCoachTelegramCallback(callbackId);
+      await sendCoachMonitoringSummary(chatId, coach, req, messageId);
+      return;
+    }
+
+    if (data.startsWith('c:g:')) {
+      const groupId = Number(data.split(':')[2]);
+      await answerCoachTelegramCallback(callbackId);
+      if (Number.isInteger(groupId) && groupId > 0) {
+        await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
+      }
+      return;
+    }
+
+    if (data.startsWith('c:a:')) {
+      const [, , rawGroupId, rawParticipantId, statusCode] = data.split(':');
+      const groupId = Number(rawGroupId);
+      const participantId = Number(rawParticipantId);
+      const statusMap: Record<string, CoachAttendanceStatus> = { p: 'present', a: 'absent', e: 'excused' };
+      const status = statusMap[statusCode];
+
+      if (!Number.isInteger(groupId) || !Number.isInteger(participantId) || !status) {
+        await answerCoachTelegramCallback(callbackId, 'Не вдалося розпізнати дію.');
+        return;
+      }
+
+      const participant = await markCoachAttendance(coach.id, groupId, participantId, status);
+      if (!participant) {
+        await answerCoachTelegramCallback(callbackId, 'Немає доступу до цього учасника.');
+        return;
+      }
+
+      await answerCoachTelegramCallback(callbackId, `${participant.name}: ${coachStatusLabels[status]}`);
+      await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
+      return;
+    }
+
+    if (data.startsWith('c:all:')) {
+      const [, , rawGroupId, statusCode] = data.split(':');
+      const groupId = Number(rawGroupId);
+      const statusMap: Record<string, CoachAttendanceStatus> = { p: 'present', a: 'absent', e: 'excused' };
+      const status = statusMap[statusCode];
+
+      if (!Number.isInteger(groupId) || !status) {
+        await answerCoachTelegramCallback(callbackId, 'Не вдалося розпізнати групу.');
+        return;
+      }
+
+      const count = await markCoachGroupAttendance(coach.id, groupId, status);
+      await answerCoachTelegramCallback(callbackId, `Оновлено: ${count}`);
+      await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
+      return;
+    }
+
+    await answerCoachTelegramCallback(callbackId, 'Дія застаріла. Відкрийте меню ще раз.');
+    await sendCoachMainMenu(chatId, coach, req, messageId);
+  }
 
   // Existing notifier bot webhook. Keep this limited to legacy notification flows
   // so the lead/request bot does not become the coach portal bot by accident.
@@ -1664,15 +2583,21 @@ async function startServer() {
       if (headerSecret !== configuredSecret) return res.sendStatus(401);
     }
 
-    const { message } = req.body || {};
-    if (!message || !message.text) return res.sendStatus(200);
-
-    const text = String(message.text || '');
-    const chatId = message.chat?.id;
-    const chatType = message.chat?.type;
-    if (!chatId || chatType !== 'private') return res.sendStatus(200);
+    const { message, callback_query } = req.body || {};
 
     try {
+      if (callback_query) {
+        await handleCoachTelegramCallback(req, callback_query);
+        return res.sendStatus(200);
+      }
+
+      if (!message || !message.text) return res.sendStatus(200);
+
+      const text = String(message.text || '');
+      const chatId = message.chat?.id;
+      const chatType = message.chat?.type;
+      if (!chatId || chatType !== 'private') return res.sendStatus(200);
+
       if (text.startsWith("/start")) {
         const parts = text.trim().split(/\s+/);
         const token = parts[1] || '';
@@ -1687,70 +2612,64 @@ async function startServer() {
           if (coach) {
             await sendCoachTelegramBotMessage(
               chatId,
-              `<b>Telegram тренера підключено</b>\n\n${escapeTelegramHtml(coach.name)}, тепер цей бот веде вас у тренерський портал: відмітки, групи, оплати, дні народження і повідомлення батьків.`,
+              `<b>Telegram тренера підключено</b>\n\n${escapeTelegramHtml(coach.name)}, тепер цей бот працює як швидкий пульт тренера: групи, відмітки, оплати, дні народження і моніторинг.`,
               buildCoachTelegramReplyKeyboard()
             );
-            await sendCoachTelegramBotMessage(
-              chatId,
-              'Швидкі посилання на портал:',
-              buildCoachTelegramKeyboard(req)
-            );
+            await sendCoachMainMenu(chatId, coach, req);
           } else {
             await sendCoachTelegramBotMessage(chatId, 'Не знайшов тренера для цього посилання. Відкрийте підключення з порталу ще раз.');
           }
           return res.sendStatus(200);
         }
 
-        const existingCoach = await pool.query(
-          "SELECT id, name FROM coaches WHERE telegram_chat_id = $1 LIMIT 1",
-          [String(chatId)]
-        );
-        if (existingCoach.rows.length > 0) {
-          const coach = existingCoach.rows[0];
+        const coach = await getCoachByTelegramChatId(chatId);
+        if (coach) {
           await sendCoachTelegramBotMessage(
             chatId,
-            `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, кнопки нижче відкривають потрібний розділ порталу.`,
+            `<b>Тренерський портал Black Bear Dojo</b>\n\n${escapeTelegramHtml(coach.name)}, нижнє меню лишається під рукою, а кнопки в повідомленні показують живі дані.`,
             buildCoachTelegramReplyKeyboard()
           );
-          await sendCoachTelegramBotMessage(
-            chatId,
-            'Швидкі посилання на портал:',
-            buildCoachTelegramKeyboard(req)
-          );
+          await sendCoachMainMenu(chatId, coach, req);
         } else {
           await sendCoachTelegramBotMessage(
             chatId,
             `<b>Black Bear Dojo</b>\n\nЦе окремий бот тренерського порталу. Щоб підключити його, відкрийте портал і натисніть “Підключити Telegram” у кабінеті тренера.`,
-            { inline_keyboard: [[{ text: 'Відкрити портал', url: `${getAppBaseUrl(req)}/admin` }]] }
+            { inline_keyboard: [[{ text: 'Відкрити портал', url: getCoachPortalUrl(req) }]] }
           );
         }
-      } else {
-        const existingCoach = await pool.query(
-          "SELECT id, name FROM coaches WHERE telegram_chat_id = $1 LIMIT 1",
-          [String(chatId)]
+        return res.sendStatus(200);
+      }
+
+      const coach = await getCoachByTelegramChatId(chatId);
+      if (!coach) {
+        await sendCoachTelegramBotMessage(
+          chatId,
+          'Бот ще не підключено до тренера. Відкрийте портал і натисніть “Підключити Telegram”.',
+          { inline_keyboard: [[{ text: 'Відкрити портал', url: getCoachPortalUrl(req) }]] }
         );
-        if (existingCoach.rows.length > 0) {
-          const action = getCoachTelegramAction(req, text);
-          if (action) {
-            await sendCoachTelegramBotMessage(
-              chatId,
-              `<b>${escapeTelegramHtml(action.title)}</b>\nВідкрийте потрібний розділ у тренерському порталі.`,
-              {
-                inline_keyboard: [[{ text: `Відкрити: ${action.title}`, url: action.url }]]
-              }
-            );
-          } else {
-            await sendCoachTelegramBotMessage(
-              chatId,
-              'Оберіть дію з меню тренера нижче.',
-              buildCoachTelegramReplyKeyboard()
-            );
-          }
-        }
+        return res.sendStatus(200);
+      }
+
+      const action = getCoachTelegramAction(req, text);
+      if (!action || action.type === 'menu') {
+        await sendCoachMainMenu(chatId, coach, req);
+      } else if (action.type === 'today') {
+        await sendCoachTodaySummary(chatId, coach, req);
+      } else if (action.type === 'groups') {
+        await sendCoachGroupsList(chatId, coach, req);
+      } else if (action.type === 'payments') {
+        await sendCoachPaymentsSummary(chatId, coach, req);
+      } else if (action.type === 'birthdays') {
+        await sendCoachBirthdaysSummary(chatId, coach, req);
+      } else if (action.type === 'monitor') {
+        await sendCoachMonitoringSummary(chatId, coach, req);
       }
     } catch (e) {
       console.error("Coach Telegram webhook error:", e);
-      await sendCoachTelegramBotMessage(chatId, 'Сталася помилка підключення. Відкрийте портал і спробуйте ще раз.');
+      const chatId = message?.chat?.id || callback_query?.message?.chat?.id;
+      if (chatId) {
+        await sendCoachTelegramBotMessage(chatId, 'Сталася помилка. Дані не втрачені: відкрийте портал або спробуйте ще раз.');
+      }
     }
 
     res.sendStatus(200);
@@ -1811,6 +2730,88 @@ async function startServer() {
     } catch (e) {
       console.error('Failed to build coach Telegram links:', e);
       res.status(500).json({ error: "Failed to fetch coach Telegram links" });
+    }
+  });
+
+  app.post("/api/admin/coach-telegram/webhook", requireAdmin, async (req, res) => {
+    const token = getCoachTelegramBotToken();
+    if (!token) return res.status(500).json({ error: "Coach Telegram token is not configured" });
+
+    const webhookUrl = `${getAppBaseUrl(req)}/api/telegram/coach-webhook`;
+    const secretToken = process.env.TELEGRAM_COACH_WEBHOOK_SECRET?.trim();
+
+    try {
+      const webhookResponse = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: webhookUrl,
+          allowed_updates: ['message', 'callback_query'],
+          drop_pending_updates: false,
+          ...(secretToken ? { secret_token: secretToken } : {})
+        })
+      });
+      const webhookData: any = await webhookResponse.json().catch(() => ({}));
+      if (!webhookResponse.ok || webhookData.ok === false) {
+        return res.status(502).json({ error: "Telegram setWebhook failed", details: webhookData });
+      }
+
+      await fetch(`https://api.telegram.org/bot${token}/setMyCommands`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          commands: [
+            { command: 'start', description: 'Підключити або відкрити меню тренера' },
+            { command: 'menu', description: 'Показати швидке меню' },
+            { command: 'today', description: 'План і відмітки на сьогодні' },
+            { command: 'payments', description: 'Оплати до перевірки' },
+            { command: 'birthdays', description: 'Дні народження' }
+          ]
+        })
+      }).catch(() => null);
+
+      await fetch(`https://api.telegram.org/bot${token}/setMyDescription`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: 'Тренерський бот Black Bear Dojo: групи, відмітки, оплати, дні народження і моніторинг з порталу.'
+        })
+      }).catch(() => null);
+
+      res.json({ success: true, webhookUrl, allowed_updates: ['message', 'callback_query'] });
+    } catch (e) {
+      console.error('Failed to configure coach Telegram webhook:', e);
+      res.status(500).json({ error: "Failed to configure coach Telegram webhook" });
+    }
+  });
+
+  app.post("/api/admin/coach-telegram/digest", requireAdmin, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    try {
+      const result = await sendCoachMorningDigests(req);
+      res.json({ success: true, ...result });
+    } catch (e) {
+      console.error('Failed to send coach digest manually:', e);
+      res.status(500).json({ error: "Failed to send coach digest" });
+    }
+  });
+
+  app.get("/api/telegram/coach-digest", async (req, res) => {
+    const cronHeader = req.headers['x-vercel-cron'];
+    const cronSecret = process.env.CRON_SECRET?.trim();
+    const authHeader = String(req.headers.authorization || '');
+    const hasSecretAccess = cronSecret && authHeader === `Bearer ${cronSecret}`;
+    if (!hasSecretAccess && cronHeader !== '1') {
+      return res.sendStatus(401);
+    }
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+
+    try {
+      const result = await sendCoachMorningDigests(req);
+      res.json({ success: true, ...result });
+    } catch (e) {
+      console.error('Failed to send coach digest:', e);
+      res.status(500).json({ error: "Failed to send coach digest" });
     }
   });
 
