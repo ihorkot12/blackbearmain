@@ -1,5 +1,6 @@
 (() => {
   const PANEL_ID = 'bb-parent-telegram-social-panel';
+  const ANCHOR_ID = 'bb-parent-telegram-social-anchor';
   const STYLE_ID = 'bb-parent-telegram-social-style';
 
   const isParentPage = () => window.location.pathname.replace(/\/$/, '') === '/parent';
@@ -18,36 +19,58 @@
     style.id = STYLE_ID;
     style.textContent = `
       .bb-parent-connect-panel {
-        margin: 18px auto;
-        max-width: 1120px;
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        border-radius: 8px;
-        background: #ffffff;
-        color: #111827;
-        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+        position: relative;
+        z-index: 1;
+        margin: 0;
+        width: 100%;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 28px;
+        background: linear-gradient(135deg, rgba(24, 24, 27, 0.72), rgba(9, 9, 11, 0.9));
+        color: #ffffff;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.24);
         overflow: hidden;
+        isolation: isolate;
+      }
+      .bb-parent-connect-anchor {
+        display: block;
+        min-width: 0;
+      }
+      .bb-parent-connect-anchor:empty {
+        display: none;
+      }
+      .bb-parent-connect-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 16% 0%, rgba(220, 38, 38, 0.16), transparent 34%),
+          radial-gradient(circle at 100% 100%, rgba(59, 130, 246, 0.12), transparent 28%);
+        opacity: 0.9;
       }
       .bb-parent-connect-inner {
+        position: relative;
+        z-index: 1;
         display: grid;
         grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.85fr);
         gap: 0;
       }
       .bb-parent-connect-section {
-        padding: 18px;
+        padding: 24px;
       }
       .bb-parent-connect-section + .bb-parent-connect-section {
-        border-left: 1px solid rgba(15, 23, 42, 0.12);
-        background: #f8fafc;
+        border-left: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.025);
       }
       .bb-parent-connect-eyebrow {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 8px;
-        color: #475569;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0;
+        margin-bottom: 10px;
+        color: #a1a1aa;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.18em;
         text-transform: uppercase;
       }
       .bb-parent-connect-dot {
@@ -60,24 +83,25 @@
         background: #16a34a;
       }
       .bb-parent-connect-title {
-        margin: 0 0 6px;
-        color: #020617;
-        font-size: 18px;
-        font-weight: 800;
-        line-height: 1.25;
+        margin: 0 0 8px;
+        color: #ffffff;
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: -0.03em;
+        line-height: 1.05;
       }
       .bb-parent-connect-text {
-        margin: 0 0 14px;
+        margin: 0 0 18px;
         max-width: 680px;
-        color: #475569;
+        color: #a1a1aa;
         font-size: 14px;
         line-height: 1.5;
       }
       .bb-parent-connect-social-note {
-        margin: -4px 0 14px;
-        color: #991b1b;
-        font-size: 14px;
-        font-weight: 800;
+        margin: -4px 0 16px;
+        color: #fecaca;
+        font-size: 13px;
+        font-weight: 900;
         line-height: 1.35;
       }
       .bb-parent-connect-actions {
@@ -90,42 +114,47 @@
         min-height: 40px;
         align-items: center;
         justify-content: center;
-        border: 1px solid #111827;
-        border-radius: 8px;
-        padding: 9px 14px;
-        background: #111827;
+        border: 1px solid rgba(220, 38, 38, 0.82);
+        border-radius: 14px;
+        padding: 11px 16px;
+        background: #dc2626;
         color: #ffffff;
-        font-size: 14px;
-        font-weight: 700;
+        font-size: 12px;
+        font-weight: 900;
+        letter-spacing: 0.04em;
         line-height: 1.2;
         text-decoration: none;
         cursor: pointer;
+        transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
       }
       .bb-parent-connect-button:hover,
       .bb-parent-connect-button:focus-visible {
-        background: #0f172a;
+        border-color: #ef4444;
+        background: #ef4444;
         color: #ffffff;
+        transform: translateY(-1px);
       }
       .bb-parent-connect-button.secondary {
-        border-color: rgba(15, 23, 42, 0.22);
-        background: #ffffff;
-        color: #111827;
+        border-color: rgba(255, 255, 255, 0.1);
+        background: rgba(255, 255, 255, 0.04);
+        color: #ffffff;
       }
       .bb-parent-connect-button.secondary:hover,
       .bb-parent-connect-button.secondary:focus-visible {
-        border-color: #ef4444;
-        color: #991b1b;
+        border-color: rgba(220, 38, 38, 0.55);
+        background: rgba(220, 38, 38, 0.12);
+        color: #ffffff;
       }
       @media (max-width: 760px) {
         .bb-parent-connect-panel {
-          margin: 14px 12px;
+          border-radius: 22px;
         }
         .bb-parent-connect-inner {
           grid-template-columns: 1fr;
         }
         .bb-parent-connect-section + .bb-parent-connect-section {
           border-left: 0;
-          border-top: 1px solid rgba(15, 23, 42, 0.12);
+          border-top: 1px solid rgba(255, 255, 255, 0.07);
         }
         .bb-parent-connect-button {
           width: 100%;
@@ -211,12 +240,11 @@
   }, true);
 
   function findMountPoint() {
-    const root = document.getElementById('root');
-    const main = document.querySelector('main') || root;
-    if (!main) return null;
+    const anchor = document.getElementById(ANCHOR_ID);
+    if (anchor) return anchor;
 
-    const firstWideSection = main.querySelector('.max-w-7xl, .max-w-6xl, section, [class*="grid"]');
-    return firstWideSection?.parentElement || main;
+    document.getElementById(PANEL_ID)?.remove();
+    return null;
   }
 
   function renderHtml(telegram, social) {
@@ -269,8 +297,8 @@
       panel = document.createElement('div');
       panel.id = PANEL_ID;
       panel.className = 'bb-parent-connect-panel';
-      mount.insertBefore(panel, mount.firstElementChild || null);
     }
+    if (panel.parentElement !== mount) mount.appendChild(panel);
 
     panel.innerHTML = renderHtml(telegram, social || {});
     panel.querySelector('[data-bb-connect-telegram]')?.addEventListener('click', openTelegramConnect);

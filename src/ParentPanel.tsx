@@ -752,6 +752,16 @@ const ParentPanel = () => {
             className="fixed inset-0 z-[55] bg-zinc-950 lg:hidden p-8 pt-24 overflow-y-auto"
           >
             <div className="space-y-2">
+              <button
+                onClick={handleLogout}
+                className="mb-4 w-full flex items-center justify-between gap-4 px-6 py-4 rounded-2xl border border-white/5 bg-white/[0.03] text-zinc-400 hover:border-red-600/30 hover:bg-red-600/10 hover:text-red-500 transition-all font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+              >
+                <span className="flex items-center gap-4">
+                  <LogOut size={20} />
+                  Вийти
+                </span>
+                <ChevronRight size={16} className="opacity-40" />
+              </button>
               {[
                 { id: 'overview', label: 'Огляд', icon: LayoutDashboard },
                 { id: 'family', label: 'Сім\'я', icon: Users },
@@ -844,6 +854,19 @@ const ParentPanel = () => {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            id="parent-sidebar-logout-top"
+            onClick={handleLogout}
+            className="mt-3 w-full flex items-center justify-between gap-4 px-5 py-3.5 rounded-2xl border border-white/5 bg-white/[0.03] text-zinc-400 hover:border-red-600/30 hover:bg-red-600/10 hover:text-red-500 transition-all font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
+          >
+            <span className="flex items-center gap-4">
+              <LogOut size={20} />
+              Вийти
+            </span>
+            <ChevronRight size={16} className="opacity-40" />
+          </button>
         </div>
 
         <nav className="bb-parent-sidebar-nav space-y-1.5 flex-1 min-h-0 overflow-y-auto pr-1 -mr-1">
@@ -1230,6 +1253,8 @@ const ParentPanel = () => {
                   </motion.button>
                 ))}
               </div>
+
+              <div id="bb-parent-telegram-social-anchor" className="bb-parent-connect-anchor" />
 
               {(bestAthlete || currentRank) && (
                 <div className="grid lg:grid-cols-2 gap-6">

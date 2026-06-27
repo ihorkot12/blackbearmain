@@ -1049,6 +1049,11 @@ export const AdminPage = () => {
 
   const navigate = useNavigate();
 
+  const handleLogout = () => {
+    localStorage.removeItem('admin_token');
+    navigate('/');
+  };
+
   useEffect(() => {
     const search = async () => {
       if (searchQuery.length < 2) {
@@ -1345,6 +1350,19 @@ export const AdminPage = () => {
             </button>
           </div>
 
+          <button
+            type="button"
+            id="admin-sidebar-logout-top"
+            onClick={handleLogout}
+            className="mb-6 w-full flex items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-white/5 bg-white/[0.03] text-zinc-400 hover:border-red-600/30 hover:bg-red-600/10 hover:text-red-500 transition-all duration-300 group"
+          >
+            <span className="flex items-center gap-4">
+              <LogOut size={18} />
+              <span className="font-black uppercase tracking-widest text-[9px] lg:text-[10px]">Вийти</span>
+            </span>
+            <ChevronRight size={14} className="opacity-40 transition-colors group-hover:text-red-500" />
+          </button>
+
           <nav className="flex-1 min-h-0 space-y-8 overflow-y-auto custom-scrollbar pr-2">
             {visibleGroups.map((group, gIdx) => (
               <div key={gIdx} className="space-y-3">
@@ -1377,10 +1395,7 @@ export const AdminPage = () => {
           <div className="pt-8 border-t border-white/5 mt-auto shrink-0">
             <button 
               id="logout-button"
-              onClick={() => {
-                localStorage.removeItem('admin_token');
-                navigate('/');
-              }}
+              onClick={handleLogout}
               className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-zinc-500 hover:bg-red-600/10 hover:text-red-600 transition-all duration-300 group"
             >
               <LogOut size={18} />
