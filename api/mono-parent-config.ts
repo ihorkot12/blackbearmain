@@ -505,13 +505,14 @@ async function reserveTelegramDelivery(notificationId: number, participantId: nu
     `INSERT INTO telegram_notification_deliveries
        (notification_id, participant_id, telegram_chat_id, status, updated_at)
      VALUES ($1, $2, $3, 'pending', CURRENT_TIMESTAMP)
-     ON CONFLICT (notification_id, telegram_chat_id)
-     DO UPDATE SET
-       status = CASE WHEN telegram_notification_deliveries.status = 'sent' THEN telegram_notification_deliveries.status ELSE 'pending' END,
-       error = CASE WHEN telegram_notification_deliveries.status = 'sent' THEN telegram_notification_deliveries.error ELSE NULL END,
-       updated_at = CURRENT_TIMESTAMP
-     WHERE telegram_notification_deliveries.status IS DISTINCT FROM 'sent'
-     RETURNING id`,
+      ON CONFLICT (notification_id, telegram_chat_id)
+      DO UPDATE SET
+        status = CASE WHEN telegram_notification_deliveries.status = 'sent' THEN telegram_notification_deliveries.status ELSE 'pending' END,
+        error = CASE WHEN telegram_notification_deliveries.status = 'sent' THEN telegram_notification_deliveries.error ELSE NULL END,
+        updated_at = CURRENT_TIMESTAMP
+      WHERE telegram_notification_deliveries.status IS DISTINCT FROM 'sent'
+        AND telegram_notification_deliveries.updated_at < CURRENT_TIMESTAMP - INTERVAL '3 days'
+      RETURNING id`,
     [notificationId, participantId, chatId]
   );
   return result.rows[0]?.id || null;

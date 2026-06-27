@@ -5221,9 +5221,9 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       `);
 
       for (const row of absenceResult.rows) {
-        // Check if notification already exists for today
+        // Avoid nudging parents every day while the same absence streak is still active.
         const exists = await pool.query(
-          "SELECT 1 FROM notifications WHERE participant_id = $1 AND type = 'absence' AND created_at > CURRENT_DATE",
+          "SELECT 1 FROM notifications WHERE participant_id = $1 AND type = 'absence' AND created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'",
           [row.participant_id]
         );
         if (exists.rowCount === 0) {
