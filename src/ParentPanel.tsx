@@ -1403,50 +1403,6 @@ const ParentPanel = () => {
                 </section>
               </div>
 
-              <section>
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-black uppercase tracking-tight">Останні сповіщення</h2>
-                  <button 
-                    onClick={() => setActiveTab('notifications')}
-                    className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
-                  >
-                    Всі сповіщення →
-                  </button>
-                </div>
-                <div className="grid md:grid-cols-2 gap-6">
-                  {notifications.slice(0, 4).map((n, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleNotificationClick(n)}
-                      className={`w-full bg-zinc-900/30 p-6 rounded-3xl border border-white/5 flex items-start gap-4 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 ${isHomeworkNotification(n) ? 'hover:bg-white/[0.04] cursor-pointer' : 'cursor-default'}`}
-                    >
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        n.type === 'attendance' ? 'bg-orange-500/10 text-orange-500' :
-                        n.type === 'payment' ? 'bg-green-500/10 text-green-500' :
-                        n.type === 'achievement' ? 'bg-yellow-500/10 text-yellow-500' :
-                        'bg-red-600/10 text-red-600'
-                      }`}>
-                        {n.type === 'attendance' ? <Calendar size={18} /> :
-                         n.type === 'payment' ? <CreditCard size={18} /> :
-                         n.type === 'achievement' ? <Trophy size={18} /> :
-                         <AlertCircle size={18} />}
-                      </div>
-                      <div>
-                        <p className="text-xs text-zinc-300 line-clamp-2 mb-2">{n.message}</p>
-                        <p className="text-[8px] text-zinc-600 font-bold uppercase tracking-widest">
-                          {new Date(n.created_at).toLocaleString('uk-UA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
-                  {notifications.length === 0 && (
-                    <div className="col-span-2 p-12 text-center bg-zinc-900/20 rounded-3xl border border-dashed border-white/5 text-zinc-500 text-xs">
-                      Сповіщень немає
-                    </div>
-                  )}
-                </div>
-              </section>
             </div>
           )}
 
