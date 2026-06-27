@@ -1806,7 +1806,7 @@ async function startServer() {
         COUNT(p.id)::int - COUNT(a.participant_id)::int as unmarked_count
       FROM groups g
       LEFT JOIN locations l ON g.location_id = l.id
-      LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') = 'active'
+      LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new')
       LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
       WHERE g.coach_id = $1
       GROUP BY g.id, g.name, l.name, g.order_index
@@ -1976,7 +1976,7 @@ async function startServer() {
       FROM participants p
       LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
       WHERE p.group_id = $1
-      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
       ORDER BY p.name ASC
     `, [groupId, date]);
     const participants = participantsResult.rows;
@@ -2106,7 +2106,7 @@ async function startServer() {
       JOIN groups g ON p.group_id = g.id
       WHERE p.group_id = $1
       AND g.coach_id = $2
-      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
       ORDER BY p.name ASC
     `, [groupId, coachId]);
 
@@ -2183,7 +2183,7 @@ async function startServer() {
       FROM participants p
       JOIN groups g ON p.group_id = g.id
       WHERE g.coach_id = $1
-      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
       AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
       ORDER BY g.name ASC, p.name ASC
       LIMIT 50
@@ -2233,7 +2233,7 @@ async function startServer() {
       JOIN groups g ON p.group_id = g.id
       WHERE g.coach_id = $1
       AND p.birthday IS NOT NULL
-      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
       ORDER BY p.name ASC
     `, [coach.id]);
 
@@ -2304,7 +2304,7 @@ async function startServer() {
         JOIN groups g ON p.group_id = g.id
         LEFT JOIN attendance a ON a.participant_id = p.id
         WHERE g.coach_id = $1
-        AND COALESCE(p.status, 'active') = 'active'
+        AND COALESCE(p.status, 'active') IN ('active', 'new')
         GROUP BY p.id, p.name, g.name, p.last_attendance_date, p.created_at
         HAVING
           COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
@@ -2318,7 +2318,7 @@ async function startServer() {
       pool.query(`
         SELECT g.name, COUNT(p.id)::int as unmarked_count
         FROM groups g
-        LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') = 'active'
+        LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new')
         LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
         WHERE g.coach_id = $1
         AND a.participant_id IS NULL
@@ -2332,7 +2332,7 @@ async function startServer() {
         FROM participants p
         JOIN groups g ON p.group_id = g.id
         WHERE g.coach_id = $1
-        AND COALESCE(p.status, 'active') = 'active'
+        AND COALESCE(p.status, 'active') IN ('active', 'new')
         AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
       `, [coach.id])
     ]);
@@ -2387,7 +2387,7 @@ async function startServer() {
       JOIN groups g ON p.group_id = g.id
       WHERE g.coach_id = $1
       AND p.birthday IS NOT NULL
-      AND COALESCE(p.status, 'active') = 'active'
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
       ORDER BY p.name ASC
     `, [coachId]);
 
@@ -2439,7 +2439,7 @@ async function startServer() {
               FROM participants p
               JOIN groups g ON p.group_id = g.id
               WHERE g.coach_id = $1
-              AND COALESCE(p.status, 'active') = 'active'
+              AND COALESCE(p.status, 'active') IN ('active', 'new')
               AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
             `, [coach.id])
           : Promise.resolve({ rows: [{ count: 0 }] } as any),
@@ -2449,7 +2449,7 @@ async function startServer() {
               FROM participants p
               JOIN groups g ON p.group_id = g.id
               WHERE g.coach_id = $1
-              AND COALESCE(p.status, 'active') = 'active'
+              AND COALESCE(p.status, 'active') IN ('active', 'new')
               AND COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
             `, [coach.id])
           : Promise.resolve({ rows: [{ count: 0 }] } as any)
