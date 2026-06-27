@@ -157,6 +157,20 @@ const pool = new Pool({
   }
 });
 
+async function connectDbWithRetry(attempts = 3) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await pool.connect();
+    } catch (err) {
+      lastError = err;
+      if (attempt === attempts) break;
+      await new Promise(resolve => setTimeout(resolve, attempt * 300));
+    }
+  }
+  throw lastError;
+}
+
 async function initDb() {
   if (!process.env.DATABASE_URL) {
     console.warn("DATABASE_URL is not set. Database features will be disabled.");
@@ -165,7 +179,7 @@ async function initDb() {
 
   let client;
   try {
-    client = await pool.connect();
+    client = await connectDbWithRetry();
     await client.query(`
       CREATE TABLE IF NOT EXISTS admin_users (
         id SERIAL PRIMARY KEY,
