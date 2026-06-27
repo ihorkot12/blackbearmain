@@ -1988,7 +1988,8 @@ async function startServer() {
     const participantRows = participants.slice(0, 25).map((participant: any) => ([
       { text: `OK ${shortenCoachName(participant.name, 18)}`, callback_data: `c:a:${groupId}:${participant.id}:p` },
       { text: 'X', callback_data: `c:a:${groupId}:${participant.id}:a` },
-      { text: 'P', callback_data: `c:a:${groupId}:${participant.id}:e` }
+      { text: 'P', callback_data: `c:a:${groupId}:${participant.id}:e` },
+      { text: '-', callback_data: `c:a:${groupId}:${participant.id}:u` }
     ]));
 
     await sendOrEditCoachTelegramMessage(
@@ -2099,6 +2100,53 @@ async function startServer() {
       await markCoachAttendance(coachId, groupId, Number(participant.id), status, date);
     }
     return participantsResult.rows.length;
+  }
+
+  async function clearCoachAttendance(
+    coachId: number,
+    groupId: number,
+    participantId: number,
+    date = getKyivDateString()
+  ) {
+    const participantResult = await pool.query(`
+      SELECT p.id, p.name
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE p.id = $1 AND p.group_id = $2 AND g.coach_id = $3
+      LIMIT 1
+    `, [participantId, groupId, coachId]);
+    const participant = participantResult.rows[0];
+    if (!participant) return null;
+
+    try {
+      await pool.query("BEGIN");
+
+      const existing = await pool.query(
+        "SELECT status FROM attendance WHERE participant_id = $1 AND date = $2",
+        [participantId, date]
+      );
+      const previousStatus = existing.rows[0]?.status || '';
+
+      await pool.query(
+        "DELETE FROM attendance WHERE participant_id = $1 AND date = $2",
+        [participantId, date]
+      );
+
+      if (previousStatus === 'present') {
+        await pool.query(
+          "INSERT INTO points_log (participant_id, points, reason, date) VALUES ($1, $2, $3, $4)",
+          [participantId, -1, 'attendance_clear', date]
+        );
+        await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [participantId]);
+      }
+
+      await pool.query("COMMIT");
+      await logAuditAction(coachId, 'coach', 'Telegram відвідуваність: скинуто', 'attendance', participantId, { date, groupId });
+      return participant;
+    } catch (e) {
+      await pool.query("ROLLBACK");
+      throw e;
+    }
   }
 
   async function sendCoachPaymentsSummary(
@@ -2507,8 +2555,20 @@ async function startServer() {
       const statusMap: Record<string, CoachAttendanceStatus> = { p: 'present', a: 'absent', e: 'excused' };
       const status = statusMap[statusCode];
 
-      if (!Number.isInteger(groupId) || !Number.isInteger(participantId) || !status) {
+      if (!Number.isInteger(groupId) || !Number.isInteger(participantId) || (!status && statusCode !== 'u')) {
         await answerCoachTelegramCallback(callbackId, 'Не вдалося розпізнати дію.');
+        return;
+      }
+
+      if (statusCode === 'u') {
+        const participant = await clearCoachAttendance(coach.id, groupId, participantId);
+        if (!participant) {
+          await answerCoachTelegramCallback(callbackId, 'Немає доступу до цього учасника.');
+          return;
+        }
+
+        await answerCoachTelegramCallback(callbackId, `${participant.name}: скинуто`);
+        await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
         return;
       }
 
