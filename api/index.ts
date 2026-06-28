@@ -2313,17 +2313,8 @@ async function startServer() {
       ORDER BY p.name ASC
     `, [coach.id]);
 
-    const todayString = getKyivDateString();
-    const today = new Date(`${todayString}T12:00:00Z`);
-    const birthdays = result.rows.map((participant: any) => {
-      const birthdayDate = new Date(participant.birthday);
-      let nextBirthday = new Date(Date.UTC(today.getUTCFullYear(), birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
-      if (nextBirthday < today) {
-        nextBirthday = new Date(Date.UTC(today.getUTCFullYear() + 1, birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
-      }
-      const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
-      return { ...participant, daysUntil, nextBirthday: nextBirthday.toISOString().slice(0, 10) };
-    }).filter((participant: any) => participant.daysUntil <= 30)
+    const birthdays = buildCoachBirthdayEntries(result.rows)
+      .filter((participant: any) => participant.daysUntil <= 30)
       .sort((a: any, b: any) => a.daysUntil - b.daysUntil || String(a.name).localeCompare(String(b.name), 'uk'));
 
     let text = `<b>Дні народження</b>\nНаступні 30 днів\n\n`;
@@ -2467,28 +2458,105 @@ async function startServer() {
       ORDER BY p.name ASC
     `, [coachId]);
 
-    const todayString = getKyivDateString();
-    const today = new Date(`${todayString}T12:00:00Z`);
-    return result.rows.map((participant: any) => {
+    return buildCoachBirthdayEntries(result.rows)
+      .filter((participant: any) => participant.daysUntil <= days)
+      .sort((a: any, b: any) => a.daysUntil - b.daysUntil || String(a.name).localeCompare(String(b.name), 'uk'));
+  }
+
+  const buildCoachBirthdayEntries = (rows: any[], dateString = getKyivDateString()) => {
+    const today = new Date(`${dateString}T12:00:00Z`);
+    return rows.map((participant: any) => {
       const birthdayDate = new Date(participant.birthday);
       let nextBirthday = new Date(Date.UTC(today.getUTCFullYear(), birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
       if (nextBirthday < today) {
         nextBirthday = new Date(Date.UTC(today.getUTCFullYear() + 1, birthdayDate.getUTCMonth(), birthdayDate.getUTCDate(), 12));
       }
       const daysUntil = Math.round((nextBirthday.getTime() - today.getTime()) / 86400000);
-      return { ...participant, daysUntil, nextBirthday: nextBirthday.toISOString().slice(0, 10) };
-    }).filter((participant: any) => participant.daysUntil <= days)
-      .sort((a: any, b: any) => a.daysUntil - b.daysUntil || String(a.name).localeCompare(String(b.name), 'uk'));
+      return {
+        ...participant,
+        birthdayMonth: birthdayDate.getUTCMonth() + 1,
+        birthdayDay: birthdayDate.getUTCDate(),
+        daysUntil,
+        nextBirthday: nextBirthday.toISOString().slice(0, 10)
+      };
+    });
+  };
+
+  async function fetchCoachBirthdaysExactDays(coachId: number, days: number) {
+    const birthdays = await fetchCoachBirthdaysWithinDays(coachId, days);
+    return birthdays.filter((participant: any) => participant.daysUntil === days);
   }
 
-  const shouldIncludeCoachPaymentsDigest = (dateString = getKyivDateString()) => {
-    const dayOfMonth = Number(dateString.split('-')[2]);
-    const dayOfWeek = new Date(`${dateString}T12:00:00Z`).getUTCDay();
-    return dayOfWeek === 1 || [5, 15, 25].includes(dayOfMonth);
+  async function fetchCoachBirthdaysInMonth(coachId: number, dateString = getKyivDateString()) {
+    const result = await pool.query(`
+      SELECT p.id, p.name, p.birthday, g.name as group_name
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE g.coach_id = $1
+      AND p.birthday IS NOT NULL
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
+      ORDER BY p.name ASC
+    `, [coachId]);
+
+    const [, rawMonth] = dateString.split('-');
+    const month = Number(rawMonth);
+    return buildCoachBirthdayEntries(result.rows, dateString)
+      .filter((participant: any) => participant.birthdayMonth === month)
+      .sort((a: any, b: any) =>
+        Number(a.birthdayDay || 0) - Number(b.birthdayDay || 0) ||
+        String(a.name).localeCompare(String(b.name), 'uk')
+      );
+  }
+
+  const formatCoachBirthdayReminderLine = (participant: any, includeDate = false) => {
+    let line = `• ${escapeTelegramHtml(participant.name)}`;
+    if (includeDate) {
+      line += ` — ${String(participant.birthdayDay || '').padStart(2, '0')}.${String(participant.birthdayMonth || '').padStart(2, '0')}`;
+    }
+    if (participant.group_name) line += `, ${escapeTelegramHtml(participant.group_name)}`;
+    return line;
+  };
+
+  const getCoachPaymentsDigestStage = (dateString = getKyivDateString()) => {
+    const [rawYear, rawMonth, rawDay] = dateString.split('-');
+    const year = Number(rawYear);
+    const month = Number(rawMonth);
+    const day = Number(rawDay);
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const preCloseDay = Math.max(25, lastDay - 3);
+
+    if (day === 10) {
+      return {
+        include: true,
+        title: 'Оплати: нагадування 10 числа',
+        hint: 'Мʼяко перевірте, хто ще не оплатив за місяць.'
+      };
+    }
+
+    if (day === 15) {
+      return {
+        include: true,
+        title: 'Оплати: контроль 15 числа',
+        hint: 'Середина місяця: час закрити більшість оплат.'
+      };
+    }
+
+    if (day === preCloseDay || day === lastDay) {
+      return {
+        include: true,
+        title: 'Оплати: закриття місяця',
+        hint: 'Під кінець місяця перевірте, хто ще не оплатив.'
+      };
+    }
+
+    return { include: false, title: '', hint: '' };
   };
 
   const shouldIncludeCoachAbsenceDigest = (dateString = getKyivDateString()) =>
     new Date(`${dateString}T12:00:00Z`).getUTCDay() === 1;
+
+  const shouldIncludeCoachMonthlyBirthdayDigest = (dateString = getKyivDateString()) =>
+    Number(dateString.split('-')[2]) === 1;
 
   async function sendCoachMorningDigests(req: express.Request) {
     const date = getKyivDateString();
@@ -2500,25 +2568,50 @@ async function startServer() {
       ORDER BY order_index ASC, id ASC
     `);
 
-    const includePayments = shouldIncludeCoachPaymentsDigest(date);
+    const paymentDigestStage = getCoachPaymentsDigestStage(date);
+    const includePayments = paymentDigestStage.include;
     const includeAbsence = shouldIncludeCoachAbsenceDigest(date);
+    const includeMonthlyBirthdays = shouldIncludeCoachMonthlyBirthdayDigest(date);
     let sent = 0;
 
     for (const coach of coachesResult.rows) {
-      const [schedule, birthdays, groups, debtorsResult, absenceResult] = await Promise.all([
+      const [
+        schedule,
+        birthdaysToday,
+        birthdaysIn3Days,
+        birthdaysIn7Days,
+        birthdaysThisMonth,
+        groups,
+        debtorsResult,
+        absenceResult
+      ] = await Promise.all([
         fetchCoachTodaySchedule(coach.id, date),
-        fetchCoachBirthdaysWithinDays(coach.id, 0),
+        fetchCoachBirthdaysExactDays(coach.id, 0),
+        fetchCoachBirthdaysExactDays(coach.id, 3),
+        fetchCoachBirthdaysExactDays(coach.id, 7),
+        includeMonthlyBirthdays ? fetchCoachBirthdaysInMonth(coach.id, date) : Promise.resolve([]),
         fetchCoachGroupSummaries(coach.id, date),
         includePayments
           ? pool.query(`
-              SELECT COUNT(*)::int as count
+              SELECT
+                p.id,
+                p.name,
+                p.payment_status,
+                g.name as group_name,
+                (
+                  SELECT MAX(pay.date)
+                  FROM payments pay
+                  WHERE pay.participant_id = p.id
+                ) as last_payment_date
               FROM participants p
               JOIN groups g ON p.group_id = g.id
               WHERE g.coach_id = $1
               AND COALESCE(p.status, 'active') IN ('active', 'new')
               AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
+              ORDER BY g.name ASC, p.name ASC
+              LIMIT 50
             `, [coach.id])
-          : Promise.resolve({ rows: [{ count: 0 }] } as any),
+          : Promise.resolve({ rows: [] } as any),
         includeAbsence
           ? pool.query(`
               SELECT COUNT(*)::int as count
@@ -2531,11 +2624,16 @@ async function startServer() {
           : Promise.resolve({ rows: [{ count: 0 }] } as any)
       ]);
 
-      const debtorCount = Number(debtorsResult.rows[0]?.count || 0);
+      const debtors = debtorsResult.rows || [];
+      const debtorCount = debtors.length;
       const absenceCount = Number(absenceResult.rows[0]?.count || 0);
       const hasTraining = schedule.length > 0;
-      const hasBirthdays = birthdays.length > 0;
-      const shouldSend = hasTraining || hasBirthdays || (includePayments && debtorCount > 0) || (includeAbsence && absenceCount > 0);
+      const hasBirthdayReminders =
+        birthdaysToday.length > 0 ||
+        birthdaysIn3Days.length > 0 ||
+        birthdaysIn7Days.length > 0 ||
+        birthdaysThisMonth.length > 0;
+      const shouldSend = hasTraining || hasBirthdayReminders || (includePayments && debtorCount > 0) || (includeAbsence && absenceCount > 0);
       if (!shouldSend) continue;
 
       let text = `<b>Ранкова картка тренера</b>\n${formatCoachDate(date)}\n\n`;
@@ -2551,18 +2649,52 @@ async function startServer() {
         text += `Без відмітки сьогодні: ${unmarkedTotal}\n\n`;
       }
 
-      if (hasBirthdays) {
+      if (birthdaysToday.length > 0) {
         text += `<b>День народження сьогодні</b>\n`;
-        birthdays.forEach((participant: any) => {
-          text += `• ${escapeTelegramHtml(participant.name)}`;
-          if (participant.group_name) text += ` — ${escapeTelegramHtml(participant.group_name)}`;
-          text += `\n`;
+        birthdaysToday.forEach((participant: any) => {
+          text += `${formatCoachBirthdayReminderLine(participant)}\n`;
         });
         text += `\n`;
       }
 
+      if (birthdaysIn3Days.length > 0) {
+        text += `<b>День народження через 3 дні</b>\n`;
+        birthdaysIn3Days.forEach((participant: any) => {
+          text += `${formatCoachBirthdayReminderLine(participant, true)}\n`;
+        });
+        text += `\n`;
+      }
+
+      if (birthdaysIn7Days.length > 0) {
+        text += `<b>День народження через 7 днів</b>\n`;
+        birthdaysIn7Days.forEach((participant: any) => {
+          text += `${formatCoachBirthdayReminderLine(participant, true)}\n`;
+        });
+        text += `\n`;
+      }
+
+      if (birthdaysThisMonth.length > 0) {
+        text += `<b>Іменинники цього місяця</b>\n`;
+        birthdaysThisMonth.slice(0, 30).forEach((participant: any) => {
+          text += `${formatCoachBirthdayReminderLine(participant, true)}\n`;
+        });
+        if (birthdaysThisMonth.length > 30) text += `• +${birthdaysThisMonth.length - 30} ще\n`;
+        text += `\n`;
+      }
+
       if (includePayments && debtorCount > 0) {
-        text += `<b>Оплати</b>\nДо перевірки: ${debtorCount}. Це контрольний день, не щоденний спам.\n\n`;
+        text += `<b>${escapeTelegramHtml(paymentDigestStage.title)}</b>\n${escapeTelegramHtml(paymentDigestStage.hint)}\n`;
+        text += `Не оплатили: ${debtorCount}\n`;
+        debtors.slice(0, 20).forEach((participant: any) => {
+          text += `• ${escapeTelegramHtml(participant.name)}`;
+          if (participant.group_name) text += ` — ${escapeTelegramHtml(participant.group_name)}`;
+          if (participant.last_payment_date) {
+            text += `, остання ${formatCoachDate(String(participant.last_payment_date).slice(0, 10))}`;
+          }
+          text += `\n`;
+        });
+        if (debtors.length > 20) text += `• +${debtors.length - 20} ще\n`;
+        text += `\n`;
       }
 
       if (includeAbsence && absenceCount > 0) {
