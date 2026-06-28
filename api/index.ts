@@ -221,6 +221,8 @@ async function initDb() {
       ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT;
       ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_username TEXT;
       ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
+      ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT;
+      ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_username TEXT;
 
       CREATE TABLE IF NOT EXISTS locations (
         id SERIAL PRIMARY KEY,
@@ -8082,9 +8084,25 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       try {
         const result = await pool.query(`
-          SELECT p.*, g.name as group_name
+          SELECT p.*, g.name as group_name,
+                 c.id as coach_id,
+                 c.name as coach_name,
+                 COALESCE(
+                   NULLIF(c.phone, ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_' || c.id::text || '_phone' LIMIT 1), ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_phone' LIMIT 1), ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'contact_phone' LIMIT 1), '')
+                 ) as coach_phone,
+                 COALESCE(
+                   NULLIF(c.telegram_username, ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_' || c.id::text || '_telegram_username' LIMIT 1), ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_' || c.id::text || '_telegram' LIMIT 1), ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_telegram_username' LIMIT 1), ''),
+                   NULLIF((SELECT value FROM settings WHERE key = 'coach_telegram' LIMIT 1), '')
+                 ) as coach_telegram_username
           FROM participants p
           LEFT JOIN groups g ON p.group_id = g.id
+          LEFT JOIN coaches c ON c.id = g.coach_id
           WHERE p.id = $1
         `, [participantId]);
 

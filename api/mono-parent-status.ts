@@ -189,6 +189,11 @@ async function ensureSchema() {
 
     ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_type TEXT;
     ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id TEXT;
+    CREATE INDEX IF NOT EXISTS idx_notifications_reference
+      ON notifications(participant_id, reference_type, reference_id);
+
+    ALTER TABLE coaches ADD COLUMN IF NOT EXISTS phone TEXT;
+    ALTER TABLE coaches ADD COLUMN IF NOT EXISTS telegram_username TEXT;
 
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_connected_at TIMESTAMP;
@@ -693,6 +698,141 @@ function getAuthHeader(req: any) {
   return Array.isArray(header) ? header[0] : header;
 }
 
+const KYIV_TIME_ZONE = 'Europe/Kyiv';
+
+const scheduledPaymentReminderMessages: Record<number, { stage: string; message: (monthLabel: string, coachHelp: string) => string }> = {
+  1: {
+    stage: 'due_by_5',
+    message: (monthLabel, coachHelp) =>
+      `Нагадуємо: оплату тренувань за ${monthLabel} потрібно внести до 5 числа поточного місяця.\n\n${coachHelp}`
+  },
+  10: {
+    stage: 'overdue_10',
+    message: (monthLabel, coachHelp) =>
+      `Оплата тренувань за ${monthLabel} ще не відмічена. Будь ласка, перевірте оплату.\n\n${coachHelp}`
+  },
+  20: {
+    stage: 'overdue_20',
+    message: (monthLabel, coachHelp) =>
+      `Кінець місяця вже близько, а оплата тренувань за ${monthLabel} ще не відмічена. Будь ласка, перевірте оплату в кабінеті.\n\n${coachHelp}`
+  }
+};
+
+function normalizeTelegramUsername(value: unknown) {
+  return String(clean(value) || '').replace(/^@+/, '').trim();
+}
+
+async function getPaymentCoachHelp(participant: any) {
+  const coachId = participant?.coach_id ? String(participant.coach_id) : '';
+  const phone =
+    clean(participant?.coach_phone) ||
+    await getSettingsValue([
+      coachId ? `coach_${coachId}_phone` : '',
+      'coach_phone',
+      'contact_phone'
+    ].filter(Boolean));
+  const telegramUsername = normalizeTelegramUsername(
+    clean(participant?.coach_telegram_username) ||
+    await getSettingsValue([
+      coachId ? `coach_${coachId}_telegram_username` : '',
+      coachId ? `coach_${coachId}_telegram` : '',
+      'coach_telegram_username',
+      'coach_telegram'
+    ].filter(Boolean))
+  );
+  const coachName = clean(participant?.coach_name);
+  const lines = [
+    `Якщо оплату вже зробили, але статус не оновився або бачите помилку, зверніться до тренера${coachName ? `: ${coachName}` : '.'}`,
+    phone ? `Телефон: ${phone}` : '',
+    telegramUsername ? `Telegram: @${telegramUsername}` : ''
+  ].filter(Boolean);
+  return lines.join('\n');
+}
+
+function getKyivDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: KYIV_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
+
+function getKyivMonthLabel(year: number, month: number) {
+  return new Intl.DateTimeFormat('uk-UA', {
+    timeZone: KYIV_TIME_ZONE,
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date(Date.UTC(year, month - 1, 1, 12)));
+}
+
+async function createScheduledPaymentReminders(now = new Date()) {
+  if (!pool) return { created: 0, eligible: 0, skipped: 'Database not configured' };
+
+  const { year, month, day } = getKyivDateParts(now);
+  const reminder = scheduledPaymentReminderMessages[day];
+  if (!reminder) return { created: 0, eligible: 0, skipped: 'not_a_payment_reminder_day', day, month, year };
+
+  const monthLabel = getKyivMonthLabel(year, month);
+  const monthKey = String(month).padStart(2, '0');
+  const referenceId = `payment-reminder:${year}-${monthKey}:${reminder.stage}`;
+
+  const debtors = await pool.query(
+    `SELECT p.id, p.name,
+            g.coach_id,
+            c.name AS coach_name,
+            c.phone AS coach_phone,
+            c.telegram_username AS coach_telegram_username
+     FROM participants p
+     LEFT JOIN groups g ON g.id = p.group_id
+     LEFT JOIN coaches c ON c.id = g.coach_id
+     WHERE COALESCE(p.status, 'active') = 'active'
+       AND LOWER(TRIM(COALESCE(p.payment_status, 'unpaid'))) NOT IN ('paid', 'оплачено', 'ok', 'success')
+       AND NOT EXISTS (
+         SELECT 1
+         FROM payments pay
+         WHERE pay.participant_id = p.id
+           AND pay.month = $1
+           AND pay.year = $2
+           AND COALESCE(pay.type, 'subscription') = 'subscription'
+       )
+     ORDER BY p.name ASC
+     LIMIT 500`,
+    [month, year]
+  );
+
+  let created = 0;
+  for (const debtor of debtors.rows) {
+    const coachHelp = await getPaymentCoachHelp(debtor);
+    const insertRes = await pool.query(
+      `INSERT INTO notifications (participant_id, type, message, reference_type, reference_id)
+       SELECT $1, 'payment', $2, 'payment_reminder', $3
+       WHERE NOT EXISTS (
+         SELECT 1
+         FROM notifications
+         WHERE participant_id = $1
+           AND reference_type = 'payment_reminder'
+           AND reference_id = $3
+       )
+       RETURNING id`,
+      [debtor.id, reminder.message(monthLabel, coachHelp), referenceId]
+    );
+    if ((insertRes.rowCount || 0) > 0) created += 1;
+  }
+
+  return {
+    created,
+    eligible: debtors.rows.length,
+    skipped: debtors.rows.length - created,
+    stage: reminder.stage,
+    day,
+    month,
+    year
+  };
+}
+
 async function readJsonBody(req: any) {
   if (req.body && typeof req.body === 'object') return req.body;
   if (typeof req.body === 'string') {
@@ -1112,6 +1252,8 @@ async function handleTelegramDispatch(req: any, res: any) {
     return res.status(200).json({ ok: true, sent: 0, skipped: 'TELEGRAM_PARENT_BOT_TOKEN is not configured' });
   }
 
+  const paymentReminders = await createScheduledPaymentReminders();
+
   const notifications = await pool!.query(
     `SELECT n.id, n.participant_id, n.type, n.message, n.created_at, p.name AS participant_name
      FROM notifications n
@@ -1159,7 +1301,7 @@ async function handleTelegramDispatch(req: any, res: any) {
     }
   }
 
-  return res.status(200).json({ ok: true, sent, skipped, failed, checked: notifications.rows.length });
+  return res.status(200).json({ ok: true, sent, skipped, failed, checked: notifications.rows.length, paymentReminders });
 }
 
 async function handleMonobankStatus(req: any, res: any) {

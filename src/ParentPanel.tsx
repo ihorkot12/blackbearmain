@@ -509,6 +509,12 @@ const ParentPanel = () => {
   const athleteBadges = badges.length > 0
     ? badges.slice(0, 4).map((badge: any) => badge.name || badge.title || badge.type || 'Відзнака')
     : currentSkillChecklist.slice(0, 4);
+  const currentPaymentMonth = new Intl.DateTimeFormat('uk-UA', { month: 'long', year: 'numeric' }).format(new Date());
+  const isPaymentDue = participant?.payment_status !== 'paid';
+  const coachContactText = participant?.coach_name ? `тренера: ${participant.coach_name}` : 'тренера';
+  const coachPhone = String(participant?.coach_phone || '').trim();
+  const coachPhoneHref = coachPhone ? `tel:${coachPhone.replace(/[^\d+]/g, '')}` : '';
+  const coachTelegramUsername = String(participant?.coach_telegram_username || '').replace(/^@+/, '').trim();
 
   if (loading) {
     return (
@@ -1692,6 +1698,46 @@ const ParentPanel = () => {
                     Оплатити онлайн
                   </button>
                 </div>
+
+                {isPaymentDue && (
+                  <div className="bg-red-600/10 border border-red-600/20 rounded-[2rem] p-6">
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-red-600/20 text-red-500">
+                          <AlertCircle size={20} />
+                        </div>
+                        <div>
+                          <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-2">Нагадування про оплату</div>
+                          <h3 className="text-xl font-black uppercase tracking-tight text-white">Оплата за {currentPaymentMonth} до 5 числа</h3>
+                          <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">
+                            Якщо оплату вже зробили, але статус не оновився або бачите помилку, зверніться до {coachContactText}.
+                          </p>
+                          <div className="mt-3 space-y-1 text-sm font-bold text-zinc-200">
+                            {coachPhone && <div>Телефон: {coachPhone}</div>}
+                            {coachTelegramUsername && <div>Telegram: @{coachTelegramUsername}</div>}
+                            {!coachPhone && !coachTelegramUsername && <div>Контакти тренера можна уточнити через повідомлення в кабінеті.</div>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-3 lg:justify-end">
+                        {coachPhoneHref && (
+                          <a href={coachPhoneHref} className="inline-flex items-center justify-center rounded-2xl bg-white/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-white/15">
+                            Подзвонити
+                          </a>
+                        )}
+                        {coachTelegramUsername && (
+                          <a href={`https://t.me/${coachTelegramUsername}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-3 text-xs font-black uppercase tracking-widest text-white transition-colors hover:bg-blue-700">
+                            Telegram
+                          </a>
+                        )}
+                        <button type="button" onClick={() => switchParentTab('messages')} className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-xs font-black uppercase tracking-widest text-zinc-200 transition-colors hover:bg-white/10">
+                          <MessageSquare size={16} />
+                          Повідомлення
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="bg-zinc-900/30 rounded-[2.5rem] border border-white/5 overflow-x-auto">
                   {payments.length > 0 ? (
