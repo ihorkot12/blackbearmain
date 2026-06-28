@@ -97,6 +97,32 @@
     height: 0;
   }
 
+  @media (max-width: 639px) {
+    .bb-motion-surface {
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+
+    .bb-motion-page {
+      width: 100%;
+      max-width: 100vw;
+      box-sizing: border-box;
+      overflow-x: hidden;
+      padding-left: max(1rem, var(--bb-safe-left)) !important;
+      padding-right: max(1rem, var(--bb-safe-right)) !important;
+    }
+
+    .bb-motion-page > *,
+    .bb-motion-page :is(header, section, div, button, article) {
+      min-width: 0;
+      max-width: 100%;
+    }
+
+    .bb-motion-page :is(h1, h2, h3, p, button, span) {
+      overflow-wrap: anywhere;
+    }
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .bb-motion-surface :is(button:not(:disabled), a[href], [role="button"]):hover {
       translate: 0 -1px;

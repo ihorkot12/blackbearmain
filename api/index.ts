@@ -4391,6 +4391,19 @@ async function startServer() {
         }
       }
 
+      // Exact admin/coach logins must win before fuzzy phone fallback.
+      // Otherwise a numeric coach login can accidentally match a participant phone.
+      if (!user) {
+        const adminResult = await pool.query(
+          `SELECT id, name, password as admin_password, role, coach_id FROM admin_users WHERE LOWER(TRIM(login)) = LOWER($1) LIMIT 1`,
+          [loginValue]
+        );
+        if (adminResult.rows.length > 0) {
+          user = { ...adminResult.rows[0], isAdmin: true };
+          console.log('Found admin:', user.id);
+        }
+      }
+
       if (!user && normalizedPhone.length >= 7) {
         const phoneResult = await pool.query(
           `SELECT id, name, phone, parent_phone, parent_password, parent_login
@@ -4412,7 +4425,7 @@ async function startServer() {
 
       if (!user) {
         const adminResult = await pool.query(
-          `SELECT id, name, password as admin_password, role, coach_id FROM admin_users WHERE login = $1 LIMIT 1`,
+          `SELECT id, name, password as admin_password, role, coach_id FROM admin_users WHERE LOWER(TRIM(login)) = LOWER($1) LIMIT 1`,
           [loginValue]
         );
         if (adminResult.rows.length > 0) {
