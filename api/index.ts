@@ -1559,10 +1559,10 @@ async function startServer() {
   };
 
   const coachStatusSymbols: Record<string, string> = {
-    present: 'OK',
-    absent: 'X',
-    excused: 'P',
-    unmarked: '-'
+    present: 'Був',
+    absent: 'Нема',
+    excused: 'Поваж.',
+    unmarked: '...'
   };
 
   const getCoachPortalUrl = (
@@ -2000,10 +2000,10 @@ async function startServer() {
     }
 
     const participantRows = participants.slice(0, 25).map((participant: any) => ([
-      { text: `OK ${shortenCoachName(participant.name, 18)}`, callback_data: `c:a:${groupId}:${participant.id}:p` },
-      { text: 'X', callback_data: `c:a:${groupId}:${participant.id}:a` },
-      { text: 'P', callback_data: `c:a:${groupId}:${participant.id}:e` },
-      { text: '-', callback_data: `c:a:${groupId}:${participant.id}:u` }
+      { text: `Був ${shortenCoachName(participant.name, 14)}`, callback_data: `c:a:${groupId}:${participant.id}:p` },
+      { text: 'Нема', callback_data: `c:a:${groupId}:${participant.id}:a` },
+      { text: 'Поваж.', callback_data: `c:a:${groupId}:${participant.id}:e` },
+      { text: 'Скинути', callback_data: `c:a:${groupId}:${participant.id}:u` }
     ]));
 
     await sendOrEditCoachTelegramMessage(
@@ -2011,7 +2011,14 @@ async function startServer() {
       text,
       {
         inline_keyboard: [
-          [{ text: 'Всі присутні', callback_data: `c:all:${groupId}:p` }],
+          [
+            { text: 'Всі були', callback_data: `c:all:${groupId}:p` },
+            { text: 'Всі відсутні', callback_data: `c:all:${groupId}:a` }
+          ],
+          [
+            { text: 'Всі поважні', callback_data: `c:all:${groupId}:e` },
+            { text: 'Очистити групу', callback_data: `c:clear:${groupId}` }
+          ],
           ...participantRows,
           [
             { text: 'Оновити', callback_data: `c:g:${groupId}` },
@@ -2085,6 +2092,7 @@ async function startServer() {
         await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [participantId]);
       }
 
+      await recalculateParticipantAttendanceStats(participantId);
       await pool.query("COMMIT");
       await logAuditAction(coachId, 'coach', `Telegram відвідуваність: ${status}`, 'attendance', participantId, { date, groupId });
       return participant;
@@ -2114,6 +2122,45 @@ async function startServer() {
       await markCoachAttendance(coachId, groupId, Number(participant.id), status, date);
     }
     return participantsResult.rows.length;
+  }
+
+  async function recalculateParticipantAttendanceStats(participantId: number | string) {
+    const id = Number(participantId);
+    if (!Number.isInteger(id) || id <= 0) return;
+
+    const toDateString = (value: any) =>
+      value instanceof Date ? value.toISOString().slice(0, 10) : String(value || '').slice(0, 10);
+
+    const result = await pool.query(
+      "SELECT date FROM attendance WHERE participant_id = $1 AND status = 'present' ORDER BY date DESC",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      await pool.query("UPDATE participants SET streak = 0, last_attendance_date = NULL WHERE id = $1", [id]);
+      return;
+    }
+
+    let streak = 1;
+    let previousDate = toDateString(result.rows[0].date);
+
+    for (const row of result.rows.slice(1)) {
+      const currentDate = toDateString(row.date);
+      const previousTime = new Date(`${previousDate}T12:00:00Z`).getTime();
+      const currentTime = new Date(`${currentDate}T12:00:00Z`).getTime();
+      const diffDays = Math.round((previousTime - currentTime) / 86400000);
+      if (diffDays > 0 && diffDays <= 4) {
+        streak += 1;
+        previousDate = currentDate;
+      } else {
+        break;
+      }
+    }
+
+    await pool.query(
+      "UPDATE participants SET streak = $1, last_attendance_date = $2 WHERE id = $3",
+      [streak, toDateString(result.rows[0].date), id]
+    );
   }
 
   async function clearCoachAttendance(
@@ -2154,6 +2201,7 @@ async function startServer() {
         await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [participantId]);
       }
 
+      await recalculateParticipantAttendanceStats(participantId);
       await pool.query("COMMIT");
       await logAuditAction(coachId, 'coach', 'Telegram відвідуваність: скинуто', 'attendance', participantId, { date, groupId });
       return participant;
@@ -2161,6 +2209,34 @@ async function startServer() {
       await pool.query("ROLLBACK");
       throw e;
     }
+  }
+
+  async function clearCoachGroupAttendance(
+    coachId: number,
+    groupId: number,
+    date = getKyivDateString()
+  ) {
+    const participantsResult = await pool.query(`
+      SELECT p.id
+      FROM participants p
+      JOIN groups g ON p.group_id = g.id
+      WHERE p.group_id = $1
+      AND g.coach_id = $2
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
+      ORDER BY p.name ASC
+    `, [groupId, coachId]);
+
+    for (const participant of participantsResult.rows) {
+      await clearCoachAttendance(coachId, groupId, Number(participant.id), date);
+    }
+
+    await logAuditAction(coachId, 'coach', 'Telegram відвідуваність: очищено групу', 'attendance', null, {
+      date,
+      groupId,
+      count: participantsResult.rows.length
+    });
+
+    return participantsResult.rows.length;
   }
 
   async function sendCoachPaymentsSummary(
@@ -2610,6 +2686,20 @@ async function startServer() {
 
       const count = await markCoachGroupAttendance(coach.id, groupId, status);
       await answerCoachTelegramCallback(callbackId, `Оновлено: ${count}`);
+      await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
+      return;
+    }
+
+    if (data.startsWith('c:clear:')) {
+      const groupId = Number(data.split(':')[2]);
+
+      if (!Number.isInteger(groupId) || groupId <= 0) {
+        await answerCoachTelegramCallback(callbackId, 'Не вдалося розпізнати групу.');
+        return;
+      }
+
+      const count = await clearCoachGroupAttendance(coach.id, groupId);
+      await answerCoachTelegramCallback(callbackId, `Очищено: ${count}`);
       await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
       return;
     }
@@ -3246,6 +3336,7 @@ async function startServer() {
           await pool.query("UPDATE participants SET streak = 0 WHERE id = $1", [pId]);
         }
 
+        await recalculateParticipantAttendanceStats(pId);
         results.push(pId);
       }
 
@@ -7377,6 +7468,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         await pool.query("UPDATE participants SET rank_points = GREATEST(0, rank_points - 1), streak = 0 WHERE id = $1", [participant_id]);
       }
 
+      await recalculateParticipantAttendanceStats(participant_id);
       await pool.query("COMMIT");
 
       // Trigger workflows in background
@@ -8274,6 +8366,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
              ON CONFLICT (participant_id, date) DO UPDATE SET status = $3`,
             [record.participant_id, record.date, record.status]
           );
+          await recalculateParticipantAttendanceStats(record.participant_id);
         }
         res.json({ success: true, count: attendance_records.length });
       } catch (error: any) {
