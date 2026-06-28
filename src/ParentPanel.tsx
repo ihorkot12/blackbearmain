@@ -1674,11 +1674,15 @@ const ParentPanel = () => {
           )}
 
           {activeTab === 'manual' && (
-            <KarateManual audience="parent" currentBelt={normalizeBeltName(participant?.belt)} />
+            <KarateManual audience={isAdultMember ? 'adult' : 'parent'} currentBelt={normalizeBeltName(participant?.belt)} />
           )}
 
           {activeTab === 'homework' && (
-            <HomeworkParentDiary participantId={participant?.id} focusTarget={homeworkFocusTarget} />
+            <HomeworkParentDiary
+              participantId={participant?.id}
+              focusTarget={homeworkFocusTarget}
+              audience={isAdultMember ? 'adult' : 'family'}
+            />
           )}
 
           {activeTab === 'payments' && (

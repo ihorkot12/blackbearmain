@@ -22,7 +22,7 @@ import {
   Users,
 } from 'lucide-react';
 
-type ManualAudience = 'parent' | 'coach' | 'admin';
+type ManualAudience = 'parent' | 'adult' | 'coach' | 'admin';
 
 type KarateManualProps = {
   audience?: ManualAudience;
@@ -387,6 +387,7 @@ const KarateManual = ({ audience = 'parent', currentBelt }: KarateManualProps) =
 
   const selectedLevel = levelData.find(level => level.kyu === selectedKyu) || levelData[0];
   const isCoachView = audience === 'coach' || audience === 'admin';
+  const audienceLabel = isCoachView ? 'тренера' : audience === 'adult' ? 'спортсмена' : 'родини';
   const playbook = isCoachView ? coachPlaybook : parentPlaybook;
 
   const categories = useMemo(() => ['Усі', ...Array.from(new Set(dictionaryTerms.map(item => item.category)))], []);
@@ -411,11 +412,13 @@ const KarateManual = ({ audience = 'parent', currentBelt }: KarateManualProps) =
               Методичка Black Bear
             </div>
             <h1 className="max-w-4xl text-4xl font-black uppercase leading-[0.9] tracking-tighter text-white md:text-6xl">
-              Карате база для <span className="text-red-600">{isCoachView ? 'тренера' : 'родини'}</span>
+              Карате база для <span className="text-red-600">{audienceLabel}</span>
             </h1>
             <p className="mt-5 max-w-2xl text-base font-medium leading-relaxed text-zinc-300">
               Нормативи на кю, словник команд, коротка історія Оями та правила додзьо в одному місці.
-              Це допомагає однаково розуміти прогрес учня: тренеру, батькам і самому спортсмену.
+              {audience === 'adult'
+                ? ' Це допомагає бачити свій прогрес, готуватись до атестації і тренуватись системно.'
+                : ' Це допомагає однаково розуміти прогрес учня: тренеру, батькам і самому спортсмену.'}
             </p>
           </div>
 

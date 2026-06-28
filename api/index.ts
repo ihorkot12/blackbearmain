@@ -1058,25 +1058,27 @@ async function startServer() {
   };
 
   const getParentParticipantId = async (req: express.Request): Promise<number | null> => {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      const tokenPayload = verifyAuthToken(authHeader.slice('Bearer '.length));
+      if (tokenPayload?.role === 'parent') {
+        try {
+          const result = await pool.query("SELECT id FROM participants WHERE id = $1", [Number(tokenPayload.sub)]);
+          if (result.rows[0]?.id) return result.rows[0].id;
+        } catch (e) {
+          console.error('Parent token auth error:', e);
+          return null;
+        }
+      }
+    }
+
     const sessionParticipantId = (req.session as any).participantId;
     if (sessionParticipantId) {
       const parsed = Number(sessionParticipantId);
       return Number.isFinite(parsed) ? parsed : null;
     }
 
-    const authHeader = req.headers.authorization;
-    if (!authHeader?.startsWith('Bearer ')) return null;
-
-    const tokenPayload = verifyAuthToken(authHeader.slice('Bearer '.length));
-    if (tokenPayload?.role !== 'parent') return null;
-
-    try {
-      const result = await pool.query("SELECT id FROM participants WHERE id = $1", [Number(tokenPayload.sub)]);
-      return result.rows[0]?.id ?? null;
-    } catch (e) {
-      console.error('Parent token auth error:', e);
-      return null;
-    }
+    return null;
   };
 
   const getParentFamilyParticipantIds = async (participantId: number): Promise<number[]> => {
@@ -1497,6 +1499,60 @@ async function startServer() {
     }
   });
 
+  async function getParentTelegramNotificationRecipients(participantId: number, legacyChatId?: string | null) {
+    const recipients = new Set<string>();
+
+    try {
+      const result = await pool.query(
+        `SELECT telegram_chat_id
+         FROM telegram_subscriptions
+         WHERE participant_id = $1
+           AND enabled = TRUE
+           AND telegram_chat_id IS NOT NULL
+         ORDER BY connected_at DESC NULLS LAST, updated_at DESC NULLS LAST`,
+        [participantId]
+      );
+      result.rows.forEach((row: any) => {
+        const chatId = String(row.telegram_chat_id || '').trim();
+        if (chatId) recipients.add(chatId);
+      });
+    } catch (e) {
+      // Older deployments may not have the new subscription table yet.
+    }
+
+    const fallbackChatId = String(legacyChatId || '').trim();
+    if (fallbackChatId && recipients.size === 0) recipients.add(fallbackChatId);
+
+    return Array.from(recipients);
+  }
+
+  async function sendParentTelegramNotification(chatId: string, text: string) {
+    const token = process.env.TELEGRAM_PARENT_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
+    if (!token || !chatId) return false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          chat_id: chatId,
+          text,
+          parse_mode: 'HTML',
+          disable_web_page_preview: true
+        })
+      });
+      return response.ok;
+    } catch (e) {
+      console.error('Failed to send parent Telegram notification:', e);
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async function notifyParent(participantId: number, type: string, message: string, coachName?: string, skipAdminLog: boolean = false) {
     if (!pool) return;
     try {
@@ -1512,19 +1568,13 @@ async function startServer() {
       );
 
       // 3. Send to Parent Telegram only for direct, intentional messages.
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-      const parentTelegramTypes = new Set(['manual', 'message', 'announcement']);
-      if (token && participant.telegram_chat_id && parentTelegramTypes.has(type)) {
+      const parentTelegramTypes = new Set(['manual', 'message', 'coach_message', 'announcement']);
+      if (parentTelegramTypes.has(type)) {
         const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
-        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: participant.telegram_chat_id,
-            text: text,
-            parse_mode: 'HTML'
-          })
-        });
+        const recipients = await getParentTelegramNotificationRecipients(participantId, participant.telegram_chat_id);
+        for (const chatId of recipients) {
+          await sendParentTelegramNotification(chatId, text);
+        }
       }
 
       // 4. Optional admin audit channel. Disabled by default to avoid Telegram noise.
@@ -1686,11 +1736,14 @@ async function startServer() {
   async function sendCoachTelegramBotMessage(chatId: string | number, text: string, replyMarkup?: any) {
     const token = getCoachTelegramBotToken();
     if (!token || !chatId) return false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           chat_id: chatId,
           text,
@@ -1758,11 +1811,14 @@ async function startServer() {
   async function answerCoachTelegramCallback(callbackQueryId: string, text?: string) {
     const token = getCoachTelegramBotToken();
     if (!token || !callbackQueryId) return false;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
 
     try {
       await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           callback_query_id: callbackQueryId,
           ...(text ? { text } : {})
@@ -1772,11 +1828,14 @@ async function startServer() {
     } catch (e) {
       console.error('Coach Telegram callback answer error:', e);
       return false;
+    } finally {
+      clearTimeout(timeout);
     }
   }
 
   const parseCoachStartToken = (token: string) => {
-    const [type, rawId, signature] = token.split('_');
+    const [type, rawId, ...signatureParts] = token.split('_');
+    const signature = signatureParts.join('_');
     if (!['c', 'coach'].includes(type)) return null;
 
     const coachId = Number(rawId);

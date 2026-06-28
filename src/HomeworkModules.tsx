@@ -585,7 +585,15 @@ type HomeworkFocusTarget = {
   nonce?: number;
 } | null;
 
-export const HomeworkParentDiary = ({ participantId, focusTarget }: { participantId?: number | null; focusTarget?: HomeworkFocusTarget }) => {
+export const HomeworkParentDiary = ({
+  participantId,
+  focusTarget,
+  audience = 'family',
+}: {
+  participantId?: number | null;
+  focusTarget?: HomeworkFocusTarget;
+  audience?: 'family' | 'adult';
+}) => {
   const [items, setItems] = useState<HomeworkItem[]>([]);
   const [drafts, setDrafts] = useState<Record<number, HomeworkDraft>>({});
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -706,6 +714,9 @@ export const HomeworkParentDiary = ({ participantId, focusTarget }: { participan
   };
 
   const activeCount = items.filter(item => !['approved'].includes(item.status || '')).length;
+  const introText = audience === 'adult'
+    ? 'Тут ви відмічаєте домашню роботу: скільки сетів, повторів, хвилин і що було складно.'
+    : 'Тут дитина або батьки відмічають, що зроблено вдома: скільки сетів, повторів, хвилин і що було складно.';
 
   return (
     <div className="space-y-8">
@@ -714,7 +725,7 @@ export const HomeworkParentDiary = ({ participantId, focusTarget }: { participan
           <p className="mb-3 text-xs font-black uppercase text-red-500">Домашній щоденник</p>
           <h2 className="text-4xl font-black uppercase text-white lg:text-5xl">Домашні завдання</h2>
           <p className="mt-4 max-w-2xl text-sm leading-relaxed text-zinc-400">
-            Тут дитина або батьки відмічають, що зроблено вдома: скільки сетів, повторів, хвилин і що було складно.
+            {introText}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:w-72">

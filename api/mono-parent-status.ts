@@ -427,6 +427,19 @@ async function disableTelegramChat(chatId: string) {
      WHERE telegram_chat_id = $1`,
     [chatId]
   );
+  await pool.query(
+    `UPDATE participants p
+     SET telegram_chat_id = (
+       SELECT ts.telegram_chat_id
+       FROM telegram_subscriptions ts
+       WHERE ts.participant_id = p.id
+         AND ts.enabled = TRUE
+       ORDER BY ts.connected_at DESC NULLS LAST, ts.updated_at DESC NULLS LAST
+       LIMIT 1
+     )
+     WHERE p.telegram_chat_id = $1`,
+    [chatId]
+  );
 }
 
 const matchesFamilyAccess = (target: any, subscription: any) => {
@@ -548,25 +561,34 @@ function inlineUrlKeyboard(label: string, url: string) {
 async function sendParentTelegram(chatId: string, text: string, replyMarkup?: any) {
   const token = getParentBotToken();
   if (!token) return { ok: false, skipped: 'missing_parent_bot_token' };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: text.length > 3900 ? `${text.slice(0, 3880)}...` : text,
-      parse_mode: 'HTML',
-      disable_web_page_preview: true,
-      reply_markup: replyMarkup
-    })
-  });
+  try {
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text.length > 3900 ? `${text.slice(0, 3880)}...` : text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+        reply_markup: replyMarkup
+      })
+    });
 
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    return { ok: false, status: response.status, error: body.slice(0, 300) };
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      return { ok: false, status: response.status, error: body.slice(0, 300) };
+    }
+
+    return { ok: true };
+  } catch (error: any) {
+    return { ok: false, description: clean(error?.message) || 'Telegram API request failed' };
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return { ok: true };
 }
 
 const asNumber = (value: unknown) => {

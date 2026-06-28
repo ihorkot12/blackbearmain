@@ -432,11 +432,14 @@ function sanitizeWebhookInfo(result: any) {
 
 async function callTelegramToken(token: string | null, method: string, payload?: Record<string, any>) {
   if (!token) return { ok: false, skipped: 'missing_token' };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
 
   try {
     const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify(payload || {}),
     });
     const text = await response.text();
@@ -454,6 +457,8 @@ async function callTelegramToken(token: string | null, method: string, payload?:
     return { ok: true, result: data?.result };
   } catch (error: any) {
     return { ok: false, description: clean(error?.message) || 'Telegram API request failed' };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -966,6 +971,19 @@ async function disableTelegramChat(chatId: string) {
     `UPDATE participant_accesses
      SET telegram_enabled = FALSE, updated_at = CURRENT_TIMESTAMP
      WHERE telegram_chat_id = $1`,
+    [chatId]
+  );
+  await pool.query(
+    `UPDATE participants p
+     SET telegram_chat_id = (
+       SELECT ts.telegram_chat_id
+       FROM telegram_subscriptions ts
+       WHERE ts.participant_id = p.id
+         AND ts.enabled = TRUE
+       ORDER BY ts.connected_at DESC NULLS LAST, ts.updated_at DESC NULLS LAST
+       LIMIT 1
+     )
+     WHERE p.telegram_chat_id = $1`,
     [chatId]
   );
 }
