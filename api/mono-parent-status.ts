@@ -1453,7 +1453,10 @@ async function handleTelegramDispatch(req: any, res: any) {
   }
 
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && getAuthHeader(req) !== `Bearer ${cronSecret}`) {
+  const cronHeader = String(req.headers?.['x-vercel-cron'] || '');
+  const hasSecretAccess = Boolean(cronSecret && getAuthHeader(req) === `Bearer ${cronSecret}`);
+  const hasVercelCronAccess = cronHeader === '1';
+  if (!hasSecretAccess && !hasVercelCronAccess) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
