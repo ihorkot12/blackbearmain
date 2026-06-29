@@ -75,6 +75,13 @@ const normalizeLogin = (value: unknown) => String(value ?? '').trim();
 const normalizePhone = (value: unknown) => String(value ?? '').replace(/[^\d+]/g, '');
 const lower = (value: unknown) => String(value ?? '').trim().toLowerCase();
 
+function formatAmount(amountUah: number) {
+  return new Intl.NumberFormat('uk-UA', {
+    minimumFractionDigits: Number.isInteger(amountUah) ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amountUah);
+}
+
 function htmlEscape(value: unknown) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -230,6 +237,18 @@ const getPortalBaseUrl = () =>
   (clean(process.env.APP_URL) || clean(process.env.PUBLIC_SITE_URL) || clean(process.env.SITE_URL) || 'https://shin-karate.kyiv.ua').replace(/\/+$/, '');
 
 const getTelegramWebhookUrl = () => `${getPortalBaseUrl()}/api/telegram/parent-webhook`;
+const KYIV_TIME_ZONE = 'Europe/Kyiv';
+
+function getKyivDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: KYIV_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const get = (type: string) => Number(parts.find((part) => part.type === type)?.value || 0);
+  return { year: get('year'), month: get('month'), day: get('day') };
+}
 
 async function ensureTelegramMessagingSchema() {
   if (!pool) return;
@@ -500,8 +519,36 @@ function inlineUrlKeyboard(label: string, url: string) {
   return { inline_keyboard: [[{ text: label, url }]] };
 }
 
-function inlineRowsKeyboard(rows: Array<Array<{ text: string; url: string }>>) {
+function inlineRowsKeyboard(rows: Array<Array<{ text: string; url?: string; callback_data?: string }>>) {
   return { inline_keyboard: rows };
+}
+
+async function answerParentTelegramCallback(callbackQueryId: string | null, text?: string) {
+  if (!callbackQueryId) return { ok: false, skipped: 'missing_callback_query_id' };
+  return callParentTelegram('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    text,
+    show_alert: false,
+  });
+}
+
+async function sendPaymentAdminTelegram(text: string) {
+  const token = await getConfiguredValue(
+    ['TELEGRAM_BOT_TOKEN'],
+    ['telegram_bot_token', 'TELEGRAM_BOT_TOKEN']
+  );
+  const chatId = await getConfiguredValue(
+    ['TELEGRAM_PAYMENT_CHAT_ID', 'MONOBANK_PAYMENT_CHAT_ID', 'TELEGRAM_CHAT_ID'],
+    ['telegram_payment_chat_id', 'monobank_payment_chat_id', 'telegram_chat_id', 'TELEGRAM_PAYMENT_CHAT_ID', 'MONOBANK_PAYMENT_CHAT_ID', 'TELEGRAM_CHAT_ID']
+  );
+  if (!token || !chatId) return { ok: false, skipped: 'missing_payment_chat' };
+
+  return callTelegramToken(token, 'sendMessage', {
+    chat_id: chatId,
+    text,
+    parse_mode: 'HTML',
+    disable_web_page_preview: true,
+  });
 }
 
 async function reserveTelegramDelivery(notificationId: number, participantId: number, chatId: string) {
@@ -1086,7 +1133,7 @@ async function socialInlineKeyboard() {
 }
 
 async function inlineUrlWithSocialKeyboard(label: string, url: string) {
-  const rows: Array<Array<{ text: string; url: string }>> = [[{ text: label, url }]];
+  const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = [[{ text: label, url }]];
   const social = await socialInlineKeyboard();
   const socialRow = social?.inline_keyboard?.[0];
   if (Array.isArray(socialRow) && socialRow.length > 0) rows.push(socialRow);
@@ -1148,6 +1195,125 @@ function paymentLabel(status: unknown) {
   if (['paid', 'оплачено', 'ok', 'success'].includes(value)) return 'Оплачено';
   if (['partial', 'partially_paid'].includes(value)) return 'Частково оплачено';
   return 'Потрібно перевірити оплату';
+}
+
+function isPaidStatus(status: unknown) {
+  return ['paid', 'оплачено', 'ok', 'success'].includes(String(status || '').toLowerCase());
+}
+
+function parsePaymentAmount(value: unknown) {
+  const parsed = Number(String(value ?? '').replace(',', '.').replace(/\s/g, ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+async function getDefaultCashPaymentAmount(rawAmount?: unknown) {
+  const directAmount = parsePaymentAmount(rawAmount);
+  if (directAmount) return directAmount;
+
+  const configuredAmount = parsePaymentAmount(await getSettingsValue([
+    'parent_cash_payment_amount',
+    'monthly_subscription_amount',
+    'subscription_amount',
+    'default_payment_amount',
+    'club_monthly_fee'
+  ]));
+  return configuredAmount || 2500;
+}
+
+async function recordTelegramCashPayment(chatId: string, participantIdRaw: unknown) {
+  if (!pool) throw new Error('Database not configured');
+
+  const participantId = Number(participantIdRaw);
+  if (!Number.isInteger(participantId) || participantId <= 0) {
+    return { success: false, error: 'invalid_participant' };
+  }
+
+  const availableIds = await requireTelegramConnection(chatId);
+  if (!availableIds.includes(participantId)) {
+    return { success: false, error: 'forbidden' };
+  }
+
+  const { year, month, day } = getKyivDateParts();
+  const paymentDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const amount = await getDefaultCashPaymentAmount();
+
+  const participantResult = await pool.query(
+    `SELECT p.id, p.name, p.payment_status, g.name AS group_name, c.name AS coach_name
+     FROM participants p
+     LEFT JOIN groups g ON g.id = p.group_id
+     LEFT JOIN coaches c ON c.id = g.coach_id
+     WHERE p.id = $1
+     LIMIT 1`,
+    [participantId]
+  );
+  const participant = participantResult.rows[0];
+  if (!participant) return { success: false, error: 'not_found' };
+
+  const existing = await pool.query(
+    `SELECT id, amount
+     FROM payments
+     WHERE participant_id = $1
+       AND month = $2
+       AND year = $3
+       AND COALESCE(type, 'subscription') = 'subscription'
+     ORDER BY created_at DESC NULLS LAST, id DESC
+     LIMIT 1`,
+    [participantId, month, year]
+  );
+
+  if (existing.rows[0]) {
+    await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participantId]);
+    return {
+      success: true,
+      alreadyPaid: true,
+      participantName: participant.name,
+      amount: Number(existing.rows[0].amount || amount),
+      month,
+      year
+    };
+  }
+
+  const notes = [
+    'Відмічено через батьківський Telegram-бот',
+    participant.group_name ? `Група: ${participant.group_name}` : '',
+    participant.coach_name ? `Тренер: ${participant.coach_name}` : ''
+  ].filter(Boolean).join('. ');
+
+  const payment = await pool.query(
+    `INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes)
+     VALUES ($1, $2, $3, $4, $5, 'subscription', 'cash', $6)
+     RETURNING id`,
+    [participantId, amount, paymentDate, month, year, notes]
+  );
+
+  await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participantId]);
+
+  const message = `Оплата готівкою на тренуванні зарахована: ${formatAmount(amount)} грн.`;
+  await pool.query(
+    `INSERT INTO notifications (participant_id, type, message, reference_type, reference_id)
+     VALUES ($1, 'payment', $2, 'cash_payment', $3)`,
+    [participantId, message, String(payment.rows[0].id)]
+  );
+
+  const adminText = [
+    '<b>Оплата готівкою зарахована</b>',
+    `<b>Учасник:</b> ${htmlEscape(participant.name)}`,
+    `<b>Сума:</b> ${htmlEscape(formatAmount(amount))} грн`,
+    `<b>Період:</b> ${String(month).padStart(2, '0')}.${year}`,
+    '<b>Джерело:</b> Telegram-бот батьків'
+  ].join('\n');
+  await sendPaymentAdminTelegram(adminText).catch((error) => {
+    console.warn('Cash payment Telegram admin notification failed:', error);
+  });
+
+  return {
+    success: true,
+    alreadyPaid: false,
+    participantName: participant.name,
+    amount,
+    month,
+    year
+  };
 }
 
 function homeworkStatusLabel(status: unknown) {
@@ -1273,7 +1439,16 @@ async function sendTelegramPayments(chatId: string) {
   const history = payments.rows.length
     ? payments.rows.map((row: any) => `${htmlEscape(row.participant_name)} - ${Number(row.amount || 0)} грн, ${formatDate(row.date)}`).join('\n')
     : 'Останніх оплат у базі не знайдено.';
-  await sendParentTelegram(chatId, `Оплата\n\n${statusLines.join('\n')}\n\nОстанні платежі:\n${history}`, inlineUrlKeyboard('Відкрити оплату', `${getPortalBaseUrl()}/parent?tab=payments`));
+
+  const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = participants
+    .filter((participant: any) => !isPaidStatus(participant.payment_status))
+    .map((participant: any) => [{
+      text: `Оплатив(ла) готівкою: ${participant.name}`.slice(0, 64),
+      callback_data: `p:cash:${participant.id}`
+    }]);
+  rows.push([{ text: 'Відкрити оплату', url: `${getPortalBaseUrl()}/parent?tab=payments` }]);
+
+  await sendParentTelegram(chatId, `Оплата\n\n${statusLines.join('\n')}\n\nОстанні платежі:\n${history}`, inlineRowsKeyboard(rows));
 }
 
 async function sendTelegramProgress(chatId: string) {
@@ -1446,6 +1621,32 @@ async function sendTelegramNotifications(chatId: string) {
   await sendParentTelegram(chatId, `Останні важливі сповіщення\n\n${lines.join('\n\n')}`, inlineUrlKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent?tab=notifications`));
 }
 
+async function handleTelegramCallback(chatId: string, data: string, callbackQueryId: string | null) {
+  if (data.startsWith('p:cash:')) {
+    const participantId = data.split(':')[2];
+    const result = await recordTelegramCashPayment(chatId, participantId);
+    if (!result.success) {
+      await answerParentTelegramCallback(callbackQueryId, 'Не вдалося зарахувати оплату');
+      await sendParentTelegram(chatId, 'Не вдалося зарахувати оплату. Перевірте, чи Telegram підключений саме до цього кабінету.');
+      return;
+    }
+
+    const amountText = `${formatAmount(Number(result.amount || 0))} грн`;
+    await answerParentTelegramCallback(callbackQueryId, result.alreadyPaid ? 'Вже було оплачено' : 'Оплату зараховано');
+    await sendParentTelegram(
+      chatId,
+      result.alreadyPaid
+        ? `Оплата за цей місяць для ${htmlEscape(result.participantName)} вже була зарахована.`
+        : `Готово. Оплату готівкою для ${htmlEscape(result.participantName)} зараховано: ${htmlEscape(amountText)}.`
+    );
+    await sendTelegramPayments(chatId);
+    return;
+  }
+
+  await answerParentTelegramCallback(callbackQueryId, 'Кнопка застаріла');
+  await sendTelegramMenu(chatId, 'Оновив меню.');
+}
+
 async function handleTelegramMessage(chatId: string, text: string, from: any) {
   const normalized = String(text || '').trim();
   if (normalized.startsWith('/start')) {
@@ -1481,7 +1682,7 @@ async function handleTelegramMessage(chatId: string, text: string, from: any) {
   if (normalized === 'Домашні завдання') return sendTelegramHomework(chatId);
   if (normalized === 'Методичка') return sendTelegramManual(chatId);
   if (normalized === 'Розклад') return sendTelegramSchedule(chatId);
-  if (normalized === 'Оплата') return sendTelegramPayments(chatId);
+  if (normalized === 'Оплата' || normalized === '/cash' || normalized === 'Оплатив(ла) готівкою') return sendTelegramPayments(chatId);
   if (normalized === 'Прогрес') return sendTelegramProgress(chatId);
   if (normalized === 'Рейтинг' || normalized === '/rating') return sendTelegramRatings(chatId);
   if (normalized === 'Зв’язок з тренером' || normalized === "Зв'язок з тренером" || normalized === '/coach') return sendTelegramCoachContact(chatId);
@@ -1515,6 +1716,11 @@ async function handleTelegramWebhook(req: any, res: any) {
     const chatId = chatIdRaw ? String(chatIdRaw) : '';
     if (!chatId) return res.status(200).json({ ok: true });
     const from = update?.message?.from || update?.callback_query?.from || null;
+    const callbackData = clean(update?.callback_query?.data);
+    if (callbackData) {
+      await handleTelegramCallback(chatId, callbackData, clean(update?.callback_query?.id));
+      return res.status(200).json({ ok: true });
+    }
     await handleTelegramMessage(chatId, String(update?.message?.text || '').trim(), from);
     return res.status(200).json({ ok: true });
   } catch (error) {

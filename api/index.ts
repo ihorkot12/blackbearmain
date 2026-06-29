@@ -1568,7 +1568,7 @@ async function startServer() {
       );
 
       // 3. Send to Parent Telegram only for direct, intentional messages.
-      const parentTelegramTypes = new Set(['manual', 'message', 'coach_message', 'announcement']);
+      const parentTelegramTypes = new Set(['manual', 'message', 'coach_message', 'announcement', 'payment']);
       if (parentTelegramTypes.has(type)) {
         const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
         const recipients = await getParentTelegramNotificationRecipients(participantId, participant.telegram_chat_id);
@@ -1650,6 +1650,146 @@ async function startServer() {
     if (!year || !month || !day) return dateString;
     return `${day}.${month}.${year}`;
   };
+
+  const parsePaymentAmount = (value: unknown) => {
+    const parsed = Number(String(value ?? '').replace(',', '.').replace(/\s/g, ''));
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  async function getDefaultCashPaymentAmount(rawAmount?: unknown) {
+    const directAmount = parsePaymentAmount(rawAmount);
+    if (directAmount) return directAmount;
+    if (!pool) return 2500;
+
+    try {
+      const settings = await pool.query(
+        `SELECT value
+         FROM settings
+         WHERE key = ANY($1)
+         ORDER BY CASE key
+           WHEN 'parent_cash_payment_amount' THEN 1
+           WHEN 'monthly_subscription_amount' THEN 2
+           WHEN 'subscription_amount' THEN 3
+           WHEN 'default_payment_amount' THEN 4
+           WHEN 'club_monthly_fee' THEN 5
+           ELSE 6
+         END
+         LIMIT 1`,
+        [[
+          'parent_cash_payment_amount',
+          'monthly_subscription_amount',
+          'subscription_amount',
+          'default_payment_amount',
+          'club_monthly_fee'
+        ]]
+      );
+      const configuredAmount = parsePaymentAmount(settings.rows[0]?.value);
+      if (configuredAmount) return configuredAmount;
+    } catch (e) {
+      console.warn('Failed to read default cash payment amount:', e);
+    }
+
+    return 2500;
+  }
+
+  async function recordParentCashTrainingPayment(
+    participantId: number,
+    source: 'portal' | 'telegram',
+    rawAmount?: unknown,
+    actorLabel?: string
+  ) {
+    if (!pool) throw new Error('Database not configured');
+
+    const today = getKyivDateString();
+    const [yearRaw, monthRaw] = today.split('-');
+    const year = Number(yearRaw);
+    const month = Number(monthRaw);
+    const amount = await getDefaultCashPaymentAmount(rawAmount);
+
+    const participantResult = await pool.query(
+      `SELECT p.id, p.name, p.payment_status, p.telegram_chat_id, g.name AS group_name, c.name AS coach_name
+       FROM participants p
+       LEFT JOIN groups g ON g.id = p.group_id
+       LEFT JOIN coaches c ON c.id = g.coach_id
+       WHERE p.id = $1
+       LIMIT 1`,
+      [participantId]
+    );
+    const participant = participantResult.rows[0];
+    if (!participant) throw new Error('Participant not found');
+
+    const existing = await pool.query(
+      `SELECT id, amount, date, method
+       FROM payments
+       WHERE participant_id = $1
+         AND month = $2
+         AND year = $3
+         AND COALESCE(type, 'subscription') = 'subscription'
+       ORDER BY created_at DESC NULLS LAST, id DESC
+       LIMIT 1`,
+      [participantId, month, year]
+    );
+
+    if (existing.rows[0]) {
+      await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participantId]);
+      return {
+        success: true,
+        alreadyPaid: true,
+        id: existing.rows[0].id,
+        amount: Number(existing.rows[0].amount || amount),
+        month,
+        year,
+        participantName: participant.name
+      };
+    }
+
+    const notes = [
+      source === 'telegram' ? 'Відмічено батьком/учасником через Telegram-бот' : 'Відмічено батьком/учасником у кабінеті',
+      actorLabel ? `Джерело: ${actorLabel}` : '',
+      participant.group_name ? `Група: ${participant.group_name}` : '',
+      participant.coach_name ? `Тренер: ${participant.coach_name}` : ''
+    ].filter(Boolean).join('. ');
+
+    const payment = await pool.query(
+      `INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes)
+       VALUES ($1, $2, $3, $4, $5, 'subscription', 'cash', $6)
+       RETURNING id`,
+      [participantId, amount, today, month, year, notes]
+    );
+
+    await pool.query("UPDATE participants SET payment_status = 'paid' WHERE id = $1", [participantId]);
+
+    const message = `Оплата готівкою на тренуванні зарахована: ${amount} грн.`;
+    await notifyParent(participantId, 'payment', message, undefined, true);
+    await logAuditAction(null as any, source === 'telegram' ? 'parent_telegram' : 'parent_portal', `Батьки відмітили оплату готівкою: ${amount} ₴`, 'payment', participantId, {
+      source,
+      amount,
+      month,
+      year,
+      participantName: participant.name
+    });
+
+    const adminText = [
+      '<b>Оплата готівкою зарахована</b>',
+      `Учасник: <b>${participant.name}</b>`,
+      `Сума: ${amount} грн`,
+      `Період: ${String(month).padStart(2, '0')}.${year}`,
+      `Джерело: ${source === 'telegram' ? 'Telegram-бот батьків' : 'кабінет батьків/учасника'}`
+    ].join('\n');
+    await sendTelegramMessage(adminText).catch((error) => {
+      console.warn('Cash payment admin Telegram notification failed:', error);
+    });
+
+    return {
+      success: true,
+      alreadyPaid: false,
+      id: payment.rows[0].id,
+      amount,
+      month,
+      year,
+      participantName: participant.name
+    };
+  }
 
   const getCoachDayAliases = (dateString: string) => {
     const day = new Date(`${dateString}T12:00:00Z`).getUTCDay();
@@ -8276,6 +8416,20 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         res.json(result.rows);
       } catch (e) {
         res.status(500).json({ error: "Failed to fetch payments" });
+      }
+    });
+
+    app.post("/api/parent/payments/cash", async (req, res) => {
+      if (!pool) return res.status(500).json({ error: "Database not configured" });
+      const participantId = await getParentParticipantId(req);
+      if (!participantId) return res.status(401).json({ error: "Not logged in as parent" });
+
+      try {
+        const result = await recordParentCashTrainingPayment(participantId, 'portal', req.body?.amount, 'parent_portal');
+        res.json(result);
+      } catch (e) {
+        console.error("Failed to mark parent cash payment:", e);
+        res.status(500).json({ error: "Failed to mark cash payment" });
       }
     });
 

@@ -178,6 +178,7 @@ const ParentPanel = () => {
   const [messages, setMessages] = useState<any[]>([]);
   const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
   const [familyAccesses, setFamilyAccesses] = useState<any[]>([]);
+  const [isMarkingCashPayment, setIsMarkingCashPayment] = useState(false);
   const [familyAccessDraft, setFamilyAccessDraft] = useState({
     access_type: 'mother',
     name: '',
@@ -405,6 +406,34 @@ const ParentPanel = () => {
       }
     } catch (e) {
       toast.error('Не вдалося змінити дитину');
+    }
+  };
+
+  const handleMarkCashPayment = async () => {
+    if (isMarkingCashPayment) return;
+    const confirmed = window.confirm('Підтвердити, що оплату готівкою передали на тренуванні? Статус буде змінено на “Оплачено”.');
+    if (!confirmed) return;
+
+    setIsMarkingCashPayment(true);
+    try {
+      const res = await parentFetch('/api/parent/payments/cash', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося зарахувати оплату');
+        return;
+      }
+
+      setParticipant((prev: any) => prev ? { ...prev, payment_status: 'paid' } : prev);
+      await fetchData();
+      toast.success(data.alreadyPaid ? 'Оплата за цей місяць вже була зарахована' : 'Оплату готівкою зараховано');
+    } catch {
+      toast.error('Помилка зарахування оплати');
+    } finally {
+      setIsMarkingCashPayment(false);
     }
   };
 
@@ -1689,7 +1718,7 @@ const ParentPanel = () => {
             <div className="space-y-8">
               <h2 className="text-4xl font-black uppercase tracking-tighter">Історія <span className="text-red-600">оплати</span></h2>
               <div className="grid gap-6">
-                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 flex items-center justify-between">
+                <div className="bg-zinc-900/50 p-8 rounded-[2.5rem] border border-white/5 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-2">Поточний статус</div>
                     <div className={`text-2xl font-black uppercase tracking-tight ${
@@ -1698,9 +1727,21 @@ const ParentPanel = () => {
                       {participant?.payment_status === 'paid' ? 'Все оплачено' : 'Потрібна оплата'}
                     </div>
                   </div>
-                  <button className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">
-                    Оплатити онлайн
-                  </button>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <button className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">
+                      Оплатити онлайн
+                    </button>
+                    {isPaymentDue && (
+                      <button
+                        type="button"
+                        onClick={handleMarkCashPayment}
+                        disabled={isMarkingCashPayment}
+                        className="px-6 py-4 bg-white/10 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-white/15 transition-all border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isMarkingCashPayment ? 'Зарахування...' : 'Оплатив(ла) готівкою'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {isPaymentDue && (
@@ -1714,6 +1755,7 @@ const ParentPanel = () => {
                           <div className="text-[10px] font-black uppercase tracking-widest text-red-400 mb-2">Нагадування про оплату</div>
                           <h3 className="text-xl font-black uppercase tracking-tight text-white">Оплата за {currentPaymentMonth} до 5 числа</h3>
                           <p className="mt-3 max-w-2xl text-sm leading-6 text-zinc-300">
+                            Якщо передали готівку на тренуванні, натисніть “Оплатив(ла) готівкою” — оплата за поточний місяць одразу зарахується в кабінеті.
                             Якщо оплату вже зробили, але статус не оновився або бачите помилку, зверніться до {coachContactText}.
                           </p>
                           <div className="mt-3 space-y-1 text-sm font-bold text-zinc-200">
