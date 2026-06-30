@@ -590,7 +590,7 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
           <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-2xl font-black uppercase text-white">Генератор</h3>
-              <p className="mt-1 text-sm text-zinc-500">Оберіть акцент і згенеруйте 3 варіанти.</p>
+              <p className="mt-1 text-sm text-zinc-500">Оберіть акцент, рівень групи і згенеруйте 6-24 різні варіанти.</p>
             </div>
             <button
               type="button"
