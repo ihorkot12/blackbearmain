@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { toast } from 'sonner';
 import {
   Award,
+  Archive,
   BookOpenCheck,
   CalendarClock,
   CheckCircle2,
@@ -11,12 +12,15 @@ import {
   Clock3,
   Dumbbell,
   FileCheck2,
+  FileSpreadsheet,
+  Info,
   Loader2,
   MessageSquareText,
   RefreshCw,
   Send,
   Sparkles,
   Target,
+  Trash2,
   Users,
 } from 'lucide-react';
 
@@ -28,6 +32,14 @@ type HomeworkExercise = {
   reps?: string;
   rest?: string;
   note?: string;
+  level?: string;
+  equipment?: string;
+  explanation?: string;
+  cues?: string[];
+  mistakes?: string[];
+  safety?: string;
+  progression?: string;
+  diary_prompt?: string;
 };
 
 type HomeworkSuggestion = {
@@ -38,6 +50,7 @@ type HomeworkSuggestion = {
   estimated_minutes: number;
   exercises: HomeworkExercise[];
   coach_note?: string;
+  recommended_for?: string;
 };
 
 type HomeworkItem = {
@@ -62,10 +75,18 @@ type HomeworkItem = {
   submitted_at?: string;
   reviewed_at?: string;
   recipients_count?: number;
+  assigned_count?: number;
+  in_progress_count?: number;
   submitted_count?: number;
   approved_count?: number;
   needs_work_count?: number;
 };
+
+type HomeworkLibrarySummary = {
+  count?: number;
+  focuses?: Array<{ id: string; label: string; count: number }>;
+  focusCounts?: Record<string, number>;
+} | null;
 
 type HomeworkDraft = {
   diary_entries: any[];
@@ -177,6 +198,144 @@ const ExerciseList = ({ exercises }: { exercises: HomeworkExercise[] }) => (
   </div>
 );
 
+const levelLabel = (level?: string) => {
+  if (level === 'beginner') return 'база';
+  if (level === 'intermediate') return 'середній';
+  if (level === 'advanced') return 'досвідчені';
+  return '';
+};
+
+const ExerciseDetailsList = ({ exercises }: { exercises: HomeworkExercise[] }) => {
+  const [openExerciseKey, setOpenExerciseKey] = useState<string | null>(null);
+
+  return (
+    <div className="grid gap-3">
+      {exercises.map((exercise, index) => {
+        const key = `${exercise.id || exercise.name}-${index}`;
+        const isOpen = openExerciseKey === key;
+        const hasDetails = Boolean(
+          exercise.explanation ||
+          exercise.cues?.length ||
+          exercise.mistakes?.length ||
+          exercise.safety ||
+          exercise.progression ||
+          exercise.diary_prompt ||
+          exercise.equipment ||
+          exercise.level
+        );
+
+        return (
+          <div key={key} className="overflow-hidden rounded-2xl border border-white/5 bg-black/25">
+            <button
+              type="button"
+              onClick={() => hasDetails && setOpenExerciseKey(isOpen ? null : key)}
+              className="w-full p-4 text-left transition-colors hover:bg-white/[0.03]"
+            >
+              <div className="mb-2 flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-black text-white">{exercise.name}</p>
+                  <p className="mt-1 text-sm text-zinc-400">{exercise.target}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <div className="rounded-xl bg-red-600/15 px-3 py-1 text-xs font-black text-red-300">
+                    {exercise.sets || 1} сет
+                  </div>
+                  {hasDetails && <ChevronDown className={`text-zinc-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} size={18} />}
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs font-bold text-zinc-500">
+                {exercise.reps && <span className="rounded-lg bg-white/5 px-3 py-1">{exercise.reps}</span>}
+                {exercise.rest && <span className="rounded-lg bg-white/5 px-3 py-1">пауза {exercise.rest}</span>}
+                {exercise.equipment && <span className="rounded-lg bg-white/5 px-3 py-1">{exercise.equipment}</span>}
+                {levelLabel(exercise.level) && <span className="rounded-lg bg-red-500/10 px-3 py-1 text-red-200/80">{levelLabel(exercise.level)}</span>}
+              </div>
+              {exercise.note && <p className="mt-3 text-xs leading-relaxed text-zinc-500">{exercise.note}</p>}
+              {hasDetails && (
+                <div className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase text-red-300">
+                  <Info size={14} />
+                  {isOpen ? 'згорнути пояснення' : 'відкрити пояснення'}
+                </div>
+              )}
+            </button>
+
+            <AnimatePresence initial={false}>
+              {isOpen && hasDetails && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden"
+                >
+                  <div className="border-t border-white/5 px-4 pb-4 pt-3">
+                    {exercise.explanation && (
+                      <p className="rounded-xl bg-white/[0.03] p-3 text-sm leading-relaxed text-zinc-300">
+                        {exercise.explanation}
+                      </p>
+                    )}
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      {exercise.cues?.length ? (
+                        <div className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 p-3">
+                          <p className="mb-2 text-xs font-black uppercase text-emerald-300">Ключі техніки</p>
+                          <ul className="space-y-1 text-xs leading-relaxed text-zinc-300">
+                            {exercise.cues.map((cue, cueIndex) => <li key={cueIndex}>• {cue}</li>)}
+                          </ul>
+                        </div>
+                      ) : null}
+                      {exercise.mistakes?.length ? (
+                        <div className="rounded-xl border border-amber-500/10 bg-amber-500/5 p-3">
+                          <p className="mb-2 text-xs font-black uppercase text-amber-300">Типові помилки</p>
+                          <ul className="space-y-1 text-xs leading-relaxed text-zinc-300">
+                            {exercise.mistakes.map((mistake, mistakeIndex) => <li key={mistakeIndex}>• {mistake}</li>)}
+                          </ul>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-3">
+                      {exercise.safety && (
+                        <p className="rounded-xl bg-red-500/10 p-3 text-xs leading-relaxed text-red-100/80">
+                          <span className="mb-1 block font-black uppercase text-red-300">Безпека</span>
+                          {exercise.safety}
+                        </p>
+                      )}
+                      {exercise.progression && (
+                        <p className="rounded-xl bg-blue-500/10 p-3 text-xs leading-relaxed text-blue-100/80">
+                          <span className="mb-1 block font-black uppercase text-blue-300">Ускладнення</span>
+                          {exercise.progression}
+                        </p>
+                      )}
+                      {exercise.diary_prompt && (
+                        <p className="rounded-xl bg-white/[0.04] p-3 text-xs leading-relaxed text-zinc-300">
+                          <span className="mb-1 block font-black uppercase text-zinc-100">Щоденник</span>
+                          {exercise.diary_prompt}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const difficultyHints: Record<string, string> = {
+  easy: 'Молодша група або новачки: база, контроль форми, без гонки за кількістю.',
+  medium: 'Середня група: стабільний темп, прості зв’язки, чесний короткий щоденник.',
+  hard: 'Старша група або дорослі досвідчені: більше обсягу, темпу і самоконтролю.',
+};
+
+const suggestDifficultyForGroup = (groupName?: string) => {
+  const value = String(groupName || '').toLowerCase();
+  if (!value) return '';
+  if (value.includes('старш') || value.includes('дорос') || value.includes('12+') || value.includes('advanced')) return 'hard';
+  if (value.includes('серед') || value.includes('middle') || value.includes('8+') || value.includes('9+') || value.includes('10+')) return 'medium';
+  if (value.includes('молод') || value.includes('новач') || value.includes('почат') || value.includes('kids')) return 'easy';
+  return '';
+};
+
 export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: number | null }) => {
   const [groups, setGroups] = useState<any[]>([]);
   const [participants, setParticipants] = useState<any[]>([]);
@@ -189,10 +348,14 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const [focus, setFocus] = useState('technique');
   const [difficulty, setDifficulty] = useState('medium');
   const [minutes, setMinutes] = useState(15);
+  const [variantCount, setVariantCount] = useState(12);
   const [dueDate, setDueDate] = useState(nextDate(7));
+  const [librarySummary, setLibrarySummary] = useState<HomeworkLibrarySummary>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [archivingId, setArchivingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [reviewingId, setReviewingId] = useState<number | null>(null);
   const [reviewDrafts, setReviewDrafts] = useState<Record<number, { coach_feedback: string; points_awarded: number }>>({});
 
@@ -204,16 +367,18 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [groupsRes, participantsRes, assignmentsRes, submissionsRes] = await Promise.all([
+      const [groupsRes, participantsRes, assignmentsRes, submissionsRes, libraryRes] = await Promise.all([
         adminRequest('/api/groups'),
         adminRequest('/api/participants'),
         adminRequest('/api/homework'),
         adminRequest('/api/homework/submissions'),
+        adminRequest('/api/homework/library'),
       ]);
       setGroups(groupsRes.ok ? await groupsRes.json() : []);
       setParticipants(participantsRes.ok ? await participantsRes.json() : []);
       setAssignments(assignmentsRes.ok ? await assignmentsRes.json() : []);
       setSubmissions(submissionsRes.ok ? await submissionsRes.json() : []);
+      setLibrarySummary(libraryRes.ok ? await libraryRes.json() : null);
     } catch {
       toast.error('Не вдалося завантажити домашні завдання');
     } finally {
@@ -228,19 +393,55 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      const selectedGroup = groups.find(group => String(group.id) === selectedGroupId);
       const res = await adminRequest('/api/homework/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ focus, difficulty, estimated_minutes: minutes }),
+        body: JSON.stringify({
+          focus,
+          difficulty,
+          estimated_minutes: minutes,
+          count: variantCount,
+          group_name: selectedGroup?.name || '',
+          seed: Date.now(),
+        }),
       });
       const data = await res.json();
       const nextSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
       setSuggestions(nextSuggestions);
       setSelectedSuggestion(nextSuggestions[0] || null);
+      if (data.library) setLibrarySummary(data.library);
     } catch {
       toast.error('Не вдалося згенерувати ДЗ');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const downloadHomeworkLibrary = async () => {
+    try {
+      const res = await adminRequest('/api/homework/library');
+      const data = await res.json();
+      const exercises = Array.isArray(data.exercises) ? data.exercises : [];
+      if (exercises.length === 0) {
+        toast.error('Бібліотека вправ порожня');
+        return;
+      }
+      const headers = ['focus', 'level', 'name', 'target', 'sets', 'reps', 'rest', 'equipment', 'note', 'explanation', 'safety', 'progression', 'diary_prompt'];
+      const escapeCsv = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""').replace(/\r?\n/g, ' ')}"`;
+      const csv = [
+        headers.join(';'),
+        ...exercises.map((exercise: any) => headers.map(header => escapeCsv(exercise[header])).join(';')),
+      ].join('\n');
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'black-bear-homework-library.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Не вдалося завантажити таблицю вправ');
     }
   };
 
@@ -286,6 +487,44 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
       toast.error('Помилка розсилки');
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const archiveAssignment = async (item: HomeworkItem) => {
+    if (!item.id || !window.confirm('Архівувати це домашнє завдання? Воно зникне з активних списків, але історія залишиться.')) return;
+    setArchivingId(item.id);
+    try {
+      const res = await adminRequest(`/api/homework/${item.id}/archive`, { method: 'PATCH' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося архівувати ДЗ');
+        return;
+      }
+      toast.success('ДЗ перенесено в архів');
+      fetchData();
+    } catch {
+      toast.error('Помилка архівації');
+    } finally {
+      setArchivingId(null);
+    }
+  };
+
+  const deleteAssignment = async (item: HomeworkItem) => {
+    if (!item.id || !window.confirm('Видалити помилкове ДЗ? Це можна робити тільки якщо учні ще не почали виконання.')) return;
+    setDeletingId(item.id);
+    try {
+      const res = await adminRequest(`/api/homework/${item.id}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(res.status === 409 ? 'Учні вже почали виконання. Краще архівувати.' : data.error || 'Не вдалося видалити ДЗ');
+        return;
+      }
+      toast.success('Помилкове ДЗ видалено');
+      fetchData();
+    } catch {
+      toast.error('Помилка видалення');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -380,6 +619,18 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
                   </button>
                 ))}
               </div>
+              {librarySummary && (
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
+                  <span className="rounded-lg bg-white/5 px-3 py-1">База: {librarySummary.count || 0} вправ</span>
+                  {librarySummary.focuses?.map(item => (
+                    <span key={item.id} className="rounded-lg bg-white/5 px-3 py-1">{item.label}: {item.count}</span>
+                  ))}
+                  <button type="button" onClick={downloadHomeworkLibrary} className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 px-3 py-1 text-red-300 hover:bg-red-500/20">
+                    <FileSpreadsheet size={13} />
+                    таблиця
+                  </button>
+                </div>
+              )}
             </div>
 
             <label className="block">
@@ -387,18 +638,29 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
               <select value={difficulty} onChange={event => setDifficulty(event.target.value)} className="h-12 w-full rounded-2xl border border-white/10 bg-black px-4 text-sm text-white outline-none">
                 {difficultyOptions.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
               </select>
+              <span className="mt-2 block text-xs leading-relaxed text-zinc-500">{difficultyHints[difficulty]}</span>
             </label>
             <label className="block">
               <span className="mb-2 block text-xs font-black uppercase text-zinc-500">Хвилин</span>
               <input type="number" min={5} max={60} value={minutes} onChange={event => setMinutes(Number(event.target.value))} className="h-12 w-full rounded-2xl border border-white/10 bg-black px-4 text-sm text-white outline-none" />
             </label>
             <label className="block">
+              <span className="mb-2 block text-xs font-black uppercase text-zinc-500">Варіантів</span>
+              <select value={variantCount} onChange={event => setVariantCount(Number(event.target.value))} className="h-12 w-full rounded-2xl border border-white/10 bg-black px-4 text-sm text-white outline-none">
+                {[6, 12, 18, 24].map(count => <option key={count} value={count}>{count} ДЗ</option>)}
+              </select>
+            </label>
+            <label className="block">
               <span className="mb-2 block text-xs font-black uppercase text-zinc-500">Група</span>
               <select
                 value={selectedGroupId}
                 onChange={event => {
-                  setSelectedGroupId(event.target.value);
+                  const nextGroupId = event.target.value;
+                  const nextGroup = groups.find(group => String(group.id) === nextGroupId);
+                  const suggestedDifficulty = suggestDifficultyForGroup(nextGroup?.name);
+                  setSelectedGroupId(nextGroupId);
                   setSelectedParticipantIds([]);
+                  if (suggestedDifficulty) setDifficulty(suggestedDifficulty);
                 }}
                 className="h-12 w-full rounded-2xl border border-white/10 bg-black px-4 text-sm text-white outline-none"
               >
@@ -464,22 +726,21 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
               {suggestions.map((suggestion, index) => {
                 const selected = selectedSuggestion?.title === suggestion.title;
                 return (
-                  <button
+                  <div
                     key={`${suggestion.title}-${index}`}
-                    type="button"
-                    onClick={() => setSelectedSuggestion(suggestion)}
-                    className={`rounded-[2rem] border p-5 text-left transition-all ${selected ? 'border-red-500/40 bg-red-500/10' : 'border-white/5 bg-zinc-900/50 hover:border-white/15'}`}
+                    className={`rounded-[2rem] border p-5 transition-all ${selected ? 'border-red-500/40 bg-red-500/10' : 'border-white/5 bg-zinc-900/50 hover:border-white/15'}`}
                   >
-                    <div className="mb-4 flex items-start justify-between gap-4">
+                    <button type="button" onClick={() => setSelectedSuggestion(suggestion)} className="mb-4 flex w-full items-start justify-between gap-4 text-left">
                       <div>
                         <h4 className="text-xl font-black uppercase text-white">{suggestion.title}</h4>
                         <p className="mt-2 text-sm leading-relaxed text-zinc-400">{suggestion.description}</p>
+                        {suggestion.recommended_for && <p className="mt-2 text-xs font-bold uppercase text-red-300">{suggestion.recommended_for}</p>}
                       </div>
                       {selected && <CheckCircle2 className="text-red-400" size={24} />}
-                    </div>
-                    <ExerciseList exercises={suggestion.exercises} />
+                    </button>
+                    <ExerciseDetailsList exercises={suggestion.exercises} />
                     {suggestion.coach_note && <p className="mt-4 rounded-2xl bg-amber-500/10 p-4 text-sm text-amber-100/80">{suggestion.coach_note}</p>}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -500,10 +761,32 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
                   </div>
                   <span className="rounded-xl bg-white/5 px-3 py-1 text-xs font-black text-zinc-300">{item.recipients_count || 0}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-center text-xs font-bold">
+                <div className="grid grid-cols-2 gap-2 text-center text-xs font-bold sm:grid-cols-5">
+                  <div className="rounded-xl bg-white/5 p-2 text-zinc-300">нові {item.assigned_count || 0}</div>
+                  <div className="rounded-xl bg-zinc-500/10 p-2 text-zinc-300">в роботі {item.in_progress_count || 0}</div>
                   <div className="rounded-xl bg-blue-500/10 p-2 text-blue-300">на перевірці {item.submitted_count || 0}</div>
                   <div className="rounded-xl bg-emerald-500/10 p-2 text-emerald-300">готово {item.approved_count || 0}</div>
                   <div className="rounded-xl bg-amber-500/10 p-2 text-amber-300">правки {item.needs_work_count || 0}</div>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => archiveAssignment(item)}
+                    disabled={archivingId === item.id}
+                    className="flex h-10 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 text-xs font-black uppercase text-zinc-200 transition-colors hover:bg-white/10 disabled:opacity-50"
+                  >
+                    {archivingId === item.id ? <Loader2 className="animate-spin" size={14} /> : <Archive size={14} />}
+                    Архів
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteAssignment(item)}
+                    disabled={deletingId === item.id}
+                    className="flex h-10 items-center justify-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 text-xs font-black uppercase text-red-200 transition-colors hover:bg-red-500/15 disabled:opacity-50"
+                  >
+                    {deletingId === item.id ? <Loader2 className="animate-spin" size={14} /> : <Trash2 size={14} />}
+                    Видалити помилкове
+                  </button>
                 </div>
               </div>
             ))}
@@ -788,7 +1071,7 @@ export const HomeworkParentDiary = ({
                       className="overflow-hidden"
                     >
                       <div className="border-t border-white/5 p-5">
-                        <ExerciseList exercises={exercises} />
+                        <ExerciseDetailsList exercises={exercises} />
 
                         <div className="mt-6 space-y-3">
                           <h4 className="font-black uppercase text-white">Щоденник виконання</h4>

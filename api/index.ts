@@ -13,6 +13,7 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
+import { generateHomeworkSuggestions as buildHomeworkSuggestions, getHomeworkLibrarySummary, HOMEWORK_LIBRARY } from './homeworkLibrary';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -1214,7 +1215,15 @@ async function startServer() {
         sets: Number.isFinite(Number(item?.sets)) ? Math.max(1, Math.min(20, Number(item.sets))) : 1,
         reps: String(item?.reps || '').trim(),
         rest: String(item?.rest || '').trim(),
-        note: String(item?.note || '').trim()
+        note: String(item?.note || '').trim(),
+        level: String(item?.level || '').trim(),
+        equipment: String(item?.equipment || '').trim(),
+        explanation: String(item?.explanation || '').trim(),
+        cues: Array.isArray(item?.cues) ? item.cues.map((entry: any) => String(entry || '').trim()).filter(Boolean) : [],
+        mistakes: Array.isArray(item?.mistakes) ? item.mistakes.map((entry: any) => String(entry || '').trim()).filter(Boolean) : [],
+        safety: String(item?.safety || '').trim(),
+        progression: String(item?.progression || '').trim(),
+        diary_prompt: String(item?.diary_prompt || '').trim()
       }))
       .filter((item: any) => item.name && item.target);
   };
@@ -6511,9 +6520,23 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   });
 
   // Homework
+  app.get("/api/homework/library", requireAuth, async (req, res) => {
+    try {
+      res.json({
+        ...getHomeworkLibrarySummary(),
+        exercises: HOMEWORK_LIBRARY
+      });
+    } catch (e) {
+      res.status(500).json({ error: "Failed to load homework library" });
+    }
+  });
+
   app.post("/api/homework/generate", requireAuth, async (req, res) => {
     try {
-      res.json({ suggestions: generateHomeworkSuggestions(req.body || {}) });
+      res.json({
+        suggestions: buildHomeworkSuggestions(req.body || {}),
+        library: getHomeworkLibrarySummary()
+      });
     } catch (e) {
       res.status(500).json({ error: "Failed to generate homework" });
     }
@@ -6537,6 +6560,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           g.name as group_name,
           c.name as coach_name,
           COUNT(hap.id)::int as recipients_count,
+          COUNT(*) FILTER (WHERE hap.status = 'assigned')::int as assigned_count,
+          COUNT(*) FILTER (WHERE hap.status = 'in_progress')::int as in_progress_count,
           COUNT(*) FILTER (WHERE hap.status = 'submitted')::int as submitted_count,
           COUNT(*) FILTER (WHERE hap.status = 'approved')::int as approved_count,
           COUNT(*) FILTER (WHERE hap.status = 'needs_work')::int as needs_work_count
@@ -6744,6 +6769,59 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       res.json({ success: true });
     } catch (e) {
       res.status(500).json({ error: "Failed to archive homework" });
+    }
+  });
+
+  app.delete("/api/homework/:id", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const assignmentRes = await client.query(`
+        SELECT
+          ha.id,
+          g.coach_id,
+          COUNT(hap.id) FILTER (WHERE COALESCE(hap.status, 'assigned') <> 'assigned')::int as touched_count
+        FROM homework_assignments ha
+        LEFT JOIN groups g ON ha.group_id = g.id
+        LEFT JOIN homework_assignment_participants hap ON hap.assignment_id = ha.id
+        WHERE ha.id = $1
+        GROUP BY ha.id, g.coach_id
+      `, [req.params.id]);
+      if (assignmentRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: "Homework not found" });
+      }
+      if (user.role === 'coach' && assignmentRes.rows[0].coach_id !== user.coach_id) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: "Forbidden" });
+      }
+      if (Number(assignmentRes.rows[0].touched_count || 0) > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ error: "Homework already has progress. Archive it instead." });
+      }
+
+      await client.query(`
+        DELETE FROM notifications
+        WHERE reference_type = 'homework'
+          AND (
+            reference_id = $1::text
+            OR reference_id IN (
+              SELECT id::text FROM homework_assignment_participants WHERE assignment_id = $1
+            )
+          )
+      `, [req.params.id]);
+      await client.query("DELETE FROM homework_assignments WHERE id = $1", [req.params.id]);
+      await client.query('COMMIT');
+      res.json({ success: true });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      console.error("Failed to delete homework:", e);
+      res.status(500).json({ error: "Failed to delete homework" });
+    } finally {
+      client.release();
     }
   });
 
