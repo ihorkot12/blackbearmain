@@ -1,3 +1,4 @@
+// Shared server-side homework exercise bank. Keep it outside api/ so Vercel does not create an extra function.
 export type HomeworkFocus = 'technique' | 'kata' | 'conditioning' | 'flexibility' | 'discipline';
 
 export type HomeworkLibraryExercise = {

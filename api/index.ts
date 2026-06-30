@@ -13,7 +13,7 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
-import { generateHomeworkSuggestions as buildHomeworkSuggestions, getHomeworkLibrarySummary, HOMEWORK_LIBRARY } from './homeworkLibrary';
+import { generateHomeworkSuggestions as buildHomeworkSuggestions, getHomeworkLibrarySummary, HOMEWORK_LIBRARY } from '../server/homeworkLibrary';
 const { Pool } = pkg;
 
 dotenv.config();
