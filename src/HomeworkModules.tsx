@@ -86,6 +86,8 @@ type HomeworkLibrarySummary = {
   count?: number;
   focuses?: Array<{ id: string; label: string; count: number }>;
   focusCounts?: Record<string, number>;
+  source?: string;
+  sheetUrl?: string;
 } | null;
 
 type HomeworkDraft = {
@@ -351,8 +353,10 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
   const [variantCount, setVariantCount] = useState(12);
   const [dueDate, setDueDate] = useState(nextDate(7));
   const [librarySummary, setLibrarySummary] = useState<HomeworkLibrarySummary>(null);
+  const [sheetUrl, setSheetUrl] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSyncingLibrary, setIsSyncingLibrary] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [archivingId, setArchivingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -378,7 +382,9 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
       setParticipants(participantsRes.ok ? await participantsRes.json() : []);
       setAssignments(assignmentsRes.ok ? await assignmentsRes.json() : []);
       setSubmissions(submissionsRes.ok ? await submissionsRes.json() : []);
-      setLibrarySummary(libraryRes.ok ? await libraryRes.json() : null);
+      const libraryData = libraryRes.ok ? await libraryRes.json() : null;
+      setLibrarySummary(libraryData);
+      if (libraryData?.sheetUrl) setSheetUrl(libraryData.sheetUrl);
     } catch {
       toast.error('Не вдалося завантажити домашні завдання');
     } finally {
@@ -410,7 +416,10 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
       const nextSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
       setSuggestions(nextSuggestions);
       setSelectedSuggestion(nextSuggestions[0] || null);
-      if (data.library) setLibrarySummary(data.library);
+      if (data.library) {
+        setLibrarySummary(data.library);
+        if (data.library.sheetUrl) setSheetUrl(data.library.sheetUrl);
+      }
     } catch {
       toast.error('Не вдалося згенерувати ДЗ');
     } finally {
@@ -442,6 +451,39 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
       URL.revokeObjectURL(url);
     } catch {
       toast.error('Не вдалося завантажити таблицю вправ');
+    }
+  };
+
+  const syncHomeworkLibrary = async () => {
+    const cleanUrl = sheetUrl.trim();
+    if (!cleanUrl) {
+      toast.error('Встав посилання на Google Sheets з базою вправ');
+      return;
+    }
+
+    setIsSyncingLibrary(true);
+    try {
+      const res = await adminRequest('/api/homework/library/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sheetUrl: cleanUrl }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || 'Не вдалося синхронізувати Google Sheets');
+        return;
+      }
+      setLibrarySummary({
+        ...(data.library || {}),
+        source: data.source,
+        sheetUrl: data.sheetUrl,
+      });
+      setSheetUrl(data.sheetUrl || cleanUrl);
+      toast.success(`База оновлена: ${data.active || data.imported || 0} активних вправ`);
+    } catch {
+      toast.error('Помилка синхронізації Google Sheets');
+    } finally {
+      setIsSyncingLibrary(false);
     }
   };
 
@@ -620,16 +662,50 @@ export const HomeworkCoachModule = ({ role, coachId }: { role: string; coachId: 
                 ))}
               </div>
               {librarySummary && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
-                  <span className="rounded-lg bg-white/5 px-3 py-1">База: {librarySummary.count || 0} вправ</span>
-                  {librarySummary.focuses?.map(item => (
-                    <span key={item.id} className="rounded-lg bg-white/5 px-3 py-1">{item.label}: {item.count}</span>
-                  ))}
-                  <button type="button" onClick={downloadHomeworkLibrary} className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 px-3 py-1 text-red-300 hover:bg-red-500/20">
-                    <FileSpreadsheet size={13} />
-                    таблиця
-                  </button>
-                </div>
+                <>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-500">
+                    <span className="rounded-lg bg-white/5 px-3 py-1">База: {librarySummary.count || 0} вправ</span>
+                    <span className={`rounded-lg px-3 py-1 ${librarySummary.source === 'google_sheets' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-white/5 text-zinc-500'}`}>
+                      {librarySummary.source === 'google_sheets' ? 'Google Sheets' : 'резервна база'}
+                    </span>
+                    {librarySummary.focuses?.map(item => (
+                      <span key={item.id} className="rounded-lg bg-white/5 px-3 py-1">{item.label}: {item.count}</span>
+                    ))}
+                    <button type="button" onClick={downloadHomeworkLibrary} className="inline-flex items-center gap-1 rounded-lg bg-red-500/10 px-3 py-1 text-red-300 hover:bg-red-500/20">
+                      <FileSpreadsheet size={13} />
+                      таблиця
+                    </button>
+                  </div>
+
+                  {role === 'admin' && (
+                    <div className="mt-4 rounded-2xl border border-white/10 bg-black/25 p-4">
+                      <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase text-zinc-400">
+                        <FileSpreadsheet size={15} className="text-emerald-400" />
+                        Google Sheets база вправ
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                        <input
+                          value={sheetUrl}
+                          onChange={event => setSheetUrl(event.target.value)}
+                          placeholder="https://docs.google.com/spreadsheets/d/..."
+                          className="h-11 min-w-0 rounded-xl border border-white/10 bg-black px-4 text-sm text-white outline-none placeholder:text-zinc-600"
+                        />
+                        <button
+                          type="button"
+                          onClick={syncHomeworkLibrary}
+                          disabled={isSyncingLibrary}
+                          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-xs font-black uppercase text-black transition-colors hover:bg-emerald-400 disabled:opacity-50"
+                        >
+                          {isSyncingLibrary ? <Loader2 className="animate-spin" size={15} /> : <RefreshCw size={15} />}
+                          синхронізувати
+                        </button>
+                      </div>
+                      <p className="mt-2 text-xs leading-relaxed text-zinc-500">
+                        Редагуй вправи в Google Sheets, потім натисни синхронізацію. Вимкнути вправу можна через active = FALSE.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

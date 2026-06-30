@@ -277,6 +277,9 @@ async function ensureTelegramMessagingSchema() {
 
     ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_type TEXT;
     ALTER TABLE notifications ADD COLUMN IF NOT EXISTS reference_id TEXT;
+    ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen BOOLEAN DEFAULT FALSE;
+    ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen_until DATE;
+    ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_freeze_note TEXT;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_chat_id TEXT;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_connected_at TIMESTAMP;
     ALTER TABLE participant_accesses ADD COLUMN IF NOT EXISTS telegram_enabled BOOLEAN DEFAULT TRUE;
@@ -1165,7 +1168,9 @@ async function requireTelegramConnection(chatId: string) {
 async function fetchTelegramParticipants(ids: number[]) {
   if (!pool || ids.length === 0) return [];
   const result = await pool.query(
-    `SELECT p.id, p.name, p.member_type, p.belt, p.rank_points, p.payment_status, p.group_id,
+    `SELECT p.id, p.name, p.member_type, p.belt, p.rank_points, p.payment_status,
+            p.attendance_frozen, p.attendance_frozen_until, p.attendance_freeze_note,
+            p.group_id,
             g.name AS group_name,
             c.id AS coach_id,
             c.name AS coach_name,
@@ -1195,6 +1200,25 @@ function paymentLabel(status: unknown) {
   if (['paid', 'оплачено', 'ok', 'success'].includes(value)) return 'Оплачено';
   if (['partial', 'partially_paid'].includes(value)) return 'Частково оплачено';
   return 'Потрібно перевірити оплату';
+}
+
+function getKyivDateInputValue(now = new Date()) {
+  const { year, month, day } = getKyivDateParts(now);
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function isAttendanceFreezeActive(participant: any) {
+  if (!participant?.attendance_frozen) return false;
+  const until = participant.attendance_frozen_until ? String(participant.attendance_frozen_until).slice(0, 10) : '';
+  return !until || until >= getKyivDateInputValue();
+}
+
+function participantPaymentLabel(participant: any) {
+  if (isAttendanceFreezeActive(participant)) {
+    const until = participant.attendance_frozen_until ? ` до ${formatDate(participant.attendance_frozen_until)}` : '';
+    return `Канікули${until}`;
+  }
+  return paymentLabel(participant?.payment_status);
 }
 
 function isPaidStatus(status: unknown) {
@@ -1345,7 +1369,7 @@ async function sendTelegramProfile(chatId: string) {
     `Локація: ${htmlEscape(p.location_name || 'уточнюється')}`,
     `Пояс: ${htmlEscape(p.belt || 'Білий')}`,
     `Бали: ${Number(p.rank_points || 0)}`,
-    `Оплата: ${paymentLabel(p.payment_status)}`,
+    `Оплата: ${participantPaymentLabel(p)}`,
   ].join('\n'));
   await sendParentTelegram(chatId, `${title}\n\n${lines.join('\n\n')}`, await inlineUrlWithSocialKeyboard('Відкрити кабінет', `${getPortalBaseUrl()}/parent`));
 }
@@ -1435,13 +1459,13 @@ async function sendTelegramPayments(chatId: string) {
      LIMIT 5`,
     [ids]
   );
-  const statusLines = participants.map((p: any) => `<b>${htmlEscape(p.name)}</b>: ${paymentLabel(p.payment_status)}`);
+  const statusLines = participants.map((p: any) => `<b>${htmlEscape(p.name)}</b>: ${participantPaymentLabel(p)}`);
   const history = payments.rows.length
     ? payments.rows.map((row: any) => `${htmlEscape(row.participant_name)} - ${Number(row.amount || 0)} грн, ${formatDate(row.date)}`).join('\n')
     : 'Останніх оплат у базі не знайдено.';
 
   const rows: Array<Array<{ text: string; url?: string; callback_data?: string }>> = participants
-    .filter((participant: any) => !isPaidStatus(participant.payment_status))
+    .filter((participant: any) => !isPaidStatus(participant.payment_status) && !isAttendanceFreezeActive(participant))
     .map((participant: any) => [{
       text: `Оплатив(ла) готівкою: ${participant.name}`.slice(0, 64),
       callback_data: `p:cash:${participant.id}`

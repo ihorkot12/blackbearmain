@@ -39,6 +39,30 @@ const clampProgress = (value: unknown) => {
   return Math.min(100, Math.max(0, numericValue));
 };
 
+const toDateInputValue = (date = new Date()) => {
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().split('T')[0];
+};
+
+const toDateOnlyValue = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toISOString().slice(0, 10);
+};
+
+const isAttendanceFreezeActive = (participant?: any) => {
+  if (!participant?.attendance_frozen) return false;
+  const until = toDateOnlyValue(participant.attendance_frozen_until);
+  return !until || until >= toDateInputValue();
+};
+
+const formatAttendanceFreezeLabel = (participant?: any) => {
+  const until = toDateOnlyValue(participant?.attendance_frozen_until);
+  if (!until) return 'Канікули';
+  return `Канікули до ${new Date(`${until}T12:00:00`).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}`;
+};
+
 const getSkillLabel = (value: unknown): string => {
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
@@ -539,7 +563,8 @@ const ParentPanel = () => {
     ? badges.slice(0, 4).map((badge: any) => badge.name || badge.title || badge.type || 'Відзнака')
     : currentSkillChecklist.slice(0, 4);
   const currentPaymentMonth = new Intl.DateTimeFormat('uk-UA', { month: 'long', year: 'numeric' }).format(new Date());
-  const isPaymentDue = participant?.payment_status !== 'paid';
+  const isAttendanceFrozen = isAttendanceFreezeActive(participant);
+  const isPaymentDue = participant?.payment_status !== 'paid' && !isAttendanceFrozen;
   const coachContactText = participant?.coach_name ? `тренера: ${participant.coach_name}` : 'тренера';
   const coachPhone = String(participant?.coach_phone || '').trim();
   const coachPhoneHref = coachPhone ? `tel:${coachPhone.replace(/[^\d+]/g, '')}` : '';
@@ -1008,7 +1033,9 @@ const ParentPanel = () => {
               </header>
 
               <div className="grid gap-6">
-                {children.map(child => (
+                {children.map(child => {
+                  const childFrozen = isAttendanceFreezeActive(child);
+                  return (
                   <div key={child.id} className="bg-zinc-900/50 p-8 rounded-[3rem] border border-white/5 flex flex-col md:flex-row items-center gap-8 group hover:border-red-600/20 transition-all">
                     <div className="w-24 h-24 bg-red-600/20 text-red-600 rounded-[2rem] flex items-center justify-center font-black text-3xl group-hover:scale-110 transition-transform">
                       {child.name?.[0]}
@@ -1028,8 +1055,8 @@ const ParentPanel = () => {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
                           <div className="text-[8px] font-black uppercase tracking-widest text-zinc-500 mb-1">Оплата</div>
-                          <div className={`text-xs font-black uppercase ${child.payment_status === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
-                            {child.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                          <div className={`text-xs font-black uppercase ${childFrozen ? 'text-amber-300' : child.payment_status === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
+                            {childFrozen ? 'Канікули' : child.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
                           </div>
                         </div>
                         <div className="bg-black/40 p-4 rounded-2xl border border-white/5">
@@ -1063,7 +1090,7 @@ const ParentPanel = () => {
                       {child.id === participant?.id ? 'Обрано' : 'Обрати'}
                     </button>
                   </div>
-                ))}
+                )})}
               </div>
 
               <section className="bg-zinc-900/50 p-6 md:p-8 rounded-[3rem] border border-white/5 space-y-8">
@@ -1268,7 +1295,7 @@ const ParentPanel = () => {
                 {[
                   { label: 'Відвідуваність', value: attendance.length, hint: 'занять всього', icon: Activity, tab: 'attendance', tone: 'text-green-500' },
                   { label: 'Досягнення', value: totalAchievements, hint: 'відзнаки, семінари та події', icon: Award, tab: 'progress', tone: 'text-amber-400' },
-                  { label: 'Оплата', value: participant?.payment_status === 'paid' ? 'ОК' : 'Борг', hint: participant?.payment_status === 'paid' ? 'все оплачено' : 'потрібна увага', icon: CreditCard, tab: 'payments', tone: participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500' },
+                  { label: 'Оплата', value: isAttendanceFrozen ? 'Канікули' : participant?.payment_status === 'paid' ? 'ОК' : 'Борг', hint: isAttendanceFrozen ? formatAttendanceFreezeLabel(participant) : participant?.payment_status === 'paid' ? 'все оплачено' : 'потрібна увага', icon: CreditCard, tab: 'payments', tone: isAttendanceFrozen ? 'text-amber-300' : participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500' },
                   { label: 'Telegram', value: participant?.telegram_chat_id ? 'ОК' : 'Підключити', hint: participant?.telegram_chat_id ? 'сповіщення активні' : 'для важливих повідомлень', icon: MessageSquare, action: handleConnectTelegram, tone: participant?.telegram_chat_id ? 'text-blue-400' : 'text-zinc-300' },
                 ].map((card, index) => (
                   <motion.button
@@ -1722,9 +1749,9 @@ const ParentPanel = () => {
                   <div>
                     <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-2">Поточний статус</div>
                     <div className={`text-2xl font-black uppercase tracking-tight ${
-                      participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500'
+                      isAttendanceFrozen ? 'text-amber-300' : participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500'
                     }`}>
-                      {participant?.payment_status === 'paid' ? 'Все оплачено' : 'Потрібна оплата'}
+                      {isAttendanceFrozen ? formatAttendanceFreezeLabel(participant) : participant?.payment_status === 'paid' ? 'Все оплачено' : 'Потрібна оплата'}
                     </div>
                   </div>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1743,6 +1770,18 @@ const ParentPanel = () => {
                     )}
                   </div>
                 </div>
+
+                {isAttendanceFrozen && (
+                  <div className="rounded-[2rem] border border-amber-500/20 bg-amber-500/10 p-6">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-2">Заморозка відвідування</div>
+                    <p className="max-w-3xl text-sm leading-6 text-zinc-200">
+                      На період канікул платіжні нагадування і повідомлення про пропуски тимчасово не надсилаються. Домашні завдання, методичка, повідомлення тренера і прогрес залишаються активними.
+                    </p>
+                    {participant?.attendance_freeze_note && (
+                      <p className="mt-3 text-sm font-bold text-amber-100/80">{participant.attendance_freeze_note}</p>
+                    )}
+                  </div>
+                )}
 
                 {isPaymentDue && (
                   <div className="bg-red-600/10 border border-red-600/20 rounded-[2rem] p-6">

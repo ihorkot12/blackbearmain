@@ -26,6 +26,25 @@ const toDateInputValue = (date = new Date()) => {
   return localDate.toISOString().split('T')[0];
 };
 
+const toDateOnlyValue = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
+  return date.toISOString().slice(0, 10);
+};
+
+const isAttendanceFreezeActive = (participant?: any) => {
+  if (!participant?.attendance_frozen) return false;
+  const until = toDateOnlyValue(participant.attendance_frozen_until);
+  return !until || until >= toDateInputValue();
+};
+
+const formatAttendanceFreezeLabel = (participant?: any) => {
+  const until = toDateOnlyValue(participant?.attendance_frozen_until);
+  if (!until) return 'Канікули';
+  return `Канікули до ${new Date(`${until}T12:00:00`).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}`;
+};
+
 const shiftDateInputValue = (value: string, days: number) => {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -3301,7 +3320,10 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
         parent_phone: '',
         email: '',
         payment_status: 'unpaid',
-        status: 'active'
+        status: 'active',
+        attendance_frozen: false,
+        attendance_frozen_until: '',
+        attendance_freeze_note: ''
       });
       onActionComplete?.();
     } else if (initialAction?.startsWith('edit:') && participants.length > 0) {
@@ -3348,6 +3370,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
       }
 
       payload.belt = normalizeBeltName(payload.belt);
+      payload.attendance_frozen = Boolean(payload.attendance_frozen);
+      payload.attendance_frozen_until = payload.attendance_frozen ? (payload.attendance_frozen_until || null) : null;
+      payload.attendance_freeze_note = payload.attendance_frozen ? String(payload.attendance_freeze_note || '').trim() : '';
 
       if (data.id && (isBcryptHash(payload.parent_password) || isMaskedPassword(payload.parent_password) || payload.parent_password === '')) {
         delete payload.parent_password;
@@ -3606,7 +3631,10 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               parent_login: '', 
               parent_password: '',
               payment_status: 'unpaid',
-              status: 'active'
+              status: 'active',
+              attendance_frozen: false,
+              attendance_frozen_until: '',
+              attendance_freeze_note: ''
             })}
             className="bg-red-600 hover:bg-red-700 text-white px-6 lg:px-8 py-3 lg:py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-[0_10px_30px_rgba(220,38,38,0.3)] flex items-center justify-center gap-3"
           >
@@ -3647,7 +3675,9 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
+              {filtered.map(p => {
+                const isFrozen = isAttendanceFreezeActive(p);
+                return (
                 <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors group">
                   <td className="p-4 lg:p-6">
                     <div className="flex items-center gap-4">
@@ -3711,9 +3741,11 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </td>
                   <td className="p-4 lg:p-6">
                     <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full ${
-                      p.payment_status === 'paid' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
+                      isFrozen
+                        ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        : p.payment_status === 'paid' ? 'bg-green-500/10 text-green-500 border border-green-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'
                     }`}>
-                      {p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                      {isFrozen ? formatAttendanceFreezeLabel(p) : p.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
                     </span>
                   </td>
                   <td className="p-4 lg:p-6">
@@ -3764,7 +3796,7 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
@@ -4066,6 +4098,48 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                     <option value="inactive">Архів</option>
                   </select>
                 </div>
+              </div>
+              <div className="rounded-3xl border border-amber-500/15 bg-amber-500/5 p-4 lg:p-5">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingParticipant.attendance_frozen)}
+                    onChange={e => setEditingParticipant({
+                      ...editingParticipant,
+                      attendance_frozen: e.target.checked,
+                      attendance_frozen_until: e.target.checked ? (editingParticipant.attendance_frozen_until || '') : '',
+                      attendance_freeze_note: e.target.checked ? (editingParticipant.attendance_freeze_note || '') : ''
+                    })}
+                    className="mt-1 h-4 w-4 accent-amber-400"
+                  />
+                  <span>
+                    <span className="block text-xs font-black uppercase tracking-widest text-amber-300">Канікули / заморозка відвідування</span>
+                    <span className="mt-1 block text-xs leading-5 text-zinc-400">Поки увімкнено, учасник не потрапляє в нагадування про борг, пропуски і “без відмітки”. Домашні завдання, методичка і прогрес працюють як завжди.</span>
+                  </span>
+                </label>
+                {editingParticipant.attendance_frozen && (
+                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div>
+                      <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Заморожено до</label>
+                      <input
+                        type="date"
+                        value={toDateOnlyValue(editingParticipant.attendance_frozen_until)}
+                        onChange={e => setEditingParticipant({...editingParticipant, attendance_frozen_until: e.target.value})}
+                        className="w-full bg-zinc-950/70 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-amber-400 transition-colors text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-2">Коментар</label>
+                      <input
+                        type="text"
+                        value={editingParticipant.attendance_freeze_note || ''}
+                        onChange={e => setEditingParticipant({...editingParticipant, attendance_freeze_note: e.target.value})}
+                        placeholder="Напр.: канікули, сімейна поїздка"
+                        className="w-full bg-zinc-950/70 border border-white/5 rounded-2xl p-3 lg:p-4 text-white outline-none focus:border-amber-400 transition-colors text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3 lg:gap-4">
                 <div>
@@ -4677,6 +4751,7 @@ const TodayTraining = ({ role, coachId }: { role: string, coachId: number | null
           const isPresent = status === 'present';
           const isAbsent = status === 'absent';
           const draft = pointDrafts[participant.id] || { points: '2', note: '' };
+          const isFrozen = isAttendanceFreezeActive(participant);
 
           return (
             <div key={participant.id} className="rounded-[2rem] border border-white/5 bg-zinc-900/35 p-5 lg:p-6">
@@ -4685,11 +4760,13 @@ const TodayTraining = ({ role, coachId }: { role: string, coachId: number | null
                   <div className="flex flex-wrap items-center gap-3 mb-3">
                     <h3 className="text-lg lg:text-xl font-black uppercase tracking-tight truncate">{participant.name}</h3>
                     <span className={`px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest ${
-                      participant.payment_status === 'paid'
+                      isFrozen
+                        ? 'bg-amber-500/10 text-amber-300 border border-amber-500/20'
+                        : participant.payment_status === 'paid'
                         ? 'bg-green-500/10 text-green-500 border border-green-500/20'
                         : 'bg-red-500/10 text-red-500 border border-red-500/20'
                     }`}>
-                      {participant.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
+                      {isFrozen ? 'Канікули' : participant.payment_status === 'paid' ? 'Оплачено' : 'Борг'}
                     </span>
                     <span className="px-3 py-1 rounded-xl bg-white/5 text-zinc-400 border border-white/5 text-[9px] font-black uppercase tracking-widest">
                       {attendanceStatusLabel(status)}
@@ -7093,7 +7170,7 @@ const CRMFinance = ({ role, coachId, initialAction, onActionComplete }: { role: 
               Боржники
             </h3>
             <span className="px-4 py-2 bg-red-600/10 text-red-600 rounded-xl text-xs font-black uppercase tracking-widest">
-              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length} учнів
+              {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active' && !isAttendanceFreezeActive(p)).length} учнів
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -7106,7 +7183,7 @@ const CRMFinance = ({ role, coachId, initialAction, onActionComplete }: { role: 
                 </tr>
               </thead>
               <tbody>
-                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').map(p => (
+                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active' && !isAttendanceFreezeActive(p)).map(p => (
                   <tr key={p.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                     <td className="px-8 py-6">
                       <p className="font-bold text-white text-sm">{p.name}</p>
@@ -7138,7 +7215,7 @@ const CRMFinance = ({ role, coachId, initialAction, onActionComplete }: { role: 
                     </td>
                   </tr>
                 ))}
-                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active').length === 0 && (
+                {participants.filter(p => p.payment_status === 'unpaid' && p.status === 'active' && !isAttendanceFreezeActive(p)).length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-8 py-12 text-center text-zinc-500 font-medium">
                       Боржників не знайдено.

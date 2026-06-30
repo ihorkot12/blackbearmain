@@ -13,7 +13,13 @@ import multer from 'multer';
 import ExcelJS from 'exceljs';
 import cron from 'node-cron';
 import fetch from 'node-fetch';
-import { generateHomeworkSuggestions as buildHomeworkSuggestions, getHomeworkLibrarySummary, HOMEWORK_LIBRARY } from './_homeworkLibrary.js';
+import {
+  generateHomeworkSuggestionsFromLibrary,
+  getHomeworkLibrarySummaryFromLibrary,
+  HOMEWORK_LIBRARY,
+  type HomeworkFocus,
+  type HomeworkLibraryExercise,
+} from './_homeworkLibrary.js';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -29,6 +35,12 @@ const normalizeBeltName = (belt: unknown) => {
     .replace(/\s+з[і]?\s+(синьою|жовтою|зеленою|коричневою|золотою|чорною)\s+смужкою/gi, ' зі сріблястою смужкою')
     .replace(/\s+зі\s+смужкою/gi, ' зі сріблястою смужкою');
 };
+
+const activeAttendanceFreezeSql = (alias = 'p') =>
+  `(COALESCE(${alias}.attendance_frozen, false) = TRUE AND (${alias}.attendance_frozen_until IS NULL OR ${alias}.attendance_frozen_until >= CURRENT_DATE))`;
+
+const excludeActiveAttendanceFreezeSql = (alias = 'p') =>
+  `AND NOT ${activeAttendanceFreezeSql(alias)}`;
 
 // Session secret - MUST be stable on Vercel. Prefer an explicit secret, but
 // fall back to DATABASE_URL-derived entropy instead of a public hard-coded key.
@@ -297,6 +309,9 @@ async function initDb() {
         streak INTEGER DEFAULT 0,
         last_attendance_date DATE,
         achievements_text TEXT,
+        attendance_frozen BOOLEAN DEFAULT FALSE,
+        attendance_frozen_until DATE,
+        attendance_freeze_note TEXT,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
@@ -353,6 +368,9 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS skill_checklist JSONB DEFAULT '[]';
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS streak INTEGER DEFAULT 0;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS last_attendance_date DATE;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen BOOLEAN DEFAULT FALSE;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen_until DATE;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_freeze_note TEXT;
 
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
@@ -492,6 +510,30 @@ async function initDb() {
       CREATE INDEX IF NOT EXISTS idx_homework_assignments_coach_id ON homework_assignments(coach_id);
       CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_assignment_id ON homework_assignment_participants(assignment_id);
       CREATE INDEX IF NOT EXISTS idx_homework_assignment_participants_participant_id ON homework_assignment_participants(participant_id);
+
+      CREATE TABLE IF NOT EXISTS homework_library_overrides (
+        id TEXT PRIMARY KEY,
+        focus TEXT NOT NULL,
+        level TEXT DEFAULT 'beginner',
+        equipment TEXT DEFAULT '',
+        name TEXT NOT NULL,
+        target TEXT NOT NULL,
+        sets INTEGER DEFAULT 1,
+        reps TEXT DEFAULT '',
+        rest TEXT DEFAULT '',
+        note TEXT DEFAULT '',
+        explanation TEXT DEFAULT '',
+        cues JSONB DEFAULT '[]'::jsonb,
+        mistakes JSONB DEFAULT '[]'::jsonb,
+        safety TEXT DEFAULT '',
+        progression TEXT DEFAULT '',
+        diary_prompt TEXT DEFAULT '',
+        active BOOLEAN DEFAULT TRUE,
+        source TEXT DEFAULT 'google_sheets',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_homework_library_overrides_focus ON homework_library_overrides(focus);
+      CREATE INDEX IF NOT EXISTS idx_homework_library_overrides_active ON homework_library_overrides(active);
 
       ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS description TEXT;
       ALTER TABLE homework_assignments ADD COLUMN IF NOT EXISTS focus TEXT DEFAULT 'technique';
@@ -2016,7 +2058,7 @@ async function startServer() {
         COUNT(p.id)::int - COUNT(a.participant_id)::int as unmarked_count
       FROM groups g
       LEFT JOIN locations l ON g.location_id = l.id
-      LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new')
+      LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new') AND NOT ${activeAttendanceFreezeSql('p')}
       LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
       WHERE g.coach_id = $1
       GROUP BY g.id, g.name, l.name, g.order_index
@@ -2470,6 +2512,7 @@ async function startServer() {
       JOIN groups g ON p.group_id = g.id
       WHERE g.coach_id = $1
       AND COALESCE(p.status, 'active') IN ('active', 'new')
+      ${excludeActiveAttendanceFreezeSql('p')}
       AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
       ORDER BY g.name ASC, p.name ASC
       LIMIT 50
@@ -2582,6 +2625,7 @@ async function startServer() {
         LEFT JOIN attendance a ON a.participant_id = p.id
         WHERE g.coach_id = $1
         AND COALESCE(p.status, 'active') IN ('active', 'new')
+        ${excludeActiveAttendanceFreezeSql('p')}
         GROUP BY p.id, p.name, g.name, p.last_attendance_date, p.created_at
         HAVING
           COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
@@ -2595,7 +2639,7 @@ async function startServer() {
       pool.query(`
         SELECT g.name, COUNT(p.id)::int as unmarked_count
         FROM groups g
-        LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new')
+        LEFT JOIN participants p ON p.group_id = g.id AND COALESCE(p.status, 'active') IN ('active', 'new') AND NOT ${activeAttendanceFreezeSql('p')}
         LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
         WHERE g.coach_id = $1
         AND a.participant_id IS NULL
@@ -2610,6 +2654,7 @@ async function startServer() {
         JOIN groups g ON p.group_id = g.id
         WHERE g.coach_id = $1
         AND COALESCE(p.status, 'active') IN ('active', 'new')
+        ${excludeActiveAttendanceFreezeSql('p')}
         AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
       `, [coach.id])
     ]);
@@ -2817,6 +2862,7 @@ async function startServer() {
               JOIN groups g ON p.group_id = g.id
               WHERE g.coach_id = $1
               AND COALESCE(p.status, 'active') IN ('active', 'new')
+              ${excludeActiveAttendanceFreezeSql('p')}
               AND COALESCE(p.payment_status, 'unpaid') <> 'paid'
               ORDER BY g.name ASC, p.name ASC
               LIMIT 50
@@ -2829,6 +2875,7 @@ async function startServer() {
               JOIN groups g ON p.group_id = g.id
               WHERE g.coach_id = $1
               AND COALESCE(p.status, 'active') IN ('active', 'new')
+              ${excludeActiveAttendanceFreezeSql('p')}
               AND COALESCE(CURRENT_DATE - COALESCE(p.last_attendance_date, p.created_at::date), 999) >= 14
             `, [coach.id])
           : Promise.resolve({ rows: [{ count: 0 }] } as any)
@@ -4866,7 +4913,7 @@ async function startServer() {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
     try {
       const result = await pool.query(`
-        SELECT p.id, p.name, p.member_type, p.age, p.birthday, p.email, p.belt, p.rank_points, p.payment_status, p.status, p.parent_name, p.phone, p.parent_phone, p.parent_login, p.telegram_chat_id, g.name as group_name
+        SELECT p.id, p.name, p.member_type, p.age, p.birthday, p.email, p.belt, p.rank_points, p.payment_status, p.status, p.parent_name, p.phone, p.parent_phone, p.parent_login, p.telegram_chat_id, p.attendance_frozen, p.attendance_frozen_until, p.attendance_freeze_note, g.name as group_name
         FROM participants p
         LEFT JOIN groups g ON p.group_id = g.id
         ORDER BY p.name ASC
@@ -4891,6 +4938,9 @@ async function startServer() {
         parent_phone: '',
         parent_login: '',
         telegram_chat_id: '',
+        attendance_frozen: '',
+        attendance_frozen_until: '',
+        attendance_freeze_note: '',
         group_name: ''
       });
 
@@ -5244,6 +5294,156 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     } catch {
       return null;
     }
+  };
+
+  const homeworkLibrarySheetSettingKey = 'homework_library_sheet_url';
+  const homeworkFocusValues: HomeworkFocus[] = ['technique', 'kata', 'conditioning', 'flexibility', 'discipline'];
+
+  const normalizeHeaderKey = (value: unknown) =>
+    String(value || '')
+      .replace(/^\ufeff/, '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '');
+
+  const getRowValue = (row: Record<string, any>, aliases: string[]) => {
+    const normalized = new Map(
+      Object.entries(row).map(([key, value]) => [normalizeHeaderKey(key), value])
+    );
+    for (const alias of aliases) {
+      const value = normalized.get(normalizeHeaderKey(alias));
+      if (value !== undefined && value !== null && String(value).trim() !== '') return value;
+    }
+    return '';
+  };
+
+  const normalizeHomeworkFocus = (value: unknown): HomeworkFocus => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (homeworkFocusValues.includes(raw as HomeworkFocus)) return raw as HomeworkFocus;
+    if (raw.includes('ката')) return 'kata';
+    if (raw.includes('офп') || raw.includes('фіз')) return 'conditioning';
+    if (raw.includes('гнуч')) return 'flexibility';
+    if (raw.includes('дисц')) return 'discipline';
+    return 'technique';
+  };
+
+  const normalizeHomeworkLevel = (value: unknown): HomeworkLibraryExercise['level'] => {
+    const raw = String(value || '').trim().toLowerCase();
+    if (raw === 'advanced' || raw === 'hard' || raw.includes('стар') || raw.includes('дорос') || raw.includes('досв')) return 'advanced';
+    if (raw === 'intermediate' || raw === 'medium' || raw.includes('серед')) return 'intermediate';
+    return 'beginner';
+  };
+
+  const normalizeHomeworkActive = (value: unknown) => {
+    const raw = String(value ?? 'TRUE').trim().toLowerCase();
+    return !['false', '0', 'no', 'ні', 'off', 'disabled'].includes(raw);
+  };
+
+  const parseHomeworkListCell = (value: unknown) =>
+    String(value || '')
+      .split(/\r?\n|;|\|/)
+      .map(item => item.trim())
+      .filter(Boolean);
+
+  const buildHomeworkSheetId = (focus: HomeworkFocus, name: string, index: number) => {
+    const slug = String(name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 48);
+    return `sheet_${focus}_${slug || index}`;
+  };
+
+  const normalizeHomeworkLibraryRow = (row: Record<string, any>, index: number): HomeworkLibraryExercise & { active: boolean } | null => {
+    const focus = normalizeHomeworkFocus(getRowValue(row, ['focus', 'розділ', 'section']));
+    const name = String(getRowValue(row, ['name', 'назва', 'exercise', 'вправа'])).trim();
+    const target = String(getRowValue(row, ['target', 'ціль', 'мета', 'description'])).trim();
+    if (!name || !target) return null;
+
+    const rawSets = Number(getRowValue(row, ['sets', 'сети', 'підходи']));
+    const id = String(getRowValue(row, ['id', 'код', 'slug'])).trim() || buildHomeworkSheetId(focus, name, index);
+
+    return {
+      id,
+      active: normalizeHomeworkActive(getRowValue(row, ['active', 'активно', 'enabled'])),
+      focus,
+      level: normalizeHomeworkLevel(getRowValue(row, ['level', 'рівень', 'difficulty', 'складність'])),
+      equipment: String(getRowValue(row, ['equipment', 'інвентар', 'обладнання'])).trim(),
+      name,
+      target,
+      sets: Number.isFinite(rawSets) ? Math.max(1, Math.min(12, Math.round(rawSets))) : 1,
+      reps: String(getRowValue(row, ['reps', 'повтори', 'час'])).trim(),
+      rest: String(getRowValue(row, ['rest', 'відпочинок', 'пауза'])).trim(),
+      note: String(getRowValue(row, ['note', 'примітка', 'коментар'])).trim(),
+      explanation: String(getRowValue(row, ['explanation', 'пояснення', 'details'])).trim(),
+      cues: parseHomeworkListCell(getRowValue(row, ['cues', 'ключі', 'технічні ключі'])),
+      mistakes: parseHomeworkListCell(getRowValue(row, ['mistakes', 'помилки', 'типові помилки'])),
+      safety: String(getRowValue(row, ['safety', 'безпека'])).trim(),
+      progression: String(getRowValue(row, ['progression', 'ускладнення', 'progress'])).trim(),
+      diary_prompt: String(getRowValue(row, ['diary_prompt', 'щоденник', 'diary'])).trim()
+    };
+  };
+
+  const getHomeworkLibrarySheetUrl = async () => {
+    if (!pool) return process.env.HOMEWORK_LIBRARY_SHEET_URL || '';
+    const result = await pool.query("SELECT value FROM settings WHERE key = $1 LIMIT 1", [homeworkLibrarySheetSettingKey]);
+    return String(result.rows[0]?.value || process.env.HOMEWORK_LIBRARY_SHEET_URL || '').trim();
+  };
+
+  const getRuntimeHomeworkLibrary = async () => {
+    if (!pool) {
+      return {
+        source: 'static',
+        sheetUrl: process.env.HOMEWORK_LIBRARY_SHEET_URL || '',
+        exercises: HOMEWORK_LIBRARY,
+      };
+    }
+
+    try {
+      const result = await pool.query(`
+        SELECT id, focus, level, equipment, name, target, sets, reps, rest, note, explanation,
+               cues, mistakes, safety, progression, diary_prompt
+        FROM homework_library_overrides
+        WHERE active = TRUE
+        ORDER BY focus, id
+      `);
+
+      if (result.rows.length > 0) {
+        const exercises = result.rows.map((row: any) => ({
+          id: String(row.id),
+          focus: normalizeHomeworkFocus(row.focus),
+          level: normalizeHomeworkLevel(row.level),
+          equipment: String(row.equipment || ''),
+          name: String(row.name || ''),
+          target: String(row.target || ''),
+          sets: Number(row.sets || 1),
+          reps: String(row.reps || ''),
+          rest: String(row.rest || ''),
+          note: String(row.note || ''),
+          explanation: String(row.explanation || ''),
+          cues: Array.isArray(row.cues) ? row.cues : [],
+          mistakes: Array.isArray(row.mistakes) ? row.mistakes : [],
+          safety: String(row.safety || ''),
+          progression: String(row.progression || ''),
+          diary_prompt: String(row.diary_prompt || ''),
+        })) as HomeworkLibraryExercise[];
+
+        return {
+          source: 'google_sheets',
+          sheetUrl: await getHomeworkLibrarySheetUrl(),
+          exercises,
+        };
+      }
+    } catch (e) {
+      console.error('Failed to load synced homework library:', e);
+    }
+
+    return {
+      source: 'static',
+      sheetUrl: await getHomeworkLibrarySheetUrl(),
+      exercises: HOMEWORK_LIBRARY,
+    };
   };
 
   const upload = multer({
@@ -5662,7 +5862,26 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
   app.post("/api/participants", requireAuth, async (req, res) => {
     if (!pool) return res.status(500).json({ error: "Database not configured" });
-    const { name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text } = req.body;
+    const {
+      name,
+      age,
+      birthday,
+      group_id,
+      parent_login,
+      parent_password,
+      payment_status,
+      status,
+      parent_name,
+      phone,
+      parent_phone,
+      email,
+      member_type,
+      belt,
+      achievements_text,
+      attendance_frozen,
+      attendance_frozen_until,
+      attendance_freeze_note
+    } = req.body;
 
     // Auto-generate credentials if missing
     const finalLogin = normalizeLogin(parent_login) || normalizeLogin(phone) || `parent_${Math.random().toString(36).substring(2, 8)}`;
@@ -5684,8 +5903,27 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         hashedPassword = await bcrypt.hash(rawPassword, 10);
       }
       await pool.query(
-        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
-        [name, age, birthday || null, group_id || null, finalLogin, hashedPassword, payment_status || 'unpaid', status || 'active', parent_name, phone, parent_phone || phone || null, email || null, member_type || 'child', normalizeBeltName(belt), achievements_text || '']
+        "INSERT INTO participants (name, age, birthday, group_id, parent_login, parent_password, payment_status, status, parent_name, phone, parent_phone, email, member_type, belt, achievements_text, attendance_frozen, attendance_frozen_until, attendance_freeze_note) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+        [
+          name,
+          age,
+          birthday || null,
+          group_id || null,
+          finalLogin,
+          hashedPassword,
+          payment_status || 'unpaid',
+          status || 'active',
+          parent_name,
+          phone,
+          parent_phone || phone || null,
+          email || null,
+          member_type || 'child',
+          normalizeBeltName(belt),
+          achievements_text || '',
+          attendance_frozen === true || attendance_frozen === 'true' || attendance_frozen === 'on',
+          attendance_frozen_until || null,
+          String(attendance_freeze_note || '').trim()
+        ]
       );
       res.json({ success: true, parent_login: finalLogin, parent_password: rawPassword });
     } catch (e) {
@@ -5707,7 +5945,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password',
         'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone',
         'parent_phone', 'email', 'member_type', 'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
-        'achievements_text'
+        'achievements_text', 'attendance_frozen', 'attendance_frozen_until', 'attendance_freeze_note'
       ];
 
       const updateData: any = {};
@@ -5728,6 +5966,26 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
       if (updateData.belt !== undefined) {
         updateData.belt = normalizeBeltName(updateData.belt);
+      }
+
+      if (updateData.attendance_frozen !== undefined) {
+        updateData.attendance_frozen =
+          updateData.attendance_frozen === true ||
+          updateData.attendance_frozen === 'true' ||
+          updateData.attendance_frozen === 'on';
+
+        if (!updateData.attendance_frozen) {
+          updateData.attendance_frozen_until = null;
+          updateData.attendance_freeze_note = '';
+        }
+      }
+
+      if (updateData.attendance_frozen_until === '') {
+        updateData.attendance_frozen_until = null;
+      }
+
+      if (typeof updateData.attendance_freeze_note === 'string') {
+        updateData.attendance_freeze_note = updateData.attendance_freeze_note.trim();
       }
 
       // Get current participant to check parent_login
@@ -6522,20 +6780,130 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   // Homework
   app.get("/api/homework/library", requireAuth, async (req, res) => {
     try {
+      const library = await getRuntimeHomeworkLibrary();
       res.json({
-        ...getHomeworkLibrarySummary(),
-        exercises: HOMEWORK_LIBRARY
+        ...getHomeworkLibrarySummaryFromLibrary(library.exercises),
+        source: library.source,
+        sheetUrl: library.sheetUrl,
+        exercises: library.exercises
       });
     } catch (e) {
       res.status(500).json({ error: "Failed to load homework library" });
     }
   });
 
+  app.post("/api/homework/library/sync", requireAuth, async (req, res) => {
+    if (!pool) return res.status(500).json({ error: "Database not configured" });
+    const user = (req as any).user;
+    if (user?.role !== 'admin') return res.status(403).json({ error: "Only admin can sync homework library" });
+
+    const sheetUrl = String(req.body?.sheetUrl || await getHomeworkLibrarySheetUrl()).trim();
+    const fetchUrl = getSafeGoogleSheetCsvUrl(sheetUrl);
+    if (!fetchUrl) return res.status(400).json({ error: "Only public Google Sheets URLs are allowed" });
+
+    try {
+      const response = await fetch(fetchUrl, { timeout: 15000, size: MAX_IMPORT_FILE_BYTES } as any);
+      if (!response.ok) throw new Error(`Google Sheet export failed: ${response.status}`);
+      const csvText = await response.text();
+      if (Buffer.byteLength(csvText, 'utf8') > MAX_IMPORT_FILE_BYTES) {
+        return res.status(413).json({ error: "Google Sheet export is too large" });
+      }
+
+      const rows = parseCsvRecords(csvText);
+      const parsed = rows
+        .map((row, index) => normalizeHomeworkLibraryRow(row, index + 1))
+        .filter(Boolean) as Array<HomeworkLibraryExercise & { active: boolean }>;
+
+      if (parsed.length === 0) {
+        return res.status(400).json({ error: "No valid exercises found in Google Sheet" });
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query("DELETE FROM homework_library_overrides WHERE source = 'google_sheets'");
+        for (const item of parsed) {
+          await client.query(
+            `INSERT INTO homework_library_overrides
+              (id, focus, level, equipment, name, target, sets, reps, rest, note, explanation, cues, mistakes, safety, progression, diary_prompt, active, source, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14, $15, $16, $17, 'google_sheets', CURRENT_TIMESTAMP)
+             ON CONFLICT (id) DO UPDATE SET
+              focus = EXCLUDED.focus,
+              level = EXCLUDED.level,
+              equipment = EXCLUDED.equipment,
+              name = EXCLUDED.name,
+              target = EXCLUDED.target,
+              sets = EXCLUDED.sets,
+              reps = EXCLUDED.reps,
+              rest = EXCLUDED.rest,
+              note = EXCLUDED.note,
+              explanation = EXCLUDED.explanation,
+              cues = EXCLUDED.cues,
+              mistakes = EXCLUDED.mistakes,
+              safety = EXCLUDED.safety,
+              progression = EXCLUDED.progression,
+              diary_prompt = EXCLUDED.diary_prompt,
+              active = EXCLUDED.active,
+              source = EXCLUDED.source,
+              updated_at = CURRENT_TIMESTAMP`,
+            [
+              item.id,
+              item.focus,
+              item.level,
+              item.equipment,
+              item.name,
+              item.target,
+              item.sets,
+              item.reps,
+              item.rest,
+              item.note,
+              item.explanation,
+              JSON.stringify(item.cues || []),
+              JSON.stringify(item.mistakes || []),
+              item.safety,
+              item.progression,
+              item.diary_prompt,
+              item.active
+            ]
+          );
+        }
+        await client.query(
+          "INSERT INTO settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+          [homeworkLibrarySheetSettingKey, sheetUrl]
+        );
+        await client.query('COMMIT');
+      } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
+      } finally {
+        client.release();
+      }
+
+      const activeExercises = parsed.filter(item => item.active);
+      res.json({
+        success: true,
+        source: 'google_sheets',
+        sheetUrl,
+        imported: parsed.length,
+        active: activeExercises.length,
+        library: getHomeworkLibrarySummaryFromLibrary(activeExercises)
+      });
+    } catch (e) {
+      console.error("Failed to sync homework library:", e);
+      res.status(500).json({ error: "Failed to sync homework library" });
+    }
+  });
+
   app.post("/api/homework/generate", requireAuth, async (req, res) => {
     try {
+      const library = await getRuntimeHomeworkLibrary();
       res.json({
-        suggestions: buildHomeworkSuggestions(req.body || {}),
-        library: getHomeworkLibrarySummary()
+        suggestions: generateHomeworkSuggestionsFromLibrary(library.exercises, req.body || {}),
+        library: {
+          ...getHomeworkLibrarySummaryFromLibrary(library.exercises),
+          source: library.source,
+          sheetUrl: library.sheetUrl
+        }
       });
     } catch (e) {
       res.status(500).json({ error: "Failed to generate homework" });
@@ -6910,9 +7278,11 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       // 1. Absence Alerts (2+ consecutive absences)
       const absenceResult = await pool.query(`
         WITH recent_attendance AS (
-          SELECT participant_id, status, date,
-                 ROW_NUMBER() OVER (PARTITION BY participant_id ORDER BY date DESC) as rn
-          FROM attendance
+          SELECT a.participant_id, a.status, a.date,
+                 ROW_NUMBER() OVER (PARTITION BY a.participant_id ORDER BY a.date DESC) as rn
+          FROM attendance a
+          JOIN participants p ON p.id = a.participant_id
+          WHERE NOT ${activeAttendanceFreezeSql('p')}
         )
         SELECT participant_id, COUNT(*) as absent_count
         FROM recent_attendance
@@ -6941,6 +7311,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         FROM participants p
         LEFT JOIN groups g ON p.group_id = g.id
         WHERE p.status = 'active'
+        ${excludeActiveAttendanceFreezeSql('p')}
         AND (
           p.last_attendance_date < CURRENT_DATE - INTERVAL '14 days'
           OR (p.last_attendance_date IS NULL AND p.created_at < CURRENT_TIMESTAMP - INTERVAL '14 days')
@@ -6988,7 +7359,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             1 as total_coaches,
             (SELECT COUNT(*) FROM groups WHERE coach_id = $1) as total_locations,
             (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE g.coach_id = $1 AND p.status = 'active') as total_participants,
-            (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE p.payment_status = 'unpaid' AND g.coach_id = $1 AND p.status = 'active') as unpaid_participants,
+            (SELECT COUNT(*) FROM participants p JOIN groups g ON p.group_id = g.id WHERE p.payment_status = 'unpaid' AND g.coach_id = $1 AND p.status = 'active' ${excludeActiveAttendanceFreezeSql('p')}) as unpaid_participants,
             (SELECT COALESCE(SUM(amount), 0) FROM payments pay JOIN participants p ON pay.participant_id = p.id JOIN groups g ON p.group_id = g.id WHERE g.coach_id = $1 AND pay.month = EXTRACT(MONTH FROM CURRENT_DATE) AND pay.year = EXTRACT(YEAR FROM CURRENT_DATE)) as monthly_revenue,
             (SELECT ROUND(AVG(CAST(p_count AS FLOAT) / NULLIF(capacity, 0) * 100)) FROM (SELECT g.capacity, COUNT(p.id) as p_count FROM groups g LEFT JOIN participants p ON g.id = p.group_id AND p.status = 'active' WHERE g.coach_id = $1 GROUP BY g.id, g.capacity) as occupancy) as avg_occupancy
         `;
@@ -7001,7 +7372,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
             (SELECT COUNT(*) FROM coaches) as total_coaches,
             (SELECT COUNT(*) FROM locations) as total_locations,
             (SELECT COUNT(*) FROM participants WHERE status = 'active') as total_participants,
-            (SELECT COUNT(*) FROM participants WHERE payment_status = 'unpaid' AND status = 'active') as unpaid_participants,
+            (SELECT COUNT(*) FROM participants p WHERE payment_status = 'unpaid' AND status = 'active' ${excludeActiveAttendanceFreezeSql('p')}) as unpaid_participants,
             (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE month = EXTRACT(MONTH FROM CURRENT_DATE) AND year = EXTRACT(YEAR FROM CURRENT_DATE)) as monthly_revenue,
             (SELECT ROUND(AVG(CAST(p_count AS FLOAT) / NULLIF(capacity, 0) * 100)) FROM (SELECT g.capacity, COUNT(p.id) as p_count FROM groups g LEFT JOIN participants p ON g.id = p.group_id AND p.status = 'active' GROUP BY g.id, g.capacity) as occupancy) as avg_occupancy
         `;
@@ -7029,6 +7400,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           FROM participants p
           LEFT JOIN groups g ON p.group_id = g.id
           WHERE p.payment_status = 'unpaid'
+          ${excludeActiveAttendanceFreezeSql('p')}
           ${user.role === 'coach' ? 'AND g.coach_id = $1' : ''}
           LIMIT 5
         `, user.role === 'coach' ? [user.coach_id] : []),
@@ -7038,6 +7410,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           FROM participants p
           LEFT JOIN groups g ON p.group_id = g.id
           WHERE p.status = 'active'
+          ${excludeActiveAttendanceFreezeSql('p')}
           AND (p.last_attendance_date < CURRENT_DATE - INTERVAL '14 days' OR p.last_attendance_date IS NULL)
           ${user.role === 'coach' ? 'AND g.coach_id = $1' : ''}
           ORDER BY p.last_attendance_date ASC NULLS FIRST
@@ -7318,6 +7691,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         LEFT JOIN groups g ON p.group_id = g.id
         WHERE p.status = 'active'
         AND COALESCE(p.payment_status, 'unpaid') != 'paid'
+        ${excludeActiveAttendanceFreezeSql('p')}
       `;
       const params: any[] = [];
 
@@ -8420,6 +8794,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         const childrenRes = await pool.query(`
           SELECT
             p.id, p.name, p.age, p.belt, p.rank_points, p.payment_status, p.streak, p.exam_readiness,
+            p.attendance_frozen, p.attendance_frozen_until, p.attendance_freeze_note,
             g.name as group_name,
             (SELECT status FROM attendance WHERE participant_id = p.id AND date = CURRENT_DATE LIMIT 1) as today_status,
             (SELECT COUNT(*) FROM attendance WHERE participant_id = p.id AND status = 'present') as total_attendance
