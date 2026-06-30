@@ -1,4 +1,4 @@
-// Shared server-side homework exercise bank. Keep it outside api/ so Vercel does not create an extra function.
+// Internal server-side homework exercise bank. The underscore keeps Vercel from treating it as an API route.
 export type HomeworkFocus = 'technique' | 'kata' | 'conditioning' | 'flexibility' | 'discipline';
 
 export type HomeworkLibraryExercise = {
