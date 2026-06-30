@@ -5340,9 +5340,8 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
   };
 
   const parseHomeworkListCell = (value: unknown) =>
-    String(value || '')
-      .split(/\r?\n|;|\|/)
-      .map(item => item.trim())
+    (Array.isArray(value) ? value : String(value || '').split(/\r?\n|;|\|/))
+      .map(item => String(item || '').trim())
       .filter(Boolean);
 
   const buildHomeworkSheetId = (focus: HomeworkFocus, name: string, index: number) => {
@@ -6798,18 +6797,24 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
     if (user?.role !== 'admin') return res.status(403).json({ error: "Only admin can sync homework library" });
 
     const sheetUrl = String(req.body?.sheetUrl || await getHomeworkLibrarySheetUrl()).trim();
-    const fetchUrl = getSafeGoogleSheetCsvUrl(sheetUrl);
-    if (!fetchUrl) return res.status(400).json({ error: "Only public Google Sheets URLs are allowed" });
+    const requestExercises = Array.isArray(req.body?.exercises) ? req.body.exercises : null;
+    const fetchUrl = requestExercises ? null : getSafeGoogleSheetCsvUrl(sheetUrl);
+    if (!requestExercises && !fetchUrl) return res.status(400).json({ error: "Only public Google Sheets URLs are allowed" });
 
     try {
-      const response = await fetch(fetchUrl, { timeout: 15000, size: MAX_IMPORT_FILE_BYTES } as any);
-      if (!response.ok) throw new Error(`Google Sheet export failed: ${response.status}`);
-      const csvText = await response.text();
-      if (Buffer.byteLength(csvText, 'utf8') > MAX_IMPORT_FILE_BYTES) {
-        return res.status(413).json({ error: "Google Sheet export is too large" });
+      let rows: Array<Record<string, any>>;
+      if (requestExercises) {
+        rows = requestExercises;
+      } else {
+        const response = await fetch(fetchUrl as string, { timeout: 15000, size: MAX_IMPORT_FILE_BYTES } as any);
+        if (!response.ok) throw new Error(`Google Sheet export failed: ${response.status}`);
+        const csvText = await response.text();
+        if (Buffer.byteLength(csvText, 'utf8') > MAX_IMPORT_FILE_BYTES) {
+          return res.status(413).json({ error: "Google Sheet export is too large" });
+        }
+        rows = parseCsvRecords(csvText);
       }
 
-      const rows = parseCsvRecords(csvText);
       const parsed = rows
         .map((row, index) => normalizeHomeworkLibraryRow(row, index + 1))
         .filter(Boolean) as Array<HomeworkLibraryExercise & { active: boolean }>;
