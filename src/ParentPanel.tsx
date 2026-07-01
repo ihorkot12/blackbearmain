@@ -203,6 +203,8 @@ const ParentPanel = () => {
   const [botUsername, setBotUsername] = useState('BlackBearDojoBot');
   const [familyAccesses, setFamilyAccesses] = useState<any[]>([]);
   const [isMarkingCashPayment, setIsMarkingCashPayment] = useState(false);
+  const [isConnectingTelegram, setIsConnectingTelegram] = useState(false);
+  const [lastTelegramConnectUrl, setLastTelegramConnectUrl] = useState('');
   const [familyAccessDraft, setFamilyAccessDraft] = useState({
     access_type: 'mother',
     name: '',
@@ -468,10 +470,45 @@ const ParentPanel = () => {
     window.location.href = '/';
   };
 
-  const handleConnectTelegram = () => {
-    if (!participant) return;
-    const token = `p_${participant.id}`;
-    window.open(`https://t.me/${botUsername}?start=${token}`, '_blank');
+  const handleConnectTelegram = async () => {
+    if (!participant || isConnectingTelegram) return;
+
+    setIsConnectingTelegram(true);
+    try {
+      const res = await parentFetch('/api/parent/telegram-link');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.connectUrl) {
+        toast.error(data.error || 'Не вдалося створити персональне посилання Telegram');
+        return;
+      }
+
+      const connectUrl = String(data.connectUrl);
+      const nextBotUsername = String(data.botUsername || botUsername || 'karate_kyiv_bot').replace(/^@/, '');
+      setBotUsername(nextBotUsername);
+      setLastTelegramConnectUrl(connectUrl);
+
+      const parsed = new URL(connectUrl);
+      const startToken = parsed.searchParams.get('start') || '';
+      const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const appUrl = startToken
+        ? `tg://resolve?domain=${encodeURIComponent(nextBotUsername)}&start=${encodeURIComponent(startToken)}`
+        : connectUrl;
+
+      toast.success('Відкриваю Telegram. Натисніть Start у боті.');
+      if (mobile) {
+        window.location.href = appUrl;
+        window.setTimeout(() => {
+          window.location.href = connectUrl;
+        }, 1400);
+      } else {
+        const opened = window.open(connectUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = connectUrl;
+      }
+    } catch (error) {
+      toast.error('Telegram зараз не відкрився. Спробуйте ще раз або скопіюйте посилання.');
+    } finally {
+      setIsConnectingTelegram(false);
+    }
   };
 
   const isHomeworkNotification = (notification: any) =>
@@ -1296,7 +1333,7 @@ const ParentPanel = () => {
                   { label: 'Відвідуваність', value: attendance.length, hint: 'занять всього', icon: Activity, tab: 'attendance', tone: 'text-green-500' },
                   { label: 'Досягнення', value: totalAchievements, hint: 'відзнаки, семінари та події', icon: Award, tab: 'progress', tone: 'text-amber-400' },
                   { label: 'Оплата', value: isAttendanceFrozen ? 'Канікули' : participant?.payment_status === 'paid' ? 'ОК' : 'Борг', hint: isAttendanceFrozen ? formatAttendanceFreezeLabel(participant) : participant?.payment_status === 'paid' ? 'все оплачено' : 'потрібна увага', icon: CreditCard, tab: 'payments', tone: isAttendanceFrozen ? 'text-amber-300' : participant?.payment_status === 'paid' ? 'text-green-500' : 'text-red-500' },
-                  { label: 'Telegram', value: participant?.telegram_chat_id ? 'ОК' : 'Підключити', hint: participant?.telegram_chat_id ? 'сповіщення активні' : 'для важливих повідомлень', icon: MessageSquare, action: handleConnectTelegram, tone: participant?.telegram_chat_id ? 'text-blue-400' : 'text-zinc-300' },
+                  { label: 'Telegram', value: participant?.telegram_chat_id ? 'ОК' : isConnectingTelegram ? 'Відкриваю' : 'Підключити', hint: participant?.telegram_chat_id ? 'сповіщення активні' : lastTelegramConnectUrl ? 'натисніть ще раз, якщо Telegram не відкрився' : 'для важливих повідомлень', icon: MessageSquare, action: handleConnectTelegram, tone: participant?.telegram_chat_id ? 'text-blue-400' : 'text-zinc-300' },
                 ].map((card, index) => (
                   <motion.button
                     type="button"

@@ -1577,7 +1577,7 @@ async function startServer() {
     return Array.from(recipients);
   }
 
-  async function sendParentTelegramNotification(chatId: string, text: string) {
+  async function sendParentTelegramNotification(chatId: string, text: string, replyMarkup?: any) {
     const token = process.env.TELEGRAM_PARENT_BOT_TOKEN?.trim() || process.env.TELEGRAM_BOT_TOKEN?.trim();
     if (!token || !chatId) return false;
     const controller = new AbortController();
@@ -1592,7 +1592,8 @@ async function startServer() {
           chat_id: chatId,
           text,
           parse_mode: 'HTML',
-          disable_web_page_preview: true
+          disable_web_page_preview: true,
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {})
         })
       });
       return response.ok;
@@ -1619,7 +1620,7 @@ async function startServer() {
       );
 
       // 3. Send to Parent Telegram only for direct, intentional messages.
-      const parentTelegramTypes = new Set(['manual', 'message', 'coach_message', 'announcement', 'payment']);
+      const parentTelegramTypes = new Set(['manual', 'message', 'coach_message', 'announcement', 'payment', 'homework', 'homework_review']);
       if (parentTelegramTypes.has(type)) {
         const text = `<b>🔔 Сповіщення для батьків ${participant.name}</b>\n\n${message}`;
         const recipients = await getParentTelegramNotificationRecipients(participantId, participant.telegram_chat_id);
@@ -1637,6 +1638,31 @@ async function startServer() {
 
     } catch (e) {
       console.error('Failed to notify parent:', e);
+    }
+  }
+
+  const parentHomeworkKeyboard = (req: express.Request, referenceId?: string | number | null) => ({
+    inline_keyboard: [[
+      {
+        text: 'Відкрити ДЗ',
+        url: `${getAppBaseUrl(req)}/parent?tab=homework${referenceId ? `&homework=${encodeURIComponent(String(referenceId))}` : ''}`
+      }
+    ]]
+  });
+
+  async function sendHomeworkTelegramNotice(req: express.Request, participantId: number, message: string, referenceId?: string | number | null) {
+    try {
+      const pRes = await pool.query("SELECT telegram_chat_id, name FROM participants WHERE id = $1", [participantId]);
+      const participant = pRes.rows[0];
+      if (!participant) return;
+
+      const recipients = await getParentTelegramNotificationRecipients(participantId, participant.telegram_chat_id);
+      const text = `<b>BLACK BEAR DOJO: домашнє завдання</b>\n\n<b>${participant.name}</b>\n${message}`;
+      for (const chatId of recipients) {
+        await sendParentTelegramNotification(chatId, text, parentHomeworkKeyboard(req, referenceId));
+      }
+    } catch (error) {
+      console.error('Failed to send homework Telegram notice:', error);
     }
   }
 
@@ -7075,6 +7101,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         await client.query('ROLLBACK');
         return res.status(400).json({ error: "No accessible participants selected" });
       }
+      const telegramNotices: Array<{ participantId: number; message: string; referenceId: string }> = [];
 
       const assignmentRes = await client.query(`
         INSERT INTO homework_assignments
@@ -7107,13 +7134,22 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           RETURNING id
         `, [assignment.id, participantId]);
         const assignmentParticipantId = assignmentParticipantRes.rows[0]?.id;
+        const homeworkMessage = `Нове домашнє завдання: ${assignment.title}`;
         await client.query(
           "INSERT INTO notifications (participant_id, type, message, reference_type, reference_id) VALUES ($1, 'homework', $2, 'homework', $3)",
           [participantId, `Нове домашнє завдання: ${assignment.title}`, assignmentParticipantId ? String(assignmentParticipantId) : String(assignment.id)]
         );
+        telegramNotices.push({
+          participantId,
+          message: homeworkMessage,
+          referenceId: assignmentParticipantId ? String(assignmentParticipantId) : String(assignment.id)
+        });
       }
 
       await client.query('COMMIT');
+      await Promise.allSettled(
+        telegramNotices.map(item => sendHomeworkTelegramNotice(req, item.participantId, item.message, item.referenceId))
+      );
       res.json({ success: true, assignment, count: finalParticipantIds.length });
     } catch (e) {
       await client.query('ROLLBACK');
@@ -7254,6 +7290,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         );
       }
 
+      const reviewMessage = status === 'approved'
+        ? `Домашнє завдання "${current.title}" перевірено. ${nextPoints > 0 ? `+${nextPoints} балів.` : ''}`
+        : `Тренер залишив правки до ДЗ "${current.title}".`;
+
       await client.query(
         "INSERT INTO notifications (participant_id, type, message, reference_type, reference_id) VALUES ($1, 'homework_review', $2, 'homework', $3)",
         [
@@ -7266,6 +7306,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
       );
 
       await client.query('COMMIT');
+      await sendHomeworkTelegramNotice(req, Number(current.participant_id), reviewMessage, String(current.id));
       res.json({ success: true, status, points_awarded: status === 'approved' ? nextPoints : 0 });
     } catch (e) {
       await client.query('ROLLBACK');
