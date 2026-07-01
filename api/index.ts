@@ -1982,6 +1982,34 @@ async function startServer() {
     }
   }
 
+  async function notifyCoachHomeworkSubmitted(req: express.Request, submission: any) {
+    const chatId = String(submission?.coach_telegram_chat_id || '').trim();
+    if (!chatId) return false;
+
+    const totalMinutes = Math.max(0, Number(submission?.total_minutes || 0));
+    const parentComment = String(submission?.parent_comment || '').trim();
+    const lines = [
+      '<b>ДЗ на перевірку</b>',
+      '',
+      `Учасник: <b>${escapeTelegramHtml(submission?.participant_name || 'Учасник')}</b>`,
+      `Завдання: ${escapeTelegramHtml(submission?.title || 'Домашнє завдання')}`,
+      submission?.group_name ? `Група: ${escapeTelegramHtml(submission.group_name)}` : '',
+      totalMinutes > 0 ? `Щоденник: ${totalMinutes} хв` : '',
+      parentComment ? `Коментар: ${escapeTelegramHtml(parentComment).slice(0, 600)}` : '',
+      '',
+      'Відкрийте портал, щоб перевірити і зарахувати бали.'
+    ].filter(Boolean);
+
+    return sendCoachTelegramBotMessage(chatId, lines.join('\n'), {
+      inline_keyboard: [[
+        {
+          text: 'Перевірити ДЗ',
+          url: getCoachPortalUrl(req, 'homework', 'review_homework', { submissionId: submission?.id })
+        }
+      ]]
+    });
+  }
+
   async function editCoachTelegramBotMessage(chatId: string | number, messageId: number, text: string, replyMarkup?: any) {
     const token = getCoachTelegramBotToken();
     if (!token || !chatId || !messageId) return false;
@@ -8756,10 +8784,25 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
 
     try {
       const check = await pool.query(
-        "SELECT id FROM homework_assignment_participants WHERE id = $1 AND participant_id = $2",
+        `SELECT
+           hap.id,
+           hap.status as previous_status,
+           ha.title,
+           p.name as participant_name,
+           COALESCE(hg.name, pg.name) as group_name,
+           c.name as coach_name,
+           c.telegram_chat_id as coach_telegram_chat_id
+         FROM homework_assignment_participants hap
+         JOIN homework_assignments ha ON ha.id = hap.assignment_id
+         JOIN participants p ON p.id = hap.participant_id
+         LEFT JOIN groups hg ON hg.id = ha.group_id
+         LEFT JOIN groups pg ON pg.id = p.group_id
+         LEFT JOIN coaches c ON c.id = COALESCE(ha.coach_id, hg.coach_id, pg.coach_id)
+         WHERE hap.id = $1 AND hap.participant_id = $2`,
         [req.params.id, participantId]
       );
       if (check.rows.length === 0) return res.status(404).json({ error: "Homework not found" });
+      const homeworkContext = check.rows[0];
 
       const result = await pool.query(`
         UPDATE homework_assignment_participants
@@ -8780,7 +8823,18 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         participantId
       ]);
 
-      res.json(result.rows[0]);
+      const updatedHomework = result.rows[0];
+      if (status === 'submitted' && String(homeworkContext.previous_status || '') !== 'submitted') {
+        await notifyCoachHomeworkSubmitted(req, {
+          ...homeworkContext,
+          ...updatedHomework,
+          id: updatedHomework.id,
+          total_minutes: totalMinutes,
+          parent_comment: parentComment
+        });
+      }
+
+      res.json(updatedHomework);
     } catch (e) {
       console.error("Failed to update parent homework:", e);
       res.status(500).json({ error: "Failed to update homework" });
