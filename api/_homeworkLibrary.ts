@@ -1590,8 +1590,8 @@ function buildSuggestion(
   };
 }
 
-// Запасний варіант для кастомної бібліотеки з Google Sheets, де немає наших id:
-// збираємо комплекси з наявних вправ детерміновано, без вигаданих назв.
+// Запасний варіант для бібліотеки з Google Sheets, де немає наших id.
+// У таблиці кожен рядок — уже готовий комплекс, тому одна пропозиція = один рядок.
 function buildFallbackSuggestions(
   library: HomeworkLibraryExercise[],
   focus: HomeworkFocus,
@@ -1599,30 +1599,27 @@ function buildFallbackSuggestions(
   minutes: number,
   count: number,
 ) {
+  const exactLevel: Record<HomeworkDifficulty, HomeworkLibraryExercise['level']> = {
+    easy: 'beginner',
+    medium: 'intermediate',
+    hard: 'advanced',
+  };
+  const exact = library.filter(item => item.focus === focus && item.level === exactLevel[difficulty]);
   const allowedLevels = difficultyLevels[difficulty];
-  const filtered = library.filter(item => item.focus === focus && allowedLevels.includes(item.level));
-  const pool = filtered.length > 0 ? filtered : library.filter(item => item.focus === focus);
-  const perComplex = minutes >= 30 ? 4 : minutes >= 18 ? 3 : 2;
+  const widened = exact.length > 0
+    ? exact
+    : library.filter(item => item.focus === focus && allowedLevels.includes(item.level));
+  const pool = widened.length > 0 ? widened : library.filter(item => item.focus === focus);
 
-  const suggestions = [] as ReturnType<typeof buildSuggestion>[];
-  for (let start = 0; start < pool.length && suggestions.length < count; start += perComplex) {
-    const exercises = pool.slice(start, start + perComplex);
-    if (exercises.length === 0) break;
-    const extraCount = exercises.length - 1;
-    const title = extraCount > 0
-      ? `${exercises[0].name} + ще ${extraCount} впр.`
-      : exercises[0].name;
-    suggestions.push(buildSuggestion(
-      title,
-      focus,
-      difficulty,
-      minutes,
-      `Комплекс із бази вправ клубу: ${exercises.map(item => item.name).join(', ')}.`,
-      'пройдіться разом по полю «Ключі техніки» кожної вправи і звірте виконання.',
-      exercises,
-    ));
-  }
-  return suggestions;
+  return pool.slice(0, count).map(exercise => buildSuggestion(
+    exercise.name,
+    focus,
+    difficulty,
+    minutes,
+    `${exercise.target}.`,
+    'пройдіться разом по полях «Ключі техніки» і «Типові помилки» та звірте виконання.',
+    [exercise],
+  ));
 }
 
 export function generateHomeworkSuggestionsFromLibrary(library: HomeworkLibraryExercise[], params: any) {
