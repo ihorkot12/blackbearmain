@@ -57,10 +57,12 @@ interface ContactFormProps {
   ageGroups?: { value: string; label: string }[];
   source?: string;
   onSuccess?: () => void;
+  submitLabel?: string;
+  offerNote?: React.ReactNode;
 }
 
-export const ContactForm = ({ 
-  locations, 
+export const ContactForm = ({
+  locations,
   title = "Записатися на тренування",
   subtitle = "Залиште заявку, і ми зателефонуємо вам для узгодження групи, локації та зручного часу.",
   ageGroups = [
@@ -70,7 +72,9 @@ export const ContactForm = ({
     { value: "Дорослий", label: "Доросла група" }
   ],
   source = "main",
-  onSuccess
+  onSuccess,
+  submitLabel = "Записатись на пробне",
+  offerNote
 }: ContactFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -211,6 +215,11 @@ export const ContactForm = ({
           </div>
 
           <div className="bg-zinc-900 p-6 sm:p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/10 shadow-2xl relative">
+            {offerNote && (
+              <div className="mb-8 p-5 rounded-2xl bg-red-600/10 border border-red-600/30">
+                {offerNote}
+              </div>
+            )}
             <form className="space-y-6" onSubmit={handleFormSubmit}>
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Ваше ім'я</label>
@@ -258,7 +267,7 @@ export const ContactForm = ({
                 ) : (
                   <>
                     <Send size={20} />
-                    Записатись на пробне
+                    {submitLabel}
                   </>
                 )}
               </button>
