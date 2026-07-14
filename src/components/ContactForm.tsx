@@ -151,7 +151,7 @@ export const ContactForm = ({
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-zinc-900 p-12 rounded-[2.5rem] border border-red-600/30 text-center shadow-2xl"
+        className="bg-zinc-900 p-12 rounded-[32px] border border-red-600/30 text-center shadow-2xl"
       >
         <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-8 shadow-[0_0_40px_rgba(220,38,38,0.4)]">
           <Send className="text-white" size={32} />
@@ -169,10 +169,10 @@ export const ContactForm = ({
   }
 
   return (
-    <section id="contact" className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
+    <section id="contact" className="py-20 md:py-28 lg:py-32 bg-zinc-950 relative overflow-hidden border-t border-white/10">
       <div className="absolute top-0 right-0 w-1/2 h-full bg-red-600/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
-      
-      <div className="max-w-7xl mx-auto px-6 relative z-10 w-full">
+
+      <div className="mx-auto w-full max-w-7xl px-6 lg:px-8 relative z-10">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <h2 className="max-w-2xl text-3xl sm:text-4xl md:text-5xl xl:text-6xl font-black uppercase tracking-tight mb-8 leading-[1.08] md:leading-[1.02] break-words">
@@ -206,15 +206,15 @@ export const ContactForm = ({
                 <div>
                   <div className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.2em] mb-3">Контакти</div>
                   <div className="space-y-4">
-                    <div className="text-white font-bold">Ігор Котляревський:<br/><a href="tel:+380954756500" className="text-red-500 hover:text-red-400 transition-colors">095 475 65 00</a></div>
-                    <div className="text-white font-bold">Олег Крамаренко:<br/><a href="tel:+380955680604" className="text-red-500 hover:text-red-400 transition-colors">095 568 06 04</a></div>
+                    <div className="text-white font-bold">Ігор Котляревський:<br/><a href="tel:+380954756500" className="inline-flex min-h-[44px] items-center text-red-500 hover:text-red-400 transition-colors">095 475 65 00</a></div>
+                    <div className="text-white font-bold">Олег Крамаренко:<br/><a href="tel:+380955680604" className="inline-flex min-h-[44px] items-center text-red-500 hover:text-red-400 transition-colors">095 568 06 04</a></div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-zinc-900 p-6 sm:p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/10 shadow-2xl relative">
+          <div className="bg-zinc-900 p-6 sm:p-8 md:p-10 rounded-[28px] md:rounded-[32px] border border-white/10 shadow-2xl relative">
             {offerNote && (
               <div className="mb-8 p-5 rounded-2xl bg-red-600/10 border border-red-600/30">
                 {offerNote}
@@ -227,7 +227,7 @@ export const ContactForm = ({
                   required
                   name="name"
                   type="text" 
-                  className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-700"
+                  className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-600"
                   placeholder="Олександр"
                 />
               </div>
@@ -237,7 +237,7 @@ export const ContactForm = ({
                   required
                   name="phone"
                   type="tel" 
-                  className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-700"
+                  className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-600"
                   placeholder="+38 (0__) ___ __ __"
                 />
               </div>
@@ -260,7 +260,7 @@ export const ContactForm = ({
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full h-[72px] bg-red-600 hover:bg-red-700 disabled:bg-zinc-800 text-white font-black uppercase tracking-[0.2em] rounded-2xl transition-all shadow-[0_20px_40px_rgba(220,38,38,0.2)] flex items-center justify-center gap-3 active:scale-[0.98]"
+                className="w-full h-16 bg-gradient-to-b from-[#D10000] to-[#A80000] hover:-translate-y-0.5 disabled:from-zinc-800 disabled:to-zinc-800 disabled:hover:translate-y-0 text-white text-[13px] font-black uppercase tracking-[0.12em] rounded-2xl transition-all duration-300 shadow-[0_16px_40px_-10px_rgba(209,0,0,0.6)] flex items-center justify-center gap-2.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
               >
                 {isSubmitting ? (
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -271,7 +271,7 @@ export const ContactForm = ({
                   </>
                 )}
               </button>
-              <p className="text-[10px] text-zinc-600 text-center uppercase tracking-widest font-medium">
+              <p className="text-[10px] text-zinc-500 text-center uppercase tracking-widest font-medium">
                 Натискаючи кнопку, ви погоджуєтесь на обробку персональних даних
               </p>
             </form>
