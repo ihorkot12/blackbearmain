@@ -84,18 +84,41 @@ export const PersonalLanding = () => {
   const priceSingle = content?.personal_price_single || '900';
   const priceFirst = content?.personal_price_first || '450';
 
+  // Персональну сторінку веде Ігор Котляревський — беремо його картку з бази тренерів
+  const coach = coaches.find((c: any) => /Котляревськ/i.test(c?.name || '')) || null;
+  const coachAchievements: string[] = (() => {
+    const raw = coach?.achievements;
+    if (Array.isArray(raw)) return raw;
+    if (typeof raw === 'string') {
+      try { return JSON.parse(raw); } catch { return []; }
+    }
+    return [
+      '3 дан карате Кіокушинкай',
+      'Майстер спорту України',
+      'Чемпіон України',
+      'Призер чемпіонатів Європи'
+    ];
+  })();
+
+  // Оффер діє один раз: тільки на перше відвідане заняття, не на перезапис
+  const offerTerms = `Ціна ${priceFirst} грн діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений час. При перенесенні чи повторному записі заняття коштує ${priceSingle} грн.`;
+
   const faq = [
     {
       q: 'Скільки коштує персональне тренування?',
-      a: `Разове персональне тренування — ${priceSingle} грн. Перше заняття — ${priceFirst} грн, тобто вдвічі дешевше: це знайомство з тренером, розбір рівня підготовки та постановка цілі.`
+      a: `Персональне тренування — ${priceSingle} грн. Перше тренування — ${priceFirst} грн: це знайомство, розбір рівня підготовки та постановка цілі. ${offerTerms}`
+    },
+    {
+      q: 'Чому знижка діє лише на перше тренування?',
+      a: `Це не акція заради знижки, а спосіб познайомитись: ви приходите, ми розбираємо ваш рівень і вирішуємо, чи є сенс працювати далі. Тому ${priceFirst} грн діє рівно один раз — на перше заняття, на яке ви записались і прийшли. Якщо запис переноситься або оформлюється заново, тренування коштує ${priceSingle} грн.`
     },
     {
       q: 'Чи потрібна попередня підготовка?',
-      a: 'Ні. Персональний формат і створений для того, щоб починати з будь-якого рівня: тренер підбирає навантаження під ваш вік, стан і ціль. Більшість приходить без досвіду в карате.'
+      a: 'Ні. Персональний формат і створений для того, щоб починати з будь-якого рівня: навантаження підбирається під ваш вік, стан і ціль. Більшість приходить без досвіду в карате.'
     },
     {
       q: 'Хто проводить персональні тренування?',
-      a: 'Ігор Котляревський — 3 дан кіокушинкай, майстер спорту України, абсолютний чемпіон України, призер чемпіонату Європи. Олег Крамаренко — тренер клубу, працює з дитячими та підлітковими групами, готує спортсменів до змагань.'
+      a: 'Ігор Котляревський — засновник клубу Black Bear Dojo, 3 дан карате Кіокушинкай, майстер спорту України, чемпіон України, призер чемпіонатів Європи. Персональні заняття він проводить особисто.'
     },
     {
       q: 'Для кого підходить персональний формат?',
@@ -103,7 +126,7 @@ export const PersonalLanding = () => {
     },
     {
       q: 'Де проходять заняття?',
-      a: 'У наших залах: Шулявка (вул. Сім\'ї Бродських, 31/33) та Відрадний / Сирець (вул. Віктора Некрасова, 1-3). Локацію і час узгоджуємо після заявки.'
+      a: 'Основний зал — Шулявка, вул. Сім\'ї Бродських, 31/33 (м. Шулявська). Також доступний зал на Сирці, вул. Віктора Некрасова, 1-3. Локацію і час узгоджуємо після заявки.'
     }
   ];
 
@@ -140,9 +163,9 @@ export const PersonalLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.personal_seo_title || "Персональні тренування з карате Київ | Індивідуальні заняття"}
-        description={content?.personal_seo_description || `Персональні тренування з карате у Києві для дітей, підлітків і дорослих. Перше заняття — ${priceFirst} грн замість ${priceSingle}. Індивідуальний темп, розбір техніки, підготовка до іспитів. Локації: Шулявка та Сирець.`}
-        keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, приватні уроки карате київ, карате шулявка індивідуально"}
+        title={content?.personal_seo_title || "Персональні тренування з карате у Києві | Ігор Котляревський, 3 дан"}
+        description={content?.personal_seo_description || `Персональні тренування з карате у Києві з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Перше тренування — ${priceFirst} грн замість ${priceSingle}. Розбір техніки, підготовка до іспитів, самооборона. Зал на Шулявці.`}
+        keywords={content?.personal_seo_keywords || "персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, ігор котляревський карате, приватні уроки карате київ, карате шулявка індивідуально"}
       />
       <Navbar />
 
@@ -168,7 +191,7 @@ export const PersonalLanding = () => {
           >
             <div className="inline-flex items-center gap-3 px-4 py-2 rounded-full bg-red-600/10 border border-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-[0.3em] mb-8">
               <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse" />
-              Персональний формат • Шулявка / Сирець
+              Тренує особисто Ігор Котляревський • 3 дан
             </div>
             <h1 
               className="text-4xl sm:text-6xl md:text-[110px] font-black uppercase leading-[0.95] md:leading-[0.85] tracking-tight sm:tracking-tighter mb-10"
@@ -176,13 +199,18 @@ export const PersonalLanding = () => {
             />
             <p 
               className="text-xl md:text-2xl text-zinc-400 mb-12 leading-relaxed max-w-2xl font-medium"
-              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Один на один із тренером: точний розбір техніки, темп під вас і повна увага все заняття. Починаємо зі знайомства — визначаємо рівень, ціль і план роботи.' }}
+              dangerouslySetInnerHTML={{ __html: content?.personal_hero_subtitle || 'Один на один із засновником клубу: точний розбір техніки, темп під вас і повна увага все заняття. Починаємо зі знайомства — визначаємо рівень, ціль і план роботи.' }}
             />
-            <div className="inline-flex flex-wrap items-center gap-x-4 gap-y-2 mb-10 px-6 py-4 rounded-2xl bg-zinc-900/70 border border-red-600/30 backdrop-blur-sm">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Перше заняття</span>
-              <span className="text-3xl md:text-4xl font-black text-red-600 leading-none">{priceFirst} грн</span>
-              <span className="text-xl text-zinc-600 line-through font-black leading-none">{priceSingle} грн</span>
-              <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.15em]">−50%</span>
+            <div className="inline-block mb-10 px-6 py-4 rounded-2xl bg-zinc-900/70 border border-red-600/30 backdrop-blur-sm">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">Перше тренування</span>
+                <span className="text-3xl md:text-4xl font-black text-red-600 leading-none">{priceFirst} грн</span>
+                <span className="text-xl text-zinc-600 line-through font-black leading-none">{priceSingle} грн</span>
+                <span className="px-3 py-1 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.15em]">−50%</span>
+              </div>
+              <p className="text-zinc-500 text-xs font-medium mt-3 max-w-md leading-relaxed">
+                Діє один раз — якщо записались і прийшли в узгоджений час.
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-6">
@@ -307,13 +335,17 @@ export const PersonalLanding = () => {
               <div className="absolute -top-3 left-8 px-4 py-1.5 rounded-full bg-red-600 text-white text-[10px] font-black uppercase tracking-[0.2em]">
                 Знижка 50%
               </div>
-              <h4 className="text-2xl font-black uppercase tracking-tighter mb-2">Перше заняття</h4>
-              <p className="text-zinc-500 text-sm font-medium mb-8">Знайомство з тренером, розбір рівня, постановка цілі та плану.</p>
-              <div className="flex items-end gap-4 mb-8">
+              <h4 className="text-2xl font-black uppercase tracking-tighter mb-2">Перше тренування</h4>
+              <p className="text-zinc-500 text-sm font-medium mb-8">Знайомство, розбір рівня підготовки, постановка цілі та плану.</p>
+              <div className="flex items-end gap-4 mb-6">
                 <span className="text-5xl md:text-6xl font-black text-red-600 leading-none">{priceFirst}</span>
                 <span className="text-xl font-black text-zinc-500 leading-none mb-1">грн</span>
                 <span className="text-2xl font-black text-zinc-700 line-through leading-none mb-1">{priceSingle}</span>
               </div>
+              <p className="text-zinc-500 text-xs font-medium leading-relaxed mb-8 pb-6 border-b border-white/5">
+                Ціна діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений час.
+                При перенесенні чи повторному записі — {priceSingle} грн.
+              </p>
               <Button
                 className="w-full !px-6"
                 onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
@@ -332,10 +364,13 @@ export const PersonalLanding = () => {
             >
               <h4 className="text-2xl font-black uppercase tracking-tighter mb-2">Разове тренування</h4>
               <p className="text-zinc-500 text-sm font-medium mb-8">Далі — за фактом заняття. Без абонемента і без зобов'язань.</p>
-              <div className="flex items-end gap-4 mb-8">
+              <div className="flex items-end gap-4 mb-6">
                 <span className="text-5xl md:text-6xl font-black text-white leading-none">{priceSingle}</span>
                 <span className="text-xl font-black text-zinc-500 leading-none mb-1">грн</span>
               </div>
+              <p className="text-zinc-500 text-xs font-medium leading-relaxed mb-8 pb-6 border-b border-white/5">
+                Стандартна ціна персонального тренування. Кількість занять і графік — на ваш розсуд.
+              </p>
               <Button
                 variant="secondary"
                 className="w-full !px-6"
@@ -347,66 +382,77 @@ export const PersonalLanding = () => {
           </div>
 
           <p className="text-center text-zinc-600 text-xs font-bold uppercase tracking-widest mt-10 max-w-2xl mx-auto leading-relaxed">
-            Персональні тренування — обмежений ресурс: у кожного тренера лише кілька вільних слотів на тиждень.
+            Персональні тренування веду особисто — вільних слотів на тиждень небагато.
           </p>
         </div>
       </section>
 
-      {/* Coaches Section */}
-      {coaches.length > 0 && (
-        <section className="py-16 md:py-32 bg-black">
-          <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12 md:mb-20">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Хто тренує</h2>
-              <h3 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter leading-none">
-                Ваш <span className="text-red-600">тренер</span>
-              </h3>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-              {coaches.map((coach: any, i: number) => {
-                const achievements = typeof coach.achievements === 'string'
-                  ? (() => { try { return JSON.parse(coach.achievements); } catch { return []; } })()
-                  : (coach.achievements || []);
-                return (
-                  <motion.div
-                    key={coach.id ?? i}
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.1 }}
-                    className="p-6 sm:p-8 bg-zinc-900/40 rounded-3xl lg:rounded-[2.5rem] border border-white/5 hover:border-red-600/40 transition-all duration-500"
-                  >
-                    <div className="flex items-center gap-5 mb-6">
-                      {coach.photo && (
-                        <img
-                          src={coach.photo}
-                          alt={coach.name}
-                          className="w-20 h-20 rounded-2xl object-cover grayscale shrink-0 border border-white/10"
-                          referrerPolicy="no-referrer"
-                          loading="lazy"
-                        />
-                      )}
-                      <div>
-                        <h4 className="text-xl md:text-2xl font-black uppercase tracking-tighter">{coach.name}</h4>
-                        <p className="text-red-600 font-bold uppercase tracking-widest text-[10px]">{coach.role}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {achievements.map((item: string, k: number) => (
-                        <div key={k} className="flex items-start gap-3 text-zinc-400 text-sm font-medium">
-                          <Medal size={16} className="text-red-600 shrink-0 mt-0.5" />
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
+      {/* Coach Section — Ігор Котляревський */}
+      <section id="coach" className="py-16 md:py-32 bg-black relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="text-center mb-12 md:mb-20">
+            <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Хто тренує</h2>
+            <h3 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter leading-none">
+              Тренує <span className="text-red-600">особисто</span>
+            </h3>
           </div>
-        </section>
-      )}
+
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center max-w-6xl mx-auto">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="relative"
+            >
+              <div className="absolute -inset-5 border border-red-600/20 rounded-3xl lg:rounded-[3.5rem] rotate-2" />
+              <img
+                src={coach?.photo || '/api/images/coaches/1'}
+                alt="Ігор Котляревський — тренер з карате, Black Bear Dojo"
+                className="relative w-full rounded-3xl lg:rounded-[3rem] object-cover grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <h4 className="text-4xl md:text-5xl font-black uppercase tracking-tighter mb-2 leading-none">
+                {coach?.name || 'Ігор Котляревський'}
+              </h4>
+              <p className="text-red-600 font-bold uppercase tracking-[0.2em] text-xs mb-8">
+                {coach?.role || 'Засновник клубу'}
+              </p>
+
+              <div className="space-y-4 mb-10">
+                {coachAchievements.map((item: string, k: number) => (
+                  <div key={k} className="flex items-start gap-4 text-zinc-300 font-medium">
+                    <Medal size={18} className="text-red-600 shrink-0 mt-0.5" />
+                    {item}
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-6 sm:p-8 bg-zinc-900/50 rounded-3xl border border-white/5 mb-8">
+                <Quote size={28} className="text-red-600 mb-4" />
+                <p className="text-zinc-300 italic leading-relaxed mb-4">
+                  {coach?.bio || 'Моя мета — не просто навчити битися, а сформувати характер, який допоможе дитині перемагати в житті.'}
+                </p>
+                <p className="font-bold uppercase tracking-widest text-[10px] text-white">
+                  — {coach?.name || 'Ігор Котляревський'}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                <MapPin size={16} className="text-red-600 shrink-0" />
+                Зал на Шулявці — вул. Сім'ї Бродських, 31/33
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
 
       {/* FAQ Section */}
       <section className="py-16 md:py-32 bg-zinc-950 border-y border-white/5">
@@ -477,7 +523,7 @@ export const PersonalLanding = () => {
       <ContactForm
         locations={locations}
         title="Запис на персональне тренування"
-        subtitle="Залиште номер — уточнимо ціль, рівень підготовки, локацію та вільні часові слоти."
+        subtitle="Залиште номер — Ігор особисто зателефонує, уточнить ціль, рівень підготовки та підбере вільний слот."
         ageGroups={[
           { value: "Дорослий", label: "Дорослий" },
           { value: "Підліток", label: "Підліток" },
@@ -492,10 +538,10 @@ export const PersonalLanding = () => {
             </div>
             <div>
               <div className="text-white font-black uppercase tracking-tight text-sm mb-1">
-                Перше заняття — {priceFirst} грн замість {priceSingle}
+                Перше тренування — {priceFirst} грн замість {priceSingle}
               </div>
               <div className="text-zinc-400 text-xs font-medium leading-relaxed">
-                Знайомство з тренером, розбір рівня та плану. Далі — {priceSingle} грн за заняття, без абонемента.
+                {offerTerms}
               </div>
             </div>
           </div>
