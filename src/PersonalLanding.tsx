@@ -99,9 +99,13 @@ const OptimizedImg = ({
   quality = 75,
   ...props
 }: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; width?: number; quality?: number }) => {
+  // /api/init повертає фото з міткою ?v=<timestamp>, яка змінюється щозапиту.
+  // Для оптимізатора це щоразу новий URL → кеш ніколи не спрацьовує. Тому
+  // мітку відкидаємо: URL стабільний, картинка кешується (див. minimumCacheTTL).
   const isLocal = typeof src === 'string' && src.startsWith('/');
+  const stableSrc = isLocal ? src.split('?')[0] : src;
   const optimized = isLocal
-    ? `/_vercel/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality}`
+    ? `/_vercel/image?url=${encodeURIComponent(stableSrc)}&w=${width}&q=${quality}`
     : src;
 
   return (
