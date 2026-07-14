@@ -1,5 +1,10 @@
 {
   "version": 2,
+  "images": {
+    "sizes": [640, 828, 1080, 1200, 1920],
+    "formats": ["image/webp"],
+    "minimumCacheTTL": 86400
+  },
   "crons": [
     {
       "path": "/api/telegram/dispatch",

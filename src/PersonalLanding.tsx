@@ -88,6 +88,34 @@ const SectionHeading = ({
   </Reveal>
 );
 
+/**
+ * Зображення через оптимізатор Vercel (/_vercel/image) — фото тренера в базі
+ * важить ~2.7 МБ, у слот 536px це надлишок. Працює тільки для same-origin
+ * шляхів; якщо оптимізатор недоступний, onError повертає оригінальний src.
+ */
+const OptimizedImg = ({
+  src,
+  width = 1080,
+  quality = 75,
+  ...props
+}: React.ImgHTMLAttributes<HTMLImageElement> & { src: string; width?: number; quality?: number }) => {
+  const isLocal = typeof src === 'string' && src.startsWith('/');
+  const optimized = isLocal
+    ? `/_vercel/image?url=${encodeURIComponent(src)}&w=${width}&q=${quality}`
+    : src;
+
+  return (
+    <img
+      src={optimized}
+      onError={e => {
+        const el = e.currentTarget;
+        if (el.src !== src) el.src = src; // фолбек на оригінал
+      }}
+      {...props}
+    />
+  );
+};
+
 const Button = ({
   children,
   variant = 'primary',
@@ -429,12 +457,13 @@ export const PersonalLanding = () => {
                   className="absolute -inset-4 rounded-[48px] border border-red-600/20"
                   aria-hidden
                 />
-                <img
+                <OptimizedImg
                   src={coach?.photo || '/api/images/coaches/1'}
+                  width={1080}
                   alt="Ігор Котляревський — тренер з карате, Black Bear Dojo"
-                  className="relative aspect-[4/5] w-full rounded-[32px] object-cover grayscale transition-all duration-700 hover:grayscale-0"
-                  referrerPolicy="no-referrer"
+                  className="relative aspect-[4/5] w-full rounded-[32px] bg-zinc-900 object-cover grayscale transition-all duration-700 hover:grayscale-0"
                   loading="lazy"
+                  decoding="async"
                 />
               </div>
             </Reveal>
