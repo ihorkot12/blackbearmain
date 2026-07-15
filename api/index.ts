@@ -4142,12 +4142,14 @@ async function startServer() {
         pool.query(`
           SELECT key,
                  CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
+                 CASE WHEN LEFT(value, 11) = 'data:image/' THEN md5(value) ELSE NULL END as ver,
                  CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
           FROM site_content
         `),
         pool.query(`
           SELECT id, name, role, bio, achievements, phone, telegram_username, order_index,
                  CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
+                 CASE WHEN LEFT(photo, 11) = 'data:image/' THEN md5(photo) ELSE NULL END as photo_ver,
                  CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
           FROM coaches
           ORDER BY order_index ASC
@@ -4169,7 +4171,9 @@ async function startServer() {
 
       const content = contentRes.rows.reduce((acc, item) => {
         if (item.type === 'IMAGE') {
-          acc[item.key] = `/api/images/content/${item.key}?v=${lastInitUpdate || now}`;
+          // ?v = md5 самого зображення: стабільний, поки фото не змінилось (немає
+          // блимання старого фото), і оновлюється автоматично при заміні фото.
+          acc[item.key] = `/api/images/content/${item.key}?v=${item.ver || lastInitUpdate || now}`;
         } else {
           acc[item.key] = item.value;
         }
@@ -4185,9 +4189,10 @@ async function startServer() {
         }
 
         if (c.photo_type === 'IMAGE') {
-          c.photo = `/api/images/coaches/${c.id}?v=${lastInitUpdate}`;
+          c.photo = `/api/images/coaches/${c.id}?v=${c.photo_ver || lastInitUpdate}`;
         }
         delete c.photo_type;
+        delete c.photo_ver;
         return c;
       });
 
@@ -4228,12 +4233,13 @@ async function startServer() {
       const result = await pool.query(`
         SELECT key,
                CASE WHEN LEFT(value, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as type,
+               CASE WHEN LEFT(value, 11) = 'data:image/' THEN md5(value) ELSE NULL END as ver,
                CASE WHEN LEFT(value, 11) = 'data:image/' THEN NULL ELSE value END as value
         FROM site_content
       `);
       const content = result.rows.reduce((acc, item) => {
         if (item.type === 'IMAGE') {
-          acc[item.key] = `/api/images/content/${item.key}?v=${lastInitUpdate || now}`;
+          acc[item.key] = `/api/images/content/${item.key}?v=${item.ver || lastInitUpdate || now}`;
         } else {
           acc[item.key] = item.value;
         }
@@ -4289,6 +4295,7 @@ async function startServer() {
       const result = await pool.query(`
         SELECT id, name, role, bio, achievements, phone, telegram_username, telegram_chat_id, order_index,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN 'IMAGE' ELSE 'TEXT' END as photo_type,
+               CASE WHEN LEFT(photo, 11) = 'data:image/' THEN md5(photo) ELSE NULL END as photo_ver,
                CASE WHEN LEFT(photo, 11) = 'data:image/' THEN NULL ELSE photo END as photo
         FROM coaches
         ORDER BY order_index ASC
@@ -4309,9 +4316,10 @@ async function startServer() {
         }
 
         if (coach.photo_type === 'IMAGE') {
-          coach.photo = `/api/images/coaches/${coach.id}?v=${lastInitUpdate}`;
+          coach.photo = `/api/images/coaches/${coach.id}?v=${coach.photo_ver || lastInitUpdate}`;
         }
         delete coach.photo_type;
+        delete coach.photo_ver;
         if (!canSeePrivateContacts) {
           delete coach.telegram_chat_id;
         }
