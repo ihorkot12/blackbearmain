@@ -798,10 +798,22 @@ export const PersonalLanding = () => {
           </p>
 
           <div className="flex gap-6">
-            <a href="#" aria-label="Instagram" className="text-zinc-500 transition-colors hover:text-white">
+            <a
+              href={content?.social_instagram || 'https://instagram.com/karate_kyiv'}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Instagram"
+              className="text-zinc-500 transition-colors hover:text-white"
+            >
               <Instagram size={19} />
             </a>
-            <a href="#" aria-label="Facebook" className="text-zinc-500 transition-colors hover:text-white">
+            <a
+              href={content?.social_facebook || 'https://www.facebook.com/karatee.kyiv/'}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Facebook"
+              className="text-zinc-500 transition-colors hover:text-white"
+            >
               <Facebook size={19} />
             </a>
           </div>
