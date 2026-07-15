@@ -121,6 +121,7 @@ export const Navbar = () => {
                     ref={dropdownRef}
                     className="relative"
                     onMouseEnter={() => setOpenDropdown(link.name)}
+                    onMouseLeave={() => setOpenDropdown(null)}
                   >
                     <button
                       type="button"
