@@ -465,7 +465,7 @@ export const PersonalLanding = () => {
                     73 КБ webp, тож вантажимо одразу (без lazy), щоб воно точно
                     було на місці, коли користувач дійде до секції. */}
                 <OptimizedImg
-                  src={coach?.photo || '/api/images/coaches/1'}
+                  src={content?.personal_coach_photo || '/coach-igor-personal.jpg'}
                   width={1080}
                   alt="Ігор Котляревський — тренер з карате, Black Bear Dojo"
                   className="relative aspect-[4/5] w-full rounded-[32px] bg-zinc-900 object-cover grayscale transition-all duration-700 hover:grayscale-0"
