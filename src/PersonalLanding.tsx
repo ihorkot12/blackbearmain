@@ -156,6 +156,129 @@ const Button = ({
   );
 };
 
+/**
+ * Фото з клубної фотосесії (студія, чорний фон) — зливаються з темною темою
+ * без масок. WebP ≤105 КБ кожне, лежать у public/personal/.
+ */
+const PHOTOS = {
+  hero: '/personal/hero-woman-blackbelt.webp',
+  kick: '/personal/kick.webp',
+  pair: '/personal/pair-blackbelts.webp',
+  medals: '/personal/woman-medals.webp',
+  student: '/personal/igor-student.webp',
+  group: '/personal/group-igor-women.webp'
+};
+
+/** Роздільник секцій: тонка лінія з червоним акцентом по центру замість плоского border-t */
+const Divider = () => (
+  <div aria-hidden className="relative h-px w-full bg-white/10">
+    <span className="absolute left-1/2 top-0 h-px w-40 -translate-x-1/2 bg-gradient-to-r from-transparent via-red-600 to-transparent md:w-72" />
+  </div>
+);
+
+/** Ключове слово з червоним підкресленням, що «промальовується» при появі.
+ *  Реалізовано фоном, а не абсолютним елементом — тому працює і на фразі
+ *  в кілька рядків (кожен рядок отримує свою лінію). */
+const Mark = ({ children }: { children: React.ReactNode }) => {
+  const reduce = useReducedMotion();
+  return (
+    <motion.span
+      className="[-webkit-box-decoration-break:clone] [box-decoration-break:clone]"
+      style={{
+        backgroundImage: 'linear-gradient(rgba(220,38,38,0.85), rgba(220,38,38,0.85))',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: '0 92%'
+      }}
+      initial={reduce ? { backgroundSize: '100% 0.14em' } : { backgroundSize: '0% 0.14em' }}
+      whileInView={{ backgroundSize: '100% 0.14em' }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.9, delay: 0.35, ease: EASE }}
+    >
+      {children}
+    </motion.span>
+  );
+};
+
+/**
+ * Фото з ефектом «шторки»: відкривається зліва направо, знизу — червона лінія,
+ * що промальовується разом. Кутові дужки — як рамка кадру.
+ */
+const PhotoReveal = ({
+  src,
+  alt,
+  className = '',
+  imgClassName = '',
+  position = 'center',
+  eager = false,
+  children
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  imgClassName?: string;
+  position?: string;
+  eager?: boolean;
+  children?: React.ReactNode;
+}) => {
+  const reduce = useReducedMotion();
+  return (
+    <div className={`relative ${className}`}>
+      <div className="pointer-events-none absolute -inset-6 rounded-[48px] bg-red-600/15 blur-3xl" aria-hidden />
+      <motion.div
+        className="relative overflow-hidden rounded-[28px] md:rounded-[32px] border border-white/10 bg-zinc-950"
+        initial={reduce ? false : { clipPath: 'inset(0 100% 0 0 round 32px)' }}
+        whileInView={{ clipPath: 'inset(0 0% 0 0 round 32px)' }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 1.1, ease: EASE }}
+      >
+        <img
+          src={src}
+          alt={alt}
+          loading={eager ? 'eager' : 'lazy'}
+          decoding="async"
+          className={`h-full w-full object-cover ${imgClassName}`}
+          style={{ objectPosition: position }}
+        />
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" aria-hidden />
+        {/* кутові дужки кадру */}
+        <span aria-hidden className="absolute left-4 top-4 h-6 w-6 border-l-2 border-t-2 border-red-600/80" />
+        <span aria-hidden className="absolute bottom-4 right-4 h-6 w-6 border-b-2 border-r-2 border-red-600/80" />
+        {children}
+      </motion.div>
+      <motion.span
+        aria-hidden
+        className="absolute -bottom-3 left-8 right-8 h-[3px] origin-left bg-gradient-to-r from-red-600 via-red-500 to-transparent"
+        initial={reduce ? { scaleX: 1 } : { scaleX: 0 }}
+        whileInView={{ scaleX: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ duration: 1, delay: 0.3, ease: EASE }}
+      />
+    </div>
+  );
+};
+
+/** Фото першого екрана (десктоп): портрет з чорним поясом, світло за спиною, рамка кадру */
+const HeroPhoto = () => (
+  <div className="relative aspect-[3/4] w-full">
+    <div className="pointer-events-none absolute -inset-10 rounded-full bg-red-600/20 blur-[90px]" aria-hidden />
+    <div className="relative h-full w-full overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950">
+      <img
+        src={PHOTOS.hero}
+        alt="Персональні тренування з карате для дорослих у Києві — учениця з чорним поясом, Black Bear Dojo"
+        fetchPriority="high"
+        decoding="async"
+        className="h-full w-full object-cover object-[50%_0%]"
+      />
+      <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/30 to-transparent" aria-hidden />
+      <span aria-hidden className="absolute left-5 top-5 h-7 w-7 border-l-2 border-t-2 border-red-600" />
+      <span aria-hidden className="absolute right-5 top-5 h-7 w-7 border-r-2 border-t-2 border-red-600" />
+      <div className="absolute right-6 top-6 rounded-full border border-white/15 bg-black/60 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-zinc-300 backdrop-blur">
+        Чорний пояс · Black Bear Dojo
+      </div>
+    </div>
+  </div>
+);
+
 export const PersonalLanding = () => {
   // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
   React.useEffect(() => startEngagementTracking('personal'), []);
@@ -176,6 +299,14 @@ export const PersonalLanding = () => {
   });
   const heroY = useTransform(heroProgress, [0, 1], ['0%', '18%']);
   const heroFade = useTransform(heroProgress, [0, 1], [1, 0.15]);
+
+  // Паралакс широкого кадру з ученицями
+  const groupRef = useRef<HTMLElement | null>(null);
+  const { scrollYProgress: groupProgress } = useScroll({
+    target: groupRef,
+    offset: ['start end', 'end start']
+  });
+  const groupY = useTransform(groupProgress, [0, 1], ['-8%', '8%']);
 
   useEffect(() => {
     const cached = sessionStorage.getItem('site_init_data');
@@ -223,7 +354,8 @@ export const PersonalLanding = () => {
       '3 дан карате Кіокушинкай',
       'Майстер спорту України',
       'Чемпіон України',
-      'Призер чемпіонатів Європи'
+      'Призер чемпіонатів Європи',
+      '27 років у карате, засновник Black Bear Dojo'
     ];
   })();
 
@@ -237,6 +369,25 @@ export const PersonalLanding = () => {
   }, [locations]);
 
   const [quickLeadOpen, setQuickLeadOpen] = useState(false);
+
+  // Липкий CTA на мобільному показуємо лише після першого екрана —
+  // у hero вже дві кнопки і картка з ціною, третя кнопка лише перекриває їх.
+  const [pastHero, setPastHero] = useState(false);
+  useEffect(() => {
+    const check = () => {
+      const el = heroRef.current;
+      if (!el) return;
+      // hero прокручено, коли його низ (там офер-картка з кнопкою) вийшов з екрана
+      setPastHero(el.getBoundingClientRect().bottom < window.innerHeight - 96);
+    };
+    check();
+    window.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    return () => {
+      window.removeEventListener('scroll', check);
+      window.removeEventListener('resize', check);
+    };
+  }, []);
   const openQuickLead = React.useCallback((ctaName: string) => {
     trackLeadIntent(ctaName, 'personal');
     setQuickLeadOpen(true);
@@ -245,15 +396,54 @@ export const PersonalLanding = () => {
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
 
+  // PAS: біль → загострення → рішення. Чотири ситуації, з якими приходять дорослі.
+  const pains = [
+    {
+      title: 'Ввечері додому — з ключами в кулаку',
+      desc: 'Ви хочете не боятися, а знати, що робити. Поради з інтернету не працюють, коли хтось хапає за руку.'
+    },
+    {
+      title: 'Спортзал набрид, а результату не видно',
+      desc: 'Тренажери дають мʼязи, але не дають навички. Через місяць мотивація зникає, абонемент горить.'
+    },
+    {
+      title: 'У групі — не ваш темп',
+      desc: 'Двадцять людей, одна програма. Ваші помилки ніхто не бачить, техніка не ставиться.'
+    },
+    {
+      title: 'Ніколи не займались — і соромно починати',
+      desc: 'Здається, що карате — для тих, хто з дитинства. Насправді більшість дорослих приходять з нуля.'
+    }
+  ];
+
+  // Шлях клієнта від заявки до плану — знімає невизначеність перед першим заняттям
+  const process = [
+    {
+      step: '01',
+      title: 'Заявка і дзвінок',
+      desc: 'Залишаєте імʼя та номер. Ігор телефонує особисто: уточнює ціль, рівень і підбирає слот на Шулявці.'
+    },
+    {
+      step: '02',
+      title: 'Перше тренування — знайомство',
+      desc: 'Розминка, тест базових рухів, розмова про ціль. Ви бачите, як працює формат, і вирішуєте, чи йти далі.'
+    },
+    {
+      step: '03',
+      title: 'План і перший результат',
+      desc: 'Наприкінці — чіткий план: що тренуємо, як часто, чого чекати через місяць. Далі — разові заняття, без абонемента.'
+    }
+  ];
+
   const advantages = [
     {
       title: 'Безпека',
-      desc: 'Дистанція, реакція, вихід із захвату, прості удари, що працюють у реальній ситуації, а не на показ. Мета — не потрапити в конфлікт, а якщо потрапили — вийти з нього.',
+      desc: 'Дистанція, реакція, вихід із захвату, прості удари, що працюють у реальній ситуації, а не на показ. Мета — не потрапити в конфлікт, а якщо потрапили — вийти з нього цілим.',
       icon: <Target size={22} />
     },
     {
       title: 'Практичність',
-      desc: 'Нічого заради ритуалу. Тільки те, що дає результат: техніка, реакція, дихання, контроль. Кожен рух — з поясненням, навіщо він.',
+      desc: 'Нічого заради ритуалу. Тільки те, що дає результат: техніка, реакція, дихання, контроль. Кожен рух — з поясненням, навіщо він і коли спрацює.',
       icon: <Brain size={22} />
     },
     {
@@ -268,10 +458,39 @@ export const PersonalLanding = () => {
     }
   ];
 
+  // Три кадри з фотосесії = три результати, за якими приходять дорослі
+  const gallery: { src: string; alt: string; position: string; tag: string; title: string; desc: string; zoom?: string }[] = [
+    {
+      src: PHOTOS.kick,
+      alt: 'Удар ногою — фізична форма і гнучкість на тренуваннях з карате для дорослих',
+      position: '50% 20%',
+      zoom: 'scale-[1.3] group-hover:scale-[1.36]',
+      tag: 'Форма',
+      title: 'Тіло, яке слухається',
+      desc: 'Гнучкість, корпус, витривалість — через удари, а не через тренажери.'
+    },
+    {
+      src: PHOTOS.pair,
+      alt: 'Чорні пояси клубу Black Bear Dojo — техніка карате кіокушинкай',
+      position: '50% 15%',
+      tag: 'Техніка',
+      title: 'Від нуля до чорного поясу',
+      desc: 'Кіхон, ката, робота в парах — крок за кроком, у вашому темпі.'
+    },
+    {
+      src: PHOTOS.medals,
+      alt: 'Учениця клубу з медалями змагань з карате',
+      position: '50% 12%',
+      tag: 'Впевненість',
+      title: 'Спокій, який дає навичка',
+      desc: 'Медалі — за бажанням. Впевненість у собі — у кожного, хто тренується.'
+    }
+  ];
+
   const privileges = [
     {
       title: 'Самооборона для міста',
-      desc: 'Як не опинитися в небезпечній ситуації, а якщо опинилися — дистанція, реакція, вихід із захвату, перші дії. Без ілюзій і без показухи.'
+      desc: 'Як не опинитися в небезпечній ситуації, а якщо опинилися — дистанція, реакція, вихід із захвату, перші дії. Техніка кіокушинкай не залежить від маси й сили.'
     },
     {
       title: 'Форма без спортзалу',
@@ -289,46 +508,50 @@ export const PersonalLanding = () => {
 
   const faq = [
     {
-      q: 'Скільки коштує персональне тренування?',
-      a: `Персональне тренування — ${priceSingle} грн. Перше тренування — ${priceFirst} грн: це знайомство, розбір рівня підготовки та постановка цілі. ${offerTerms}`
+      q: 'Скільки коштує персональне тренування з карате в Києві?',
+      a: `Разове персональне тренування — ${priceSingle} грн, без абонемента і без зобовʼязань. Перше тренування — ${priceFirst} грн: знайомство, розбір рівня підготовки, постановка цілі та плану. ${offerTerms}`
     },
     {
-      q: 'Чому знижка діє лише на перше тренування?',
+      q: 'Чому знижка 50% діє лише на перше тренування?',
       a: `Це не акція заради знижки, а спосіб познайомитись: ви приходите, ми розбираємо ваш рівень і вирішуємо, чи є сенс працювати далі. Тому ${priceFirst} грн діє рівно один раз — на перше заняття, на яке ви записались і прийшли. Якщо запис переноситься або оформлюється заново, тренування коштує ${priceSingle} грн.`
     },
     {
-      q: 'Чи потрібна попередня підготовка?',
-      a: 'Ні. Персональний формат і створений для того, щоб починати з нуля: навантаження підбирається під ваш стан і ціль. Більшість приходить без досвіду в карате і без спортивного минулого.'
+      q: 'Чи можна почати з нуля, без спортивного минулого?',
+      a: 'Так. Персональний формат і створений для старту з нуля: навантаження підбирається під ваш стан і ціль, темп — ваш. Більшість дорослих приходять без досвіду в карате і без спортивного минулого.'
+    },
+    {
+      q: 'Чи підходить карате для самооборони дівчатам і жінкам?',
+      a: 'Так. У кіокушинкай техніка не залежить від маси й сили: дистанція, реакція, точка удару, вихід із захвату. Програма будується під ваш рівень і ціль, попередня підготовка не потрібна.'
     },
     {
       q: 'Хто проводить персональні тренування?',
-      a: 'Ігор Котляревський — засновник клубу Black Bear Dojo, 3 дан карате Кіокушинкай, майстер спорту України, чемпіон України, призер чемпіонатів Європи. Персональні заняття він проводить особисто.'
+      a: 'Ігор Котляревський — засновник клубу Black Bear Dojo, 3 дан карате Кіокушинкай, майстер спорту України, чемпіон України, призер чемпіонатів Європи, 27 років у карате. Персональні заняття він проводить особисто.'
     },
     {
-      q: 'Для кого підходить персональний формат?',
-      a: 'Для дорослих — з нуля або з досвідом. Найчастіше приходять за самообороною, фізичною формою і впевненістю; частина — щоб розібратися з базою карате або підготуватися до іспиту на пояс. Програма будується під ваш рівень і ціль.'
-    },
-    {
-      q: 'Де проходять заняття?',
-      a: "Зал на Шулявці, вул. Сім'ї Бродських, 31/33 (м. Шулявська). Час узгоджуємо після заявки — персональні слоти окремо від групових тренувань."
+      q: 'Де і коли проходять заняття?',
+      a: "Зал на Шулявці, вул. Сім'ї Бродських, 31/33 (м. Шулявська). Персональні слоти — окремо від групових тренувань; час узгоджуємо після заявки."
     },
     {
       q: 'Чи безпечно тренуватися під час тривог?',
       a: 'Зал у безпечному приміщенні — тренування не зупиняється.'
+    },
+    {
+      q: 'Що взяти на перше тренування?',
+      a: 'Зручний спортивний одяг і воду. Кімоно на перше заняття не потрібне. Решту Ігор скаже під час дзвінка.'
     }
   ];
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.personal_seo_title || 'Персональні тренування з карате для дорослих Київ | Ігор Котляревський, 3 дан'}
+        title={content?.personal_seo_title || 'Персональні тренування з карате для дорослих у Києві — Шулявка | Ігор Котляревський, 3 дан'}
         description={
           content?.personal_seo_description ||
-          `Персональні тренування з карате для дорослих у Києві з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Самооборона, фізична форма, техніка — один на один, з нуля. Перше тренування — ${priceFirst} грн замість ${priceSingle}. Зал на Шулявці.`
+          `Індивідуальні тренування з карате для дорослих у Києві (Шулявка) з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Самооборона, фізична форма, техніка з нуля. Перше тренування — ${priceFirst} грн замість ${priceSingle}.`
         }
         keywords={
           content?.personal_seo_keywords ||
-          'персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, ігор котляревський карате, приватні уроки карате київ, карате шулявка індивідуально'
+          'персональні тренування карате київ, індивідуальні тренування карате київ, карате для дорослих київ, самооборона київ, самооборона для жінок київ, тренер з карате київ, карате шулявка, ігор котляревський карате'
         }
         url={`${SITE_URL}/personal-training`}
         jsonLd={shuliavkaGraph()}
@@ -350,30 +573,43 @@ export const PersonalLanding = () => {
         ref={heroRef as any}
         className="relative flex min-h-[100svh] items-center overflow-hidden pt-28 pb-20"
       >
+        {/* Тло: світло і тонка сітка ліній. Фото — у правій колонці (десктоп)
+            або в шапці офер-картки (мобільний), а не за текстом */}
         <motion.div style={reduce ? undefined : { y: heroY, opacity: heroFade }} className="absolute inset-0 z-0">
-          <img
-            src={
-              content?.personal_hero_bg ||
-              'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=2000&auto=format&fit=crop'
-            }
-            alt=""
+          {/* червоне світло і тонка сітка ліній — «зал», а не плоский чорний */}
+          <div className="absolute -left-40 top-1/3 h-[520px] w-[520px] rounded-full bg-red-700/20 blur-[160px]" aria-hidden />
+          <div
             aria-hidden
-            className="h-full w-full scale-110 object-cover opacity-40 grayscale"
-            referrerPolicy="no-referrer"
+            className="absolute inset-0 opacity-[0.07]"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, rgba(255,255,255,.6) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.6) 1px, transparent 1px)',
+              backgroundSize: '96px 96px',
+              maskImage: 'radial-gradient(ellipse at 30% 40%, black 0%, transparent 70%)',
+              WebkitMaskImage: 'radial-gradient(ellipse at 30% 40%, black 0%, transparent 70%)'
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/40" />
-          <div className="absolute inset-x-0 bottom-0 h-72 bg-gradient-to-t from-black to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black to-transparent" />
         </motion.div>
 
+        {/* Вертикальна червона лінія-акцент по лівому краю (десктоп) */}
+        <motion.span
+          aria-hidden
+          className="absolute left-6 top-32 hidden w-px origin-top bg-gradient-to-b from-red-600 via-red-600/60 to-transparent lg:left-8 xl:block"
+          initial={reduce ? { height: 260 } : { height: 0 }}
+          animate={{ height: 260 }}
+          transition={{ duration: 1.2, delay: 0.4, ease: EASE }}
+        />
+
         <div className={`${CONTAINER} relative z-10`}>
-          <div className="grid items-center gap-14 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+          <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 xl:gap-16">
             {/* Ліва колонка */}
             <div>
               <Reveal y={16}>
                 <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-red-600/25 bg-red-600/10 px-4 py-2">
                   <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
                   <span className="text-[10px] font-black uppercase tracking-[0.25em] text-red-400">
-                    Тренує особисто Ігор Котляревський · 3 дан
+                    Ігор Котляревський · 3 дан<span className="hidden sm:inline"> · тренує особисто · Шулявка</span>
                   </span>
                 </div>
               </Reveal>
@@ -385,28 +621,34 @@ export const PersonalLanding = () => {
                   <span className="text-red-600">тренування</span>
                   <br />
                   з карате
+                  <span className="mt-3 block text-[0.42em] font-black leading-tight tracking-[0.02em] text-zinc-400">
+                    для дорослих у Києві
+                  </span>
                 </h1>
               </Reveal>
 
               <Reveal delay={0.16}>
-                <p className="mb-10 max-w-xl text-lg leading-relaxed text-zinc-300 md:text-xl">
-                  Один на один із засновником клубу — для дорослих, з нуля. Навичка постояти за себе,
-                  тіло, яке слухається, і форма без спортзалу. Починаємо зі знайомства: рівень, ціль, план.
+                <p className="mb-10 max-w-xl text-base leading-relaxed text-zinc-300 sm:text-lg md:text-xl">
+                  Один на один із засновником клубу. З нуля. Три речі, які відчуєте вже за перші тижні:
+                  вмієте постояти за себе, тіло стає сильним і слухняним, форма зʼявляється без абонемента
+                  у спортзал.
                 </p>
               </Reveal>
 
               <Reveal delay={0.24}>
                 <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
-                  <Button onClick={() => openQuickLead('Personal CTA')}>Записатись за {priceFirst} грн</Button>
-                  <Button variant="secondary" showIcon={false} onClick={() => scrollTo('pricing')}>
-                    Вартість і формат
+                  <Button className="whitespace-nowrap" onClick={() => openQuickLead('Personal CTA')}>
+                    Записатись — {priceFirst} грн
+                  </Button>
+                  <Button variant="secondary" showIcon={false} className="hidden sm:inline-flex" onClick={() => scrollTo('process')}>
+                    Як проходить перше тренування
                   </Button>
                 </div>
               </Reveal>
 
               <Reveal delay={0.32}>
                 <ul className="flex flex-wrap items-center gap-x-7 gap-y-3">
-                  {['Для дорослих · з нуля', '3 дан кіокушинкай', 'Майстер спорту України', 'Зал на Шулявці'].map(item => (
+                  {['Для дорослих · з нуля', '3 дан кіокушинкай', 'Майстер спорту України', '27 років у карате', 'Зал на Шулявці'].map(item => (
                     <li
                       key={item}
                       className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-zinc-500"
@@ -419,22 +661,53 @@ export const PersonalLanding = () => {
               </Reveal>
             </div>
 
-            {/* Права колонка — офер-картка */}
-            <Reveal delay={0.2} y={32}>
+            {/* Права колонка — фото учениці (чорний пояс) і офер-картка поверх нього */}
+            <div className="relative lg:ml-auto lg:w-full lg:max-w-[500px] lg:pb-24 xl:max-w-[540px]">
+              {!reduce ? (
+                <motion.div
+                  className="relative hidden lg:block"
+                  initial={{ opacity: 0, x: 40 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 1, delay: 0.25, ease: EASE }}
+                >
+                  <HeroPhoto />
+                </motion.div>
+              ) : (
+                <div className="relative hidden lg:block">
+                  <HeroPhoto />
+                </div>
+              )}
+
+            <Reveal delay={0.2} y={32} className="lg:absolute lg:inset-x-5 lg:bottom-0">
               <div className="relative">
                 <div className="absolute -inset-px rounded-[32px] bg-gradient-to-b from-red-600/40 to-transparent" aria-hidden />
-                <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950/80 p-8 backdrop-blur-xl md:p-10">
+                <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950/85 p-7 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl md:p-8 lg:p-6">
                   <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-600/20 blur-3xl" aria-hidden />
 
+                  {/* Мобільний: фото — шапка картки, десктоп: фото поруч, тому тут ховаємо */}
+                  <div className="relative -mx-7 -mt-7 mb-7 aspect-[16/11] overflow-hidden md:-mx-8 md:-mt-8 lg:hidden">
+                    <img
+                      src={PHOTOS.hero}
+                      alt="Персональні тренування з карате для дорослих у Києві — учениця з чорним поясом"
+                      fetchPriority="high"
+                      decoding="async"
+                      className="h-full w-full object-cover object-[50%_18%]"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" aria-hidden />
+                    <span aria-hidden className="absolute left-5 top-5 h-6 w-6 border-l-2 border-t-2 border-red-600" />
+                    <span aria-hidden className="absolute right-5 top-5 h-6 w-6 border-r-2 border-t-2 border-red-600" />
+                  </div>
+
                   <div className="relative">
-                    <div className="mb-6 inline-flex rounded-full bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
-                      Знижка 50%
+                    <div className="mb-5 flex flex-wrap items-center gap-3 lg:mb-3">
+                      <span className="inline-flex rounded-full bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white">
+                        Знижка 50%
+                      </span>
+                      <span className={`${EYEBROW} text-[10px]`}>Перше тренування</span>
                     </div>
 
-                    <p className={`${EYEBROW} mb-4`}>Перше тренування</p>
-
-                    <div className="mb-5 flex items-end gap-3">
-                      <span className="text-6xl font-black leading-none text-red-600 md:text-7xl">
+                    <div className="mb-5 flex items-end gap-3 lg:mb-4">
+                      <span className="text-6xl font-black leading-none text-red-600">
                         {priceFirst}
                       </span>
                       <span className="mb-1.5 text-xl font-black leading-none text-zinc-400">грн</span>
@@ -443,22 +716,23 @@ export const PersonalLanding = () => {
                       </span>
                     </div>
 
-                    <p className={`${BODY} mb-8 border-b ${HAIRLINE} pb-8`}>
-                      Діє один раз — якщо записались і прийшли в узгоджений час. При перенесенні чи
-                      повторному записі — {priceSingle} грн.
+                    <p className={`${BODY} mb-7 border-b ${HAIRLINE} pb-7 text-sm lg:hidden`}>
+                      Розминка, тест базових рухів, план під вашу ціль. Без зобовʼязань далі. Ціна діє один раз —
+                      на перше заняття.
                     </p>
 
                     <Button className="w-full" onClick={() => openQuickLead('Personal CTA')}>
                       Забронювати слот
                     </Button>
 
-                    <p className="mt-5 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+                    <p className="mt-5 text-center text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-500 lg:mt-3 lg:text-[10px]">
                       Вільних слотів на тиждень небагато
                     </p>
                   </div>
                 </div>
               </div>
             </Reveal>
+            </div>
           </div>
         </div>
 
@@ -467,7 +741,7 @@ export const PersonalLanding = () => {
           <motion.button
             type="button"
             aria-label="Прокрутити далі"
-            onClick={() => scrollTo('coach')}
+            onClick={() => scrollTo('pains')}
             className="absolute bottom-8 left-1/2 z-10 hidden -translate-x-1/2 text-zinc-600 transition-colors hover:text-white lg:block"
             animate={{ y: [0, 8, 0] }}
             transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -478,21 +752,178 @@ export const PersonalLanding = () => {
       </section>
 
       {/* ---------------------------------------------------------------- *
+       * БОЛІ — PAS: ситуації, з якими приходять
+       * ---------------------------------------------------------------- */}
+      <Divider />
+      <section id="pains" className={`${SECTION_Y} bg-zinc-950`}>
+        <div className={CONTAINER}>
+          <SectionHeading eyebrow="Знайомо?">
+            Коли спортзал і група <span className="text-zinc-600">не працюють</span>
+          </SectionHeading>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {pains.map((pain, i) => (
+              <Reveal key={pain.title} delay={i * 0.08} className="h-full">
+                <article className={`${CARD} flex h-full flex-col p-7`}>
+                  <span className="mb-6 block h-1 w-10 rounded-full bg-red-600" aria-hidden />
+                  <h3 className={`${H3} mb-3`}>{pain.title}</h3>
+                  <p className={BODY}>{pain.desc}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={0.3}>
+            <p className="mx-auto mt-12 max-w-2xl text-center text-lg font-bold text-white md:text-xl">
+              Персональний формат закриває всі чотири: навичка, а не абонемент; ваш темп, а не темп групи;
+              старт з нуля без сорому.
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- *
+       * ЧОМУ ПЕРСОНАЛЬНО
+       * ---------------------------------------------------------------- */}
+      <Divider />
+      <section id="advantages" className={`${SECTION_Y} bg-black`}>
+        <div className={CONTAINER}>
+          <SectionHeading eyebrow="Що дає персональне тренування з карате">
+            Безпека. Практичність. <Mark>Форма.</Mark>
+          </SectionHeading>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {advantages.map((adv, i) => (
+              <Reveal key={adv.title} delay={i * 0.08} className="h-full">
+                <article className={`${CARD} group relative flex h-full flex-col overflow-hidden p-7 transition-colors duration-500 hover:border-red-600/40`}>
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-0 top-0 h-[2px] origin-left scale-x-0 bg-gradient-to-r from-red-600 to-transparent transition-transform duration-700 group-hover:scale-x-100"
+                  />
+                  <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 transition-transform duration-500 group-hover:scale-110">
+                    {adv.icon}
+                  </div>
+                  <h3 className={`${H3} mb-3`}>{adv.title}</h3>
+                  <p className={BODY}>{adv.desc}</p>
+                </article>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- *
+       * ФОТО — три результати, які видно: форма, техніка, результат
+       * ---------------------------------------------------------------- */}
+      <Divider />
+      <section id="gallery" className={`${SECTION_Y} relative overflow-hidden bg-zinc-950`}>
+        <div
+          className="pointer-events-none absolute right-0 top-1/2 h-[520px] w-[520px] -translate-y-1/2 translate-x-1/3 rounded-full bg-red-600/10 blur-[150px]"
+          aria-hidden
+        />
+        <div className={`${CONTAINER} relative z-10`}>
+          <SectionHeading eyebrow="Форма · Техніка · Впевненість">
+            Так виглядає <Mark>результат</Mark>
+          </SectionHeading>
+
+          <div className="-mx-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-4 [scrollbar-width:none] md:mx-0 md:grid md:grid-cols-3 md:gap-6 md:overflow-visible md:px-0 md:pb-0 [&::-webkit-scrollbar]:hidden">
+            {gallery.map((shot, i) => (
+              <Reveal
+                key={shot.title}
+                delay={i * 0.12}
+                className="w-[78vw] max-w-[340px] shrink-0 snap-center md:w-auto md:max-w-none"
+              >
+                <figure className="group relative aspect-[3/4] overflow-hidden rounded-[28px] border border-white/10 bg-black md:rounded-[32px]">
+                  <img
+                    src={shot.src}
+                    alt={shot.alt}
+                    loading="lazy"
+                    decoding="async"
+                    className={`h-full w-full object-cover transition-transform duration-[1200ms] ease-out ${shot.zoom || 'group-hover:scale-105'}`}
+                    style={{ objectPosition: shot.position }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" aria-hidden />
+                  <span aria-hidden className="absolute left-5 top-5 text-[11px] font-black tracking-[0.3em] text-red-500">
+                    0{i + 1}
+                  </span>
+                  <span
+                    aria-hidden
+                    className="absolute left-5 top-11 h-10 w-px origin-top bg-gradient-to-b from-red-600 to-transparent"
+                  />
+                  <figcaption className="absolute inset-x-0 bottom-0 p-6 md:p-7">
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.3em] text-red-500">
+                      {shot.tag}
+                    </span>
+                    <span className="block text-xl font-black uppercase leading-tight tracking-tight text-white md:text-2xl">
+                      {shot.title}
+                    </span>
+                    <span className="mt-2 block max-w-xs text-sm font-medium leading-relaxed text-zinc-400">
+                      {shot.desc}
+                    </span>
+                  </figcaption>
+                </figure>
+              </Reveal>
+            ))}
+          </div>
+
+          <Reveal delay={0.3}>
+            <p className="mx-auto mt-14 max-w-2xl text-center text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500 md:mt-20">
+              Фото — клубна фотосесія Black Bear Dojo. Учні клубу, а не стокові моделі
+            </p>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- *
+       * ЯК ЦЕ ПРАЦЮЄ — шлях від заявки до плану
+       * ---------------------------------------------------------------- */}
+      <Divider />
+      <section id="process" className={`${SECTION_Y} bg-zinc-950`}>
+        <div className={CONTAINER}>
+          <SectionHeading eyebrow="Як це працює">
+            Перше тренування — <Mark>три кроки</Mark>
+          </SectionHeading>
+
+          <ol className="mx-auto grid max-w-5xl gap-5 md:grid-cols-3">
+            {process.map((item, i) => (
+              <Reveal key={item.step} delay={i * 0.1} className="h-full">
+                <li className={`${CARD} relative flex h-full flex-col p-8`}>
+                  <span className="mb-6 text-5xl font-black leading-none text-red-600/80">{item.step}</span>
+                  <h3 className={`${H3} mb-3`}>{item.title}</h3>
+                  <p className={BODY}>{item.desc}</p>
+                </li>
+              </Reveal>
+            ))}
+          </ol>
+
+          <Reveal delay={0.3}>
+            <div className="mx-auto mt-12 flex max-w-xl flex-col items-center gap-4 text-center">
+              <Button onClick={() => openQuickLead('Process CTA')}>Записатись за {priceFirst} грн</Button>
+              <p className="text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">
+                Без абонемента · без зобовʼязань · відповідь на заявку — особисто від Ігоря
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- *
        * ТРЕНЕР — на персональній сторінці довіра має йти одразу за офером
        * ---------------------------------------------------------------- */}
-      <section id="coach" className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
+      <Divider />
+      <section id="coach" className={`${SECTION_Y} overflow-x-clip bg-black`}>
         <div className={CONTAINER}>
-          <SectionHeading eyebrow="Хто тренує">
-            Тренує <span className="text-red-600">особисто</span>
+          <SectionHeading eyebrow="Тренер з карате">
+            Хто буде вашим <Mark>тренером</Mark>
           </SectionHeading>
 
           <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2 lg:gap-20">
             <Reveal y={32}>
               <div className="relative">
-                <div
-                  className="absolute -inset-4 rounded-[48px] border border-red-600/20"
-                  aria-hidden
-                />
+                <div className="absolute -inset-4 rounded-[48px] border border-red-600/20" aria-hidden />
+                <div className="pointer-events-none absolute -inset-8 rounded-full bg-red-600/15 blur-3xl" aria-hidden />
+                <span aria-hidden className="absolute -left-2 -top-2 z-10 h-8 w-8 border-l-2 border-t-2 border-red-600" />
+                <span aria-hidden className="absolute -bottom-2 -right-2 z-10 h-8 w-8 border-b-2 border-r-2 border-red-600" />
                 {/* Фото тренера — головний елемент довіри. Після оптимізації це
                     73 КБ webp, тож вантажимо одразу (без lazy), щоб воно точно
                     було на місці, коли користувач дійде до секції. */}
@@ -500,7 +931,7 @@ export const PersonalLanding = () => {
                   src={content?.personal_coach_photo || '/coach-igor-personal.jpg'}
                   width={1080}
                   alt="Ігор Котляревський — тренер з карате, Black Bear Dojo"
-                  className="relative aspect-[4/5] w-full rounded-[32px] bg-zinc-900 object-cover grayscale transition-all duration-700 hover:grayscale-0"
+                  className="relative aspect-[4/5] w-full rounded-[32px] bg-zinc-900 object-cover grayscale-[35%] transition-all duration-700 hover:grayscale-0"
                   decoding="async"
                 />
               </div>
@@ -552,75 +983,56 @@ export const PersonalLanding = () => {
       </section>
 
       {/* ---------------------------------------------------------------- *
-       * ЧОМУ ПЕРСОНАЛЬНО
+       * СОЦІАЛЬНИЙ ДОКАЗ — Ігор з дорослими ученицями, широкий кадр
        * ---------------------------------------------------------------- */}
-      <section id="advantages" className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
-        <div className={CONTAINER}>
-          <SectionHeading eyebrow="Чому персонально?">
-            Безпека. Практичність. <span className="text-zinc-600">Форма.</span>
-          </SectionHeading>
+      <section id="students" ref={groupRef as any} className="relative overflow-hidden bg-black">
+        <div className="relative min-h-[520px] md:min-h-[600px]">
+          <motion.img
+            src={PHOTOS.group}
+            alt="Ігор Котляревський з дорослими ученицями клубу Black Bear Dojo"
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full scale-110 object-cover object-[42%_25%] md:object-[50%_25%]"
+            style={reduce ? undefined : { y: groupY }}
+          />
+          {/* Обличчя — у верхній половині кадру, текст — унизу, тому затемнення знизу, а не збоку */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/75 to-transparent" aria-hidden />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent" aria-hidden />
+          <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black to-transparent" aria-hidden />
 
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {advantages.map((adv, i) => (
-              <Reveal key={adv.title} delay={i * 0.08} className="h-full">
-                <article className={`${CARD} group flex h-full flex-col p-7 transition-colors duration-500 hover:border-red-600/40`}>
-                  <div className="mb-7 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 transition-transform duration-500 group-hover:scale-110">
-                    {adv.icon}
-                  </div>
-                  <h3 className={`${H3} mb-3`}>{adv.title}</h3>
-                  <p className={BODY}>{adv.desc}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- *
-       * ФОРМАТ ЗАНЯТТЯ
-       * ---------------------------------------------------------------- */}
-      <section id="goals" className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
-        <div className={CONTAINER}>
-          <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-            <Reveal y={32}>
-              <div className="relative">
-                <div className="absolute -inset-4 rounded-[48px] border border-red-600/20" aria-hidden />
-                <img
-                  src={
-                    content?.personal_advantages_image ||
-                    'https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=1000&auto=format&fit=crop'
-                  }
-                  alt="Персональне тренування з карате"
-                  className="relative aspect-[4/3] w-full rounded-[32px] object-cover grayscale transition-all duration-700 hover:grayscale-0"
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                />
+          <div className={`${CONTAINER} relative z-10 flex min-h-[560px] items-end pb-16 pt-64 md:min-h-[680px] md:pb-20`}>
+            <div className="grid w-full items-end gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+              <div>
+                <Reveal>
+                  <Eyebrow>Дорослі учні клубу</Eyebrow>
+                  <h2 className="text-3xl font-black uppercase leading-[1.05] tracking-tight sm:text-4xl md:text-5xl">
+                    Приходять з нуля. <br className="hidden sm:block" />
+                    <span className="text-zinc-400">Лишаються за</span> <Mark>результат.</Mark>
+                  </h2>
+                </Reveal>
               </div>
-            </Reveal>
-
-            <div>
-              <Reveal>
-                <Eyebrow>Формат заняття</Eyebrow>
-                <h2 className={`${H2} mb-12`}>
-                  Тренування під вашу <span className="text-red-600">ціль</span>
-                </h2>
-              </Reveal>
-
-              <ul className="space-y-7">
-                {privileges.map((priv, i) => (
-                  <Reveal key={priv.title} delay={0.1 + i * 0.08}>
-                    <li className="group flex gap-5">
-                      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${HAIRLINE} bg-black text-red-600 transition-colors duration-300 group-hover:border-red-600/50`}>
-                        <CheckCircle2 size={18} />
-                      </span>
-                      <span>
-                        <span className={`${H3} mb-1.5 block`}>{priv.title}</span>
-                        <span className={`${BODY} block max-w-md`}>{priv.desc}</span>
-                      </span>
-                    </li>
-                  </Reveal>
-                ))}
-              </ul>
+              <div>
+                <Reveal delay={0.1}>
+                  <p className={`${BODY} mb-8 max-w-md text-base`}>
+                    Попередній досвід не потрібен. Персональний формат — це той самий тренер і та сама школа,
+                    що в групах клубу, але вся увага на тренуванні — вам.
+                  </p>
+                </Reveal>
+                <Reveal delay={0.2}>
+                  <dl className="grid grid-cols-3 gap-4 border-l-2 border-red-600 pl-5 sm:gap-6 sm:pl-6">
+                  {[
+                    ['27', 'років у карате'],
+                    ['3 дан', 'кіокушинкай'],
+                    ['1 на 1', 'з засновником']
+                  ].map(([v, l]) => (
+                    <div key={l}>
+                      <dt className="whitespace-nowrap text-2xl font-black leading-none text-white sm:text-3xl md:text-4xl">{v}</dt>
+                      <dd className="mt-2 text-[9px] font-black uppercase tracking-[0.12em] text-zinc-500 sm:text-[10px] sm:tracking-[0.2em]">{l}</dd>
+                    </div>
+                  ))}
+                  </dl>
+                </Reveal>
+              </div>
             </div>
           </div>
         </div>
@@ -629,14 +1041,16 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * ВАРТІСТЬ — офер
        * ---------------------------------------------------------------- */}
-      <section id="pricing" className={`${SECTION_Y} relative overflow-hidden border-t ${HAIRLINE} bg-black`}>
+      <Divider />
+      <section id="pricing" className={`${SECTION_Y} relative overflow-hidden bg-zinc-950`}>
         <div
           className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-red-600/[0.07] blur-[130px]"
           aria-hidden
         />
         <div className={`${CONTAINER} relative z-10`}>
-          <SectionHeading eyebrow="Вартість">
-            Чесна ціна. <span className="text-zinc-600">Без абонемента</span>
+          <SectionHeading eyebrow="Вартість персонального тренування з карате">
+            Чесна ціна. <br className="hidden sm:block" />
+            <Mark>Без абонемента</Mark>
           </SectionHeading>
 
           <div className="mx-auto grid max-w-4xl items-stretch gap-5 md:grid-cols-2">
@@ -649,7 +1063,7 @@ export const PersonalLanding = () => {
 
                 <h3 className={`${H3} mb-2.5`}>Перше тренування</h3>
                 <p className={`${BODY} mb-8`}>
-                  Знайомство, розбір рівня підготовки, постановка цілі та плану.
+                  Знайомство, розбір рівня підготовки, постановка цілі та плану. Далі вирішуєте ви.
                 </p>
 
                 <div className="mb-6 flex items-end gap-3">
@@ -684,14 +1098,16 @@ export const PersonalLanding = () => {
                   <span className="mb-1.5 text-lg font-black leading-none text-zinc-400">грн</span>
                 </div>
 
-                <p className={`${BODY} mb-8 border-b ${HAIRLINE} pb-8 text-sm`}>
-                  Стандартна ціна персонального тренування. Кількість занять і графік — на ваш
-                  розсуд.
-                </p>
+                <div className="mt-auto">
+                  <p className={`${BODY} mb-8 border-b ${HAIRLINE} pb-8 text-sm`}>
+                    Стандартна ціна персонального тренування. Кількість занять і графік — на ваш
+                    розсуд.
+                  </p>
 
-                <Button variant="secondary" showIcon={false} className="mt-auto w-full" onClick={() => openQuickLead('Personal CTA')}>
-                  Підібрати час
-                </Button>
+                  <Button variant="secondary" showIcon={false} className="w-full" onClick={() => openQuickLead('Personal CTA')}>
+                    Підібрати час
+                  </Button>
+                </div>
               </article>
             </Reveal>
           </div>
@@ -705,12 +1121,61 @@ export const PersonalLanding = () => {
       </section>
 
       {/* ---------------------------------------------------------------- *
+       * ФОРМАТ ЗАНЯТТЯ
+       * ---------------------------------------------------------------- */}
+      <Divider />
+      <section id="goals" className={`${SECTION_Y} bg-black`}>
+        <div className={CONTAINER}>
+          <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
+            <PhotoReveal
+              src={PHOTOS.student}
+              alt="Ігор Котляревський з ученицею — персональне тренування з карате один на один"
+              className="w-full max-w-lg lg:max-w-none"
+              imgClassName="aspect-[4/5]"
+              position="50% 20%"
+            >
+              <div className="absolute bottom-6 left-6 rounded-2xl border border-white/10 bg-black/70 px-4 py-3 backdrop-blur">
+                <span className="block text-[10px] font-black uppercase tracking-[0.25em] text-red-500">Формат</span>
+                <span className="block text-sm font-black uppercase tracking-tight text-white">Один на один з тренером</span>
+              </div>
+            </PhotoReveal>
+
+            <div>
+              <Reveal>
+                <Eyebrow>Для кого</Eyebrow>
+                <h2 className="mb-12 text-[32px] font-black uppercase leading-[1.05] tracking-tight sm:text-4xl md:text-5xl">
+                  Самооборона, форма, техніка — одна програма <Mark>під вас</Mark>
+                </h2>
+              </Reveal>
+
+              <ul className="space-y-7">
+                {privileges.map((priv, i) => (
+                  <Reveal key={priv.title} delay={0.1 + i * 0.08}>
+                    <li className="group flex gap-5">
+                      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border ${HAIRLINE} bg-black text-red-600 transition-colors duration-300 group-hover:border-red-600/50`}>
+                        <CheckCircle2 size={18} />
+                      </span>
+                      <span>
+                        <span className={`${H3} mb-1.5 block`}>{priv.title}</span>
+                        <span className={`${BODY} block max-w-md`}>{priv.desc}</span>
+                      </span>
+                    </li>
+                  </Reveal>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ---------------------------------------------------------------- *
        * FAQ
        * ---------------------------------------------------------------- */}
-      <section id="faq" className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
+      <Divider />
+      <section id="faq" className={`${SECTION_Y} bg-zinc-950`}>
         <div className={CONTAINER}>
           <SectionHeading eyebrow="Часті запитання">
-            Коротко про <span className="text-zinc-600">головне</span>
+            Питання перед <span className="text-zinc-600">першим тренуванням</span>
           </SectionHeading>
 
           <div className="mx-auto max-w-3xl space-y-3">
@@ -736,46 +1201,6 @@ export const PersonalLanding = () => {
       </section>
 
       {/* ---------------------------------------------------------------- *
-       * ЗАЛИ
-       * ---------------------------------------------------------------- */}
-      <section id="locations" className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
-        <div className={CONTAINER}>
-          <SectionHeading eyebrow="Де проходять тренування">
-            Зал на <span className="text-zinc-600">Шулявці</span>
-          </SectionHeading>
-
-          <div className="mx-auto grid max-w-xl items-stretch gap-5">
-            {[
-              {
-                name: 'Шулявка',
-                address:
-                  "вул. Сім'ї Бродських, 31/33, м. Шулявська. Зручно з КПІ, Шулявки та Лук'янівки.",
-                time: 'Час — за домовленістю, слоти окремо від груп'
-              }
-            ].map((loc, i) => (
-              <Reveal key={loc.name} delay={i * 0.1} className="h-full">
-                <article className={`${CARD} group flex h-full flex-col p-8 transition-colors duration-500 hover:border-red-600/40`}>
-                  <div className="mb-6 flex items-center gap-4">
-                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600/10 text-red-600 transition-colors duration-300 group-hover:bg-red-600 group-hover:text-white">
-                      <MapPin size={20} />
-                    </span>
-                    <h3 className="text-xl font-black uppercase tracking-tight md:text-2xl">
-                      {loc.name}
-                    </h3>
-                  </div>
-                  <p className={`${BODY} mb-7`}>{loc.address}</p>
-                  <p className="mt-auto flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-red-500">
-                    <Clock size={13} className="shrink-0" />
-                    {loc.time}
-                  </p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- *
        * ЗАЯВКА
        * ---------------------------------------------------------------- */}
       <QuickLeadModal
@@ -785,6 +1210,7 @@ export const PersonalLanding = () => {
         locations={personalLocations}
         ageGroups={PERSONAL_GOALS}
         ageLabel="Ціль"
+        namePlaceholder="Імʼя"
         title="Запис на персональне тренування"
         subtitle={`Перше тренування — ${priceFirst} грн замість ${priceSingle}. Залиште номер — Ігор особисто зателефонує і підбере слот.`}
       />
@@ -792,10 +1218,11 @@ export const PersonalLanding = () => {
       <ContactForm
         locations={personalLocations}
         contacts={[{ name: 'Ігор Котляревський', phone: '+380954756500' }]}
-        title="Запис на персональне тренування"
-        subtitle="Залиште номер — Ігор особисто зателефонує, уточнить ціль, рівень підготовки та підбере вільний слот."
+        title={`Перше тренування — ${priceFirst} грн замість ${priceSingle}`}
+        subtitle="Залиште імʼя і номер — Ігор особисто зателефонує, уточнить ціль і підбере слот на Шулявці. Без абонемента, без зобовʼязань."
         ageGroups={PERSONAL_GOALS}
         ageLabel="Ціль"
+        namePlaceholder="Імʼя"
         source="personal_landing"
         submitLabel={`Записатись за ${priceFirst} грн`}
         offerNote={
@@ -859,10 +1286,12 @@ export const PersonalLanding = () => {
       <div className="fixed inset-x-4 bottom-4 z-50 md:hidden">
         <motion.button
           type="button"
-          initial={reduce ? false : { y: 100 }}
-          animate={{ y: 0 }}
-          transition={{ duration: DUR, ease: EASE, delay: 0.6 }}
+          initial={false}
+          animate={{ y: pastHero ? 0 : 120, opacity: pastHero ? 1 : 0 }}
+          transition={{ duration: 0.45, ease: EASE }}
           whileTap={{ scale: 0.97 }}
+          aria-hidden={!pastHero}
+          tabIndex={pastHero ? 0 : -1}
           onClick={() => openQuickLead('Personal CTA')}
           className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-b from-[#D10000] to-[#A80000] text-[13px] font-black uppercase tracking-[0.12em] text-white shadow-[0_16px_40px_-10px_rgba(209,0,0,0.8)]"
         >
