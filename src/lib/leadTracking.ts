@@ -1,3 +1,5 @@
+import { track } from '@vercel/analytics';
+
 const TRACKING_QUERY_KEYS = [
   'utm_source',
   'utm_medium',
@@ -52,6 +54,11 @@ export const createEventId = () =>
 /** Клік по будь-якому CTA «записатись» — намір, який видно в Meta ще до заявки. */
 export const trackLeadIntent = (contentName: string, location: string) => {
   if (typeof window === 'undefined') return;
+  try {
+    track('lead_intent', { page: location, cta: contentName });
+  } catch {
+    /* ignore */
+  }
   const fbq = (window as any).fbq;
   if (fbq) {
     fbq('trackCustom', 'LeadIntent', { content_name: contentName, location });
@@ -101,6 +108,12 @@ export const submitLead = async (payload: LeadPayload): Promise<boolean> => {
       location: payload.location,
       ...trackingData
     };
+
+    try {
+      track('lead', { source: payload.source, age_group: payload.age_group || '', location: payload.location || '' });
+    } catch {
+      /* ignore */
+    }
 
     const gtag = (window as any).gtag;
     if (gtag) {
