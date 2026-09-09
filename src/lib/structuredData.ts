@@ -63,6 +63,12 @@ export const ORGANIZATION = {
   sameAs: ['https://instagram.com/karate_kyiv', 'https://www.facebook.com/karatee.kyiv/']
 };
 
+/** Для сторінок, де тренує особисто Ігор — лише зал на Шулявці */
+export const shuliavkaGraph = (extra: object[] = []) => ({
+  '@context': 'https://schema.org',
+  '@graph': [{ ...ORGANIZATION, location: [{ '@id': SHULIAVKA['@id'] }] }, SHULIAVKA, ...extra]
+});
+
 export const clubGraph = (extra: object[] = []) => ({
   '@context': 'https://schema.org',
   '@graph': [ORGANIZATION, SHULIAVKA, NEKRASOVA, ...extra]
