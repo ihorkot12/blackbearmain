@@ -1,54 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Send } from 'lucide-react';
-
-const TRACKING_QUERY_KEYS = [
-  'utm_source',
-  'utm_medium',
-  'utm_campaign',
-  'utm_content',
-  'utm_term',
-  'fbclid'
-] as const;
-
-const getCookieValue = (name: string) => {
-  if (typeof document === 'undefined') return '';
-  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = document.cookie.match(new RegExp(`(?:^|; )${escapedName}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : '';
-};
-
-const getTrackingData = () => {
-  if (typeof window === 'undefined') return {};
-
-  const params = new URLSearchParams(window.location.search);
-  const tracking: Record<string, string> = {};
-
-  TRACKING_QUERY_KEYS.forEach((key) => {
-    const value = params.get(key);
-    if (value) tracking[key] = value;
-  });
-
-  const firstLandingPage = sessionStorage.getItem('first_landing_page') || window.location.href;
-  sessionStorage.setItem('first_landing_page', firstLandingPage);
-
-  const fbp = getCookieValue('_fbp');
-  const existingFbc = getCookieValue('_fbc');
-  const fbclid = tracking.fbclid;
-
-  if (fbp) tracking.fbp = fbp;
-  if (existingFbc) {
-    tracking.fbc = existingFbc;
-  } else if (fbclid) {
-    tracking.fbc = `fb.1.${Math.floor(Date.now() / 1000)}.${fbclid}`;
-  }
-
-  tracking.landing_page = firstLandingPage;
-  tracking.page_url = window.location.href;
-  if (document.referrer) tracking.referrer = document.referrer;
-
-  return tracking;
-};
+import { submitLead } from '../lib/leadTracking';
 
 interface ContactFormProps {
   locations: any[];
@@ -78,69 +31,36 @@ export const ContactForm = ({
 }: ContactFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [error, setError] = useState('');
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError('');
 
     const formData = new FormData(e.target as HTMLFormElement);
-    const eventId = `lead_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const trackingData = getTrackingData();
-
-    const data = {
-      name: formData.get('name'),
-      phone: formData.get('phone'),
-      age_group: formData.get('age'),
-      location: formData.get('location'),
-      event_id: eventId,
-      source,
-      ...trackingData
-    };
 
     try {
-      const res = await fetch('/api/leads-public', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+      const ok = await submitLead({
+        name: String(formData.get('name') || ''),
+        phone: String(formData.get('phone') || ''),
+        age_group: String(formData.get('age') || ''),
+        location: String(formData.get('location') || ''),
+        source
       });
 
-      if (res.ok) {
-        // Conversion Tracking
-        if (typeof window !== 'undefined') {
-          // Google Ads / Analytics
-          if ((window as any).gtag) {
-            (window as any).gtag('event', 'generate_lead', {
-              'event_id': eventId,
-              'value': 1.0,
-              'currency': 'UAH',
-              'source': source,
-              'age_group': formData.get('age'),
-              'location': formData.get('location'),
-              ...trackingData
-            });
-          }
-          // Meta Pixel
-          if ((window as any).fbq) {
-            (window as any).fbq('track', 'Lead', {
-              content_name: 'Trial Lesson Signup',
-              currency: 'UAH',
-              value: 1.0,
-              source,
-              age_group: formData.get('age'),
-              location: formData.get('location'),
-              ...trackingData
-            }, { eventID: eventId });
-          }
-        }
-
+      if (ok) {
         if (onSuccess) {
           onSuccess();
         } else {
           setIsSubmitted(true);
         }
+      } else {
+        setError('Не вдалося відправити заявку. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
       }
-    } catch (error) {
-      console.error('Error submitting form:', error);
+    } catch (err) {
+      console.error('Error submitting form:', err);
+      setError('Немає зв’язку з сервером. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
     } finally {
       setIsSubmitting(false);
     }
@@ -243,7 +163,8 @@ export const ContactForm = ({
               </div>
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Локація</label>
-                <select name="location" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                  <option value="">Оберіть локацію</option>
                   {locations.map(loc => (
                     <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
                   ))}
@@ -251,13 +172,17 @@ export const ContactForm = ({
               </div>
               <div>
                 <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Вік / Група</label>
-                <select name="age" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                <select name="age" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                  <option value="">Оберіть групу</option>
                   {ageGroups.map(group => (
                     <option key={group.value} value={group.value}>{group.label}</option>
                   ))}
                 </select>
               </div>
-              <button 
+              {error && (
+                <p className="text-sm text-red-400 leading-relaxed">{error}</p>
+              )}
+              <button
                 type="submit"
                 disabled={isSubmitting}
                 className="w-full h-16 bg-gradient-to-b from-[#D10000] to-[#A80000] hover:-translate-y-0.5 disabled:from-zinc-800 disabled:to-zinc-800 disabled:hover:translate-y-0 text-white text-[13px] font-black uppercase tracking-[0.12em] rounded-2xl transition-all duration-300 shadow-[0_16px_40px_-10px_rgba(209,0,0,0.6)] flex items-center justify-center gap-2.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
