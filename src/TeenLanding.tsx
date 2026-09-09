@@ -23,7 +23,9 @@ import {
   Flame
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import SEO from './components/SEO';
+import SEO, { SITE_URL } from './components/SEO';
+import { clubGraph, courseOffer } from './lib/structuredData';
+import { startEngagementTracking } from './lib/engagement';
 import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
 import { QuickLeadModal } from './components/QuickLeadModal';
@@ -50,6 +52,8 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const TeenLanding = () => {
+  // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
+  React.useEffect(() => startEngagementTracking('teens'), []);
   const [quickLeadOpen, setQuickLeadOpen] = useState(false);
   const openQuickLead = React.useCallback((ctaName: string) => {
     trackLeadIntent(ctaName, 'teens');
@@ -147,9 +151,11 @@ export const TeenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.teen_seo_title || "Карате для підлітків 12+ років Київ | Секція карате Шулявка"}
-        description={content?.teen_seo_description || "Секція карате для підлітків у Києві. Професійні турніри, самооборона, лідерство та впевненість у собі. Карате Кіокушинкай Київ (Шулявка, Відрадний, Сирець). Перше тренування безкоштовно!"}
+        title={content?.teen_seo_title || "Карате для підлітків 12+ Київ, Шулявка | Black Bear Dojo"}
+        description={content?.teen_seo_description || "Секція карате для підлітків від 12 років у Києві — Шулявка і Сирець. Самооборона, турніри, впевненість. Перше тренування безкоштовне."}
         keywords={content?.teen_seo_keywords || "карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ, карате сирець підлітки"}
+        url={`${SITE_URL}/teens-12-plus`}
+        jsonLd={clubGraph([courseOffer({ name: "Карате для підлітків 12+", description: "Старша група Кіокушинкай карате: самооборона, спаринги, турніри.", url: `${SITE_URL}/teens-12-plus`, ageRange: "12-17" })])}
       />
       <Navbar />
 

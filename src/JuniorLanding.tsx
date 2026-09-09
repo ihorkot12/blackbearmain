@@ -25,7 +25,9 @@ import {
   Brain
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import SEO from './components/SEO';
+import SEO, { SITE_URL } from './components/SEO';
+import { clubGraph, courseOffer } from './lib/structuredData';
+import { startEngagementTracking } from './lib/engagement';
 import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
 import { QuickLeadModal } from './components/QuickLeadModal';
@@ -54,6 +56,8 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const JuniorLanding = () => {
+  // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
+  React.useEffect(() => startEngagementTracking('juniors'), []);
   const [quickLeadOpen, setQuickLeadOpen] = useState(false);
   const openQuickLead = React.useCallback((ctaName: string) => {
     trackLeadIntent(ctaName, 'juniors');
@@ -151,9 +155,11 @@ export const JuniorLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.junior_seo_title || "Карате для дітей 7-12 років Київ | Секція карате Шулявка"}
-        description={content?.junior_seo_description || "Секція карате для дітей 7-12 років у Києві. Формування характеру, фізична підготовка та підготовка до змагань. Найкраще дитяче карате Київ (Шулявка, Відрадний, Сирець). Перше тренування безкоштовно!"}
+        title={content?.junior_seo_title || "Карате для дітей 7–12 років Київ, Шулявка | Black Bear Dojo"}
+        description={content?.junior_seo_description || "Секція карате для дітей 7–12 років у Києві — Шулявка і Сирець. Характер, фізична підготовка, підготовка до змагань. Перше тренування безкоштовне."}
         keywords={content?.junior_seo_keywords || "карате для дітей 7 років київ, карате для дітей 8 років київ, карате для дітей 10 років київ, дитяча секція карате київ, карате на шулявці для дітей, карате сирець"}
+        url={`${SITE_URL}/juniors-7-12`}
+        jsonLd={clubGraph([courseOffer({ name: "Карате для дітей 7–12 років", description: "Середня група Кіокушинкай карате: техніка, фізична підготовка, змагання.", url: `${SITE_URL}/juniors-7-12`, ageRange: "7-12" })])}
       />
       <Navbar />
 

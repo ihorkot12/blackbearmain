@@ -18,7 +18,9 @@ import {
   Facebook
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import SEO from './components/SEO';
+import SEO, { SITE_URL } from './components/SEO';
+import { clubGraph } from './lib/structuredData';
+import { startEngagementTracking } from './lib/engagement';
 import { ContactForm } from './components/ContactForm';
 
 /* ------------------------------------------------------------------ *
@@ -145,6 +147,8 @@ const Button = ({
 };
 
 export const PersonalLanding = () => {
+  // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
+  React.useEffect(() => startEngagementTracking('personal'), []);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
   const [coaches, setCoaches] = useState<any[]>([]);
@@ -300,6 +304,8 @@ export const PersonalLanding = () => {
           content?.personal_seo_keywords ||
           'персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, ігор котляревський карате, приватні уроки карате київ, карате шулявка індивідуально'
         }
+        url={`${SITE_URL}/personal-training`}
+        jsonLd={clubGraph()}
       />
 
       {/* Прогрес прокрутки */}

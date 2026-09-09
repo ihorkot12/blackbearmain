@@ -27,7 +27,9 @@ import {
   Info
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import SEO from './components/SEO';
+import SEO, { SITE_URL } from './components/SEO';
+import { clubGraph, courseOffer } from './lib/structuredData';
+import { startEngagementTracking } from './lib/engagement';
 import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
 
@@ -52,6 +54,8 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const WomenLanding = () => {
+  // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
+  React.useEffect(() => startEngagementTracking('women'), []);
   const [isScrolled, setIsScrolled] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
@@ -133,9 +137,11 @@ export const WomenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.women_seo_title || "Карате для дівчат Київ | Секція карате Шулявка"}
-        description={content?.women_seo_description || "Карате для дівчат у Києві: активне кардіо, робота руками й ногами, цікаві вправи в парах, координація, дисципліна та базова самооборона. Локації: Шулявка та Сирець."}
+        title={content?.women_seo_title || "Карате для дівчат Київ, Шулявка | Black Bear Dojo"}
+        description={content?.women_seo_description || "Карате для дівчат у Києві — Шулявка і Сирець: кардіо, робота руками й ногами, координація, базова самооборона. Перше тренування безкоштовне."}
         keywords={content?.women_seo_keywords || "карате для дівчат київ, самооборона для дівчат київ, фітнес карате київ, секція карате шулявка, карате сирець дівчата"}
+        url={`${SITE_URL}/women-karate`}
+        jsonLd={clubGraph([courseOffer({ name: "Карате для дівчат", description: "Група Кіокушинкай карате для дівчат: кардіо, координація, самооборона.", url: `${SITE_URL}/women-karate`, ageRange: "7-17" })])}
       />
       
       <Navbar />

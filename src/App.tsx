@@ -6,7 +6,9 @@
 import React, { useState, Suspense, lazy, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
-import SEO from './components/SEO';
+import SEO, { SITE_URL } from './components/SEO';
+import { clubGraph, faqPage } from './lib/structuredData';
+import { startEngagementTracking } from './lib/engagement';
 import { ContactForm } from './components/ContactForm';
 import { QuickLeadModal } from './components/QuickLeadModal';
 import { trackLeadIntent } from './lib/leadTracking';
@@ -274,6 +276,35 @@ export default function App() {
     </>
   );
 }
+
+/** FAQ головної — і в розмітці, і в FAQPage schema.org */
+const MAIN_FAQ: { q: string; a: string }[] = [
+              {
+                q: 'Як проходять тренування під час повітряної тривоги?',
+                a: 'Зал у безпечному приміщенні — тренування не зупиняється.\n\nЯкщо у вас є питання щодо конкретної локації, зателефонуйте тренеру перед записом: Ігор Котляревський — 095 475 65 00, Олег Крамаренко — 095 568 06 04.'
+              },
+              { 
+                q: 'Чи безпечні тренування для дитини 4–12 років?', 
+                a: 'Так. Тренування проходять у вікових групах із поступовим навантаженням. Контактні елементи вводяться поетапно та під контролем тренера. Дисципліна в залі — обов’язкова умова. Пріоритет — техніка, координація, самоконтроль і правильна фізична база.' 
+              },
+              { 
+                q: 'Чи підійде карате моїй дитині, якщо вона сором’язлива або фізично слабка?', 
+                a: 'Так. Більшість дітей приходять без підготовки. Початковий етап спрямований на адаптацію, розвиток координації та впевненості. Через системні тренування поступово зростає витривалість, сила та внутрішня впевненість. Навчання будується від простого до складного.' 
+              },
+              { 
+                q: 'Які результати дає карате через 3–6 місяців?', 
+                a: 'За умови регулярних тренувань: покращується дисципліна та самоконтроль, зростає впевненість у собі, розвивається фізична витривалість, формується повага до старших та однолітків, зменшується залежність від гаджетів. Результат напряму залежить від системності відвідування.' 
+              },
+              { 
+                q: 'Хто тренує дітей і який у вас досвід?', 
+                a: 'Тренування проводять Ігор Котляревський та Олег Крамаренко.\n\nІгор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 5 років у спорті та підготовці спортсменів.\n\nОлег Крамаренко — тренер клубу, який працює з дитячими та підлітковими групами, готує спортсменів до змагань і забезпечує системну підготовку відповідно до стандартів кіокушинкай.\n\nУ клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай та сучасну фізичну підготовку, з акцентом на дисципліну, техніку та поступовий розвиток спортсмена.' 
+              },
+              { 
+                q: 'Скільки коштує навчання і що входить у абонемент?', 
+                a: 'Вартість абонемента — 2500 грн на місяць.\n\nАбонемент включає:\n– регулярні тренування у віковій групі\n– системну фізичну підготовку\n– технічну базу кіокушинкай\n– підготовку до змагань (за рівнем готовності)\n\nПерше тренування — пробне.\nДля занять необхідна базова форма.' 
+              },
+            ];
+
 function LandingPage({ initialContent }: { initialContent: any }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -358,6 +389,9 @@ function LandingPage({ initialContent }: { initialContent: any }) {
     setQuickLeadOpen(true);
   }, []);
 
+  // Поведінка відвідувача: секції, час, глибина скролу, точка виходу
+  React.useEffect(() => startEngagementTracking('main'), []);
+
   // Scroll to section if hash is present
   React.useEffect(() => {
     if (location.hash) {
@@ -417,10 +451,12 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
-      <SEO 
-        title="Головна | Секція Карате Київ Шулявка | Дитяче Карате"
-        description="Black Bear Dojo — професійна школа карате Кіокушинкай у Києві. Тренування для дітей від 4 років, підлітків та дорослих. Локації: Шулявка та Сирець. Найкраща секція карате Київ Шулявка. Перше тренування безкоштовно! Нормативи на пояси та історія карате."
-        keywords="карате київ, кіокушинкай карате київ, карате для дітей київ, секція карате шулявка, карате сирець, карате відрадний, бойові мистецтва київ, нормативи карате, екзамен на пояс карате, карате для дорослих київ, дитяче карате шулявка, black bear dojo"
+      <SEO
+        title="Карате для дітей Київ — Шулявка, Сирець | Black Bear Dojo"
+        description="Карате Кіокушинкай для дітей від 4 років і підлітків у Києві: зали на Шулявці (вул. Сім'ї Бродських) і на Сирці (вул. Некрасова). Перше тренування безкоштовне. Тренер — 3 дан, майстер спорту України."
+        keywords="карате київ, карате для дітей київ, кіокушинкай карате київ, секція карате шулявка, карате сирець, карате відрадний, дитяче карате київ, карате для підлітків київ, black bear dojo"
+        url={`${SITE_URL}/`}
+        jsonLd={clubGraph([faqPage(MAIN_FAQ)])}
       />
       
       <AnimatePresence>
@@ -430,7 +466,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24">
+      <section id="hero" className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24">
         {/* Background Image with Deep Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
@@ -468,7 +504,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             </motion.div>
 
             <h1 className="text-lg md:text-2xl font-bold mb-4 tracking-tight uppercase text-red-600 leading-tight">
-              Карате Київ <span className="text-white/50 block md:inline md:ml-2">м. Шулявська • Сирець • Відрадний • Дитяче карате Київ</span>
+              Карате для дітей у Києві <span className="text-white/50 block md:inline md:ml-2">Шулявка • Сирець • Відрадний</span>
             </h1>
 
     <div className="text-[2rem] sm:text-5xl md:text-7xl font-black mb-6 tracking-tight sm:tracking-tighter leading-[1.05] md:leading-none uppercase">
@@ -527,7 +563,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Problem Section */}
       {content?.hide_section_problem !== 'true' && (
-        <section className="py-12 md:py-24 bg-zinc-950 relative overflow-hidden">
+        <section id="pains" className="py-12 md:py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             <motion.div
@@ -536,7 +572,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               viewport={{ once: true }}
             >
               <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
-                {content?.modern_label || "Виклики сучасності"}
+                {content?.modern_label || "Чому батьки обирають карате для дитини"}
               </h2>
               <h3 
                 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
@@ -588,7 +624,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Transformation Section (Dark Professional Style) */}
       {content?.hide_section_transformation !== 'true' && (
-        <section className="py-16 md:py-24 bg-black relative overflow-hidden">
+        <section id="transformation" className="py-16 md:py-24 bg-black relative overflow-hidden">
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-red-600/5 blur-[120px] rounded-full pointer-events-none" />
           
           <div className="max-w-7xl mx-auto px-6 relative z-10">
@@ -599,7 +635,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                 viewport={{ once: true }}
               >
                 <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
-                  {content?.transformation_label || "Результати навчання"}
+                  {content?.transformation_label || "Що дає дитині карате Кіокушинкай"}
                 </h2>
                 <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight">
                   {content?.transformation_title || "Як карате змінює вашу дитину"}
@@ -668,7 +704,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         <section id="how" className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
             <div className="text-center mb-16">
-              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Процес навчання</h2>
+              <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">Як записатися на карате в Києві</h2>
               <h3 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-tight">
                 {content?.how_title || "Як почати тренування"}
               </h3>
@@ -741,7 +777,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         </div>
       </section>
       {/* Encyclopedia Section (SEO & Authority) */}
-      <section className="py-24 bg-zinc-950 relative overflow-hidden">
+      <section id="manual" className="py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             <motion.div
@@ -771,7 +807,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               className="order-1 lg:order-2"
             >
               <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.3em] mb-4">
-                {content?.encyclopedia_main_label || "Методичка та нормативи"}
+                {content?.encyclopedia_main_label || "Нормативи на пояси Кіокушинкай"}
               </h2>
               <h3 
                 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase mb-8 tracking-tight leading-tight"
@@ -985,7 +1021,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         <section id="coach" className="py-12 md:py-24 bg-black relative overflow-hidden">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
             <SectionTitle 
-              title={content?.coach_title || "Наші <span class='text-zinc-600'>майстри</span>"} 
+              title={content?.coach_title || "Тренери з карате — <span class='text-zinc-600'>3 дан, майстер спорту України</span>"} 
               subtitle={content?.coach_subtitle || "Експертність та досвід, що формують майбутніх чемпіонів"}
               light
             />
@@ -1078,7 +1114,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               viewport={{ once: true }}
               className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight mb-4"
             >
-              {content?.schedule_title || "Розклад занять"}
+              {content?.schedule_title || "Розклад тренувань з карате: Шулявка і Сирець"}
             </motion.h2>
             <motion.div 
               initial={{ opacity: 0, scaleX: 0 }}
@@ -1204,7 +1240,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
       {/* Reviews Section */}
       {content?.hide_section_reviews !== 'true' && (
-        <section className="py-16 md:py-24 bg-black relative overflow-hidden">
+        <section id="reviews" className="py-16 md:py-24 bg-black relative overflow-hidden">
         {content?.reviews_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1219,7 +1255,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           </div>
         )}
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <SectionTitle title={content?.reviews_title || "Відгуки батьків"} subtitle={content?.reviews_subtitle || "Що кажуть про нас ті, хто вже довірив нам своїх дітей"} light />
+          <SectionTitle title={content?.reviews_title || "Відгуки батьків про дитяче карате"} subtitle={content?.reviews_subtitle || "Що кажуть про нас ті, хто вже довірив нам своїх дітей"} light />
           <div className="grid md:grid-cols-3 gap-6">
             {[
               { name: 'Олена', text: 'Син став набагато дисциплінованішим вже за перші два місяці. Дуже задоволені підходом тренера.' },
@@ -1237,7 +1273,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       )}
 
       {/* FAQ Section */}
-      <section className="py-16 md:py-24 bg-black relative overflow-hidden">
+      <section id="faq" className="py-16 md:py-24 bg-black relative overflow-hidden">
         {content?.faq_bg && (
           <div className="absolute inset-0 z-0">
             <img 
@@ -1255,32 +1291,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           <SectionTitle title={content?.faq_title || "Часті запитання (FAQ)"} subtitle={content?.faq_subtitle || "Відповідаємо на головні питання батьків"} light />
           
           <div className="max-w-3xl mx-auto space-y-4">
-            {[
-              {
-                q: 'Як проходять тренування під час повітряної тривоги?',
-                a: 'Зал у безпечному приміщенні — тренування не зупиняється.\n\nЯкщо у вас є питання щодо конкретної локації, зателефонуйте тренеру перед записом: Ігор Котляревський — 095 475 65 00, Олег Крамаренко — 095 568 06 04.'
-              },
-              { 
-                q: 'Чи безпечні тренування для дитини 4–12 років?', 
-                a: 'Так. Тренування проходять у вікових групах із поступовим навантаженням. Контактні елементи вводяться поетапно та під контролем тренера. Дисципліна в залі — обов’язкова умова. Пріоритет — техніка, координація, самоконтроль і правильна фізична база.' 
-              },
-              { 
-                q: 'Чи підійде карате моїй дитині, якщо вона сором’язлива або фізично слабка?', 
-                a: 'Так. Більшість дітей приходять без підготовки. Початковий етап спрямований на адаптацію, розвиток координації та впевненості. Через системні тренування поступово зростає витривалість, сила та внутрішня впевненість. Навчання будується від простого до складного.' 
-              },
-              { 
-                q: 'Які результати дає карате через 3–6 місяців?', 
-                a: 'За умови регулярних тренувань: покращується дисципліна та самоконтроль, зростає впевненість у собі, розвивається фізична витривалість, формується повага до старших та однолітків, зменшується залежність від гаджетів. Результат напряму залежить від системності відвідування.' 
-              },
-              { 
-                q: 'Хто тренує дітей і який у вас досвід?', 
-                a: 'Тренування проводять Ігор Котляревський та Олег Крамаренко.\n\nІгор Котляревський — 3 дан кіокушинкай, майстер спорту України, призер чемпіонату Європи, абсолютний чемпіон України, з досвідом понад 5 років у спорті та підготовці спортсменів.\n\nОлег Крамаренко — тренер клубу, який працює з дитячими та підлітковими групами, готує спортсменів до змагань і забезпечує системну підготовку відповідно до стандартів кіокушинкай.\n\nУ клубі підготовлені чемпіони та призери України й Європи. Методика поєднує класичну школу кіокушинкай та сучасну фізичну підготовку, з акцентом на дисципліну, техніку та поступовий розвиток спортсмена.' 
-              },
-              { 
-                q: 'Скільки коштує навчання і що входить у абонемент?', 
-                a: 'Вартість абонемента — 2500 грн на місяць.\n\nАбонемент включає:\n– регулярні тренування у віковій групі\n– системну фізичну підготовку\n– технічну базу кіокушинкай\n– підготовку до змагань (за рівнем готовності)\n\nПерше тренування — пробне.\nДля занять необхідна базова форма.' 
-              },
-            ].map((item, idx) => (
+            {MAIN_FAQ.map((item, idx) => (
               <motion.details 
                 key={idx} 
                 initial={{ opacity: 0, y: 10 }}
@@ -1305,7 +1316,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       </section>
 
       {/* Final CTA Section */}
-      <section className="py-32 bg-zinc-950 relative overflow-hidden border-t border-white/5">
+      <section id="final-cta" className="py-32 bg-zinc-950 relative overflow-hidden border-t border-white/5">
         {/* Subtle Red Glows */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-red-600/10 rounded-full blur-[120px] pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-red-600/5 rounded-full blur-[100px] pointer-events-none" />
@@ -1350,7 +1361,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
       </section>
 
       {/* Безпека — головне питання батьків у Києві, відповідь має бути до форми */}
-      <section className="py-16 md:py-20 bg-black border-t border-white/5">
+      <section id="safety" className="py-16 md:py-20 bg-black border-t border-white/5">
         <div className="max-w-4xl mx-auto px-6">
           <div className="flex flex-col sm:flex-row items-start gap-6 p-7 md:p-9 rounded-[28px] bg-zinc-900/70 border border-white/10">
             <div className="w-14 h-14 rounded-2xl bg-red-600/10 border border-red-600/20 flex items-center justify-center text-red-500 shrink-0">
