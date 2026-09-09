@@ -12,6 +12,7 @@ interface QuickLeadModalProps {
   title?: string;
   subtitle?: string;
   ageLabel?: string;
+  namePlaceholder?: string;
 }
 
 const DEFAULT_AGE_GROUPS = [
@@ -34,7 +35,8 @@ export const QuickLeadModal = ({
   ageGroups = DEFAULT_AGE_GROUPS,
   title = 'Запис на пробне тренування',
   subtitle = 'Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час.',
-  ageLabel = 'Вік / група'
+  ageLabel = 'Вік / група',
+  namePlaceholder = 'Олександр'
 }: QuickLeadModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -163,7 +165,7 @@ export const QuickLeadModal = ({
                       type="text"
                       autoComplete="name"
                       className={fieldClass}
-                      placeholder="Олександр"
+                      placeholder={namePlaceholder}
                     />
                   </div>
 

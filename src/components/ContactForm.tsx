@@ -16,6 +16,8 @@ interface ContactFormProps {
   ageLabel?: string;
   /** Контакти в лівій колонці; за замовчуванням — обидва тренери */
   contacts?: { name: string; phone: string }[];
+  /** Плейсхолдер імені — на дорослих лендінгах без чоловічого імені за замовчуванням */
+  namePlaceholder?: string;
 }
 
 export const ContactForm = ({
@@ -36,7 +38,8 @@ export const ContactForm = ({
   contacts = [
     { name: "Ігор Котляревський", phone: "+380954756500" },
     { name: "Олег Крамаренко", phone: "+380955680604" }
-  ]
+  ],
+  namePlaceholder = "Олександр"
 }: ContactFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -158,7 +161,7 @@ export const ContactForm = ({
                   name="name"
                   type="text" 
                   className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-600"
-                  placeholder="Олександр"
+                  placeholder={namePlaceholder}
                 />
               </div>
               <div>
