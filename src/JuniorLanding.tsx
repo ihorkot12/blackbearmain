@@ -374,6 +374,11 @@ export const JuniorLanding = () => {
         open={quickLeadOpen}
         onClose={() => setQuickLeadOpen(false)}
         source="junior_landing"
+        locations={locations}
+        ageGroups={[
+          { value: "7-12 років", label: "Середня група (7–12 років)" },
+          { value: "Індивідуально", label: "Індивідуальні тренування" }
+        ]}
         title="Запис у середню групу 7–12 років"
         subtitle="Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час."
       />
