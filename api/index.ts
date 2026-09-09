@@ -4045,6 +4045,63 @@ async function startServer() {
     };
   };
 
+  // Оригінали в базі важать до кількох МБ (герой — 2,4 МБ, фото тренера — 2,6 МБ).
+  // Клієнт просить потрібну ширину через ?w=, ми віддаємо зменшений WebP.
+  // sharp підвантажується динамічно: якщо його немає — віддаємо оригінал, як раніше.
+  const ALLOWED_IMAGE_WIDTHS = [320, 400, 640, 800, 960, 1280, 1600, 1920];
+
+  const parseRequestedWidth = (raw: unknown): number | null => {
+    if (typeof raw !== 'string' || !/^\d{2,4}$/.test(raw)) return null;
+    const requested = Number(raw);
+    const match = ALLOWED_IMAGE_WIDTHS.find(width => width >= requested);
+    return match ?? ALLOWED_IMAGE_WIDTHS[ALLOWED_IMAGE_WIDTHS.length - 1];
+  };
+
+  const resizeImageBuffer = async (
+    buffer: Buffer,
+    contentType: string,
+    width: number | null,
+    acceptsWebp: boolean
+  ): Promise<{ buffer: Buffer; contentType: string }> => {
+    if (!width || contentType === 'image/svg+xml' || contentType === 'image/gif') {
+      return { buffer, contentType };
+    }
+
+    try {
+      const sharpModule: any = await import('sharp');
+      const sharp = sharpModule.default || sharpModule;
+      const pipeline = sharp(buffer, { failOn: 'none' }).rotate().resize({
+        width,
+        withoutEnlargement: true
+      });
+
+      if (acceptsWebp) {
+        const output = await pipeline.webp({ quality: 78 }).toBuffer();
+        return output.length < buffer.length
+          ? { buffer: output, contentType: 'image/webp' }
+          : { buffer, contentType };
+      }
+
+      const output = await pipeline.jpeg({ quality: 80, mozjpeg: true }).toBuffer();
+      return output.length < buffer.length
+        ? { buffer: output, contentType: 'image/jpeg' }
+        : { buffer, contentType };
+    } catch (e) {
+      // sharp недоступний або кадр не читається — віддаємо як є
+      return { buffer, contentType };
+    }
+  };
+
+  const sendImage = (
+    res: any,
+    payload: { buffer: Buffer; contentType: string }
+  ) => {
+    res.setHeader('Content-Type', payload.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('Vary', 'Accept');
+    res.send(payload.buffer);
+  };
+
   const invalidateInitCache = () => {
     initCache = null;
     lastInitUpdate = Date.now();
@@ -4056,13 +4113,13 @@ async function startServer() {
   // Image Serving Endpoints for Bandwidth Optimization
   app.get("/api/images/content/:key", async (req, res) => {
     if (!pool) return res.status(500).send("Database not configured");
-    const cacheKey = `content_${req.params.key}`;
+    const width = parseRequestedWidth(req.query.w);
+    const acceptsWebp = String(req.headers.accept || '').includes('image/webp');
+    const cacheKey = `content_${req.params.key}_${width || 'orig'}_${acceptsWebp ? 'webp' : 'src'}`;
     const cached = imageCache.get(cacheKey);
 
     if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
-      res.setHeader('Content-Type', cached.contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      return res.send(cached.buffer);
+      return sendImage(res, { buffer: cached.buffer, contentType: cached.contentType });
     }
 
     try {
@@ -4076,12 +4133,12 @@ async function startServer() {
         return res.status(400).send("Invalid image format");
       }
 
-      // Update cache
-      imageCache.set(cacheKey, { contentType: imageData.contentType, buffer: imageData.buffer, timestamp: Date.now() });
+      const variant = await resizeImageBuffer(imageData.buffer, imageData.contentType, width, acceptsWebp);
 
-      res.setHeader('Content-Type', imageData.contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
-      res.send(imageData.buffer);
+      // Update cache
+      imageCache.set(cacheKey, { contentType: variant.contentType, buffer: variant.buffer, timestamp: Date.now() });
+
+      sendImage(res, variant);
     } catch (e) {
       console.error(e);
       res.status(500).send("Internal server error");
@@ -4093,13 +4150,13 @@ async function startServer() {
     if (!/^\d+$/.test(req.params.id)) {
       return res.status(400).send("Invalid coach id");
     }
-    const cacheKey = `coach_${req.params.id}`;
+    const width = parseRequestedWidth(req.query.w);
+    const acceptsWebp = String(req.headers.accept || '').includes('image/webp');
+    const cacheKey = `coach_${req.params.id}_${width || 'orig'}_${acceptsWebp ? 'webp' : 'src'}`;
     const cached = imageCache.get(cacheKey);
 
     if (cached && (Date.now() - cached.timestamp < IMAGE_CACHE_TTL)) {
-      res.setHeader('Content-Type', cached.contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      return res.send(cached.buffer);
+      return sendImage(res, { buffer: cached.buffer, contentType: cached.contentType });
     }
 
     try {
@@ -4113,12 +4170,12 @@ async function startServer() {
         return res.status(400).send("Invalid image format");
       }
 
-      // Update cache
-      imageCache.set(cacheKey, { contentType: imageData.contentType, buffer: imageData.buffer, timestamp: Date.now() });
+      const variant = await resizeImageBuffer(imageData.buffer, imageData.contentType, width, acceptsWebp);
 
-      res.setHeader('Content-Type', imageData.contentType);
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); // 1 year cache
-      res.send(imageData.buffer);
+      // Update cache
+      imageCache.set(cacheKey, { contentType: variant.contentType, buffer: variant.buffer, timestamp: Date.now() });
+
+      sendImage(res, variant);
     } catch (e) {
       console.error(e);
       res.status(500).send("Internal server error");
