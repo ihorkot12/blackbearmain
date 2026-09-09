@@ -26,7 +26,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO from './components/SEO';
+import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
+import { QuickLeadModal } from './components/QuickLeadModal';
+import { trackLeadIntent } from './lib/leadTracking';
 
 const Button = ({ children, variant = 'primary', className = '', showIcon = true, ...props }: any) => {
   const variants = {
@@ -51,6 +54,11 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const JuniorLanding = () => {
+  const [quickLeadOpen, setQuickLeadOpen] = useState(false);
+  const openQuickLead = React.useCallback((ctaName: string) => {
+    trackLeadIntent(ctaName, 'juniors');
+    setQuickLeadOpen(true);
+  }, []);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
 
@@ -153,7 +161,9 @@ export const JuniorLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden max-w-full">
         <div className="absolute inset-0 z-0">
           <img 
-            src={content?.junior_hero_bg || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=2000&auto=format&fit=crop"} 
+            src={resizedImage(content?.junior_hero_bg || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=2000&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.junior_hero_bg, [640, 960, 1280, 1920])}
+            sizes="100vw" 
             alt="Junior Karate" 
             className="w-full h-full object-cover opacity-30 grayscale scale-110"
             referrerPolicy="no-referrer"
@@ -184,7 +194,7 @@ export const JuniorLanding = () => {
             <div className="flex flex-col sm:flex-row gap-4 md:gap-8">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)] w-full sm:w-auto"
-                onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => openQuickLead('Hero CTA')}
               >
                 Записатись на пробне заняття
               </Button>
@@ -348,9 +358,7 @@ export const JuniorLanding = () => {
                 "Син займається вже 3 роки. З сором'язливого хлопчика він перетворився на впевненого підлітка, який має мету — чорний пояс. Дякую тренерам за такий вклад у дитину!"
               </p>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden">
-                  <img src="https://i.pravatar.cc/100?img=12" alt="Parent" referrerPolicy="no-referrer" />
-                </div>
+                <div className="w-12 h-12 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-red-500 font-black text-lg shrink-0" aria-hidden="true">О</div>
                 <div>
                   <div className="font-bold text-white uppercase tracking-widest text-xs">Олексій, тато Максима</div>
                   <div className="text-zinc-500 text-[10px] uppercase tracking-widest">Середня група</div>
@@ -362,6 +370,14 @@ export const JuniorLanding = () => {
       </section>
 
       {/* Contact Section */}
+      <QuickLeadModal
+        open={quickLeadOpen}
+        onClose={() => setQuickLeadOpen(false)}
+        source="junior_landing"
+        title="Запис у середню групу 7–12 років"
+        subtitle="Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час."
+      />
+
       <ContactForm 
         locations={locations}
         title="Записати дитину на пробне"
@@ -397,7 +413,7 @@ export const JuniorLanding = () => {
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+          onClick={() => openQuickLead('Mobile Sticky CTA')}
           className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />

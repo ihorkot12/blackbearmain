@@ -24,7 +24,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO from './components/SEO';
+import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
+import { QuickLeadModal } from './components/QuickLeadModal';
+import { trackLeadIntent } from './lib/leadTracking';
 
 const Button = ({ children, variant = 'primary', className = '', showIcon = true, ...props }: any) => {
   const variants = {
@@ -47,6 +50,11 @@ const Button = ({ children, variant = 'primary', className = '', showIcon = true
 };
 
 export const TeenLanding = () => {
+  const [quickLeadOpen, setQuickLeadOpen] = useState(false);
+  const openQuickLead = React.useCallback((ctaName: string) => {
+    trackLeadIntent(ctaName, 'teens');
+    setQuickLeadOpen(true);
+  }, []);
   const [locations, setLocations] = useState<any[]>([]);
   const [content, setContent] = useState<any>(null);
 
@@ -149,7 +157,9 @@ export const TeenLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src={content?.teen_hero_bg || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=2000&auto=format&fit=crop"} 
+            src={resizedImage(content?.teen_hero_bg || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=2000&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.teen_hero_bg, [640, 960, 1280, 1920])}
+            sizes="100vw" 
             alt="Teen Karate" 
             className="w-full h-full object-cover opacity-40 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -180,7 +190,7 @@ export const TeenLanding = () => {
             <div className="flex flex-col sm:flex-row gap-6">
               <Button 
                 className="shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
-                onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => openQuickLead('CTA 1')}
               >
                 Спробувати безкоштовно
               </Button>
@@ -230,7 +240,7 @@ export const TeenLanding = () => {
           >
             <Button 
               className="mx-auto"
-              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => openQuickLead('CTA 2')}
             >
               Записатись на перше тренування
             </Button>
@@ -246,7 +256,9 @@ export const TeenLanding = () => {
               <div className="absolute -inset-6 border border-red-600/20 rounded-3xl lg:rounded-[4rem] -rotate-2" />
               <div className="absolute -inset-6 border border-zinc-800 rounded-3xl lg:rounded-[4rem] rotate-1" />
               <img 
-                src={content?.teen_advantages_image || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1000&auto=format&fit=crop"} 
+                src={resizedImage(content?.teen_advantages_image || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=1000&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.teen_advantages_image, [400, 640, 960, 1280])}
+            sizes="(max-width: 768px) 100vw, 600px" 
                 alt="Teen Training" 
                 className="relative rounded-3xl lg:rounded-[3.5rem] grayscale hover:grayscale-0 transition-all duration-1000 shadow-2xl"
                 referrerPolicy="no-referrer"
@@ -413,9 +425,7 @@ export const TeenLanding = () => {
                 "Я прийшов у 14 років, бо хотів навчитися захищатися. Зараз мені 17, у мене вже коричневий пояс і я виступаю на змаганнях. Карате змінило моє ставлення до життя та навчання."
               </p>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden">
-                  <img src="https://i.pravatar.cc/100?img=33" alt="Student" referrerPolicy="no-referrer" />
-                </div>
+                <div className="w-12 h-12 rounded-full bg-zinc-800 border border-white/10 flex items-center justify-center text-red-500 font-black text-lg shrink-0" aria-hidden="true">Д</div>
                 <div>
                   <div className="font-bold text-white uppercase tracking-widest text-xs">Дмитро, 17 років</div>
                   <div className="text-zinc-500 text-[10px] uppercase tracking-widest">Старша група</div>
@@ -427,6 +437,14 @@ export const TeenLanding = () => {
       </section>
 
       {/* Contact Section */}
+      <QuickLeadModal
+        open={quickLeadOpen}
+        onClose={() => setQuickLeadOpen(false)}
+        source="teen_landing"
+        title="Запис у старшу групу 12+"
+        subtitle="Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час."
+      />
+
       <ContactForm 
         locations={locations}
         title="Запишись на пробне"
@@ -462,7 +480,7 @@ export const TeenLanding = () => {
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+          onClick={() => openQuickLead('CTA 3')}
           className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />

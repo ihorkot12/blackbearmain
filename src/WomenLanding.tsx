@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO from './components/SEO';
+import { resizedImage, imageSrcSet } from './lib/images';
 import { ContactForm } from './components/ContactForm';
 
 const Button = ({ children, variant = 'primary', className = '', showIcon = true, ...props }: any) => {
@@ -143,7 +144,9 @@ export const WomenLanding = () => {
       <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
-            src={content?.women_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop"} 
+            src={resizedImage(content?.women_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.women_hero_bg, [640, 960, 1280, 1920])}
+            sizes="100vw" 
             alt="Women Karate" 
             className="w-full h-full object-cover opacity-40 grayscale scale-105"
             referrerPolicy="no-referrer"
@@ -175,13 +178,6 @@ export const WomenLanding = () => {
                 Записатися на тренування
               </Button>
               <div className="flex items-center gap-3 px-6 py-4 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                <div className="flex -space-x-2">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-black bg-zinc-800 overflow-hidden">
-                      <img src={`https://i.pravatar.cc/100?u=women${i}`} alt="User" />
-                    </div>
-                  ))}
-                </div>
                 <div className="text-[10px] uppercase tracking-wider font-bold text-zinc-400">
                   <span className="text-white">Шулявка та Сирець</span> у Києві
                 </div>
@@ -225,7 +221,9 @@ export const WomenLanding = () => {
             <div className="relative order-1 lg:order-2">
               <div className="aspect-square rounded-3xl overflow-hidden border border-white/10">
                 <img 
-                  src={content?.women_advantages_image || "https://images.unsplash.com/photo-1599058917233-3583503c5e8e?q=80&w=1000&auto=format&fit=crop"} 
+                  src={resizedImage(content?.women_advantages_image || "https://images.unsplash.com/photo-1599058917233-3583503c5e8e?q=80&w=1000&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.women_advantages_image, [400, 640, 960, 1280])}
+            sizes="(max-width: 768px) 100vw, 600px" 
                   alt="Training" 
                   className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"
                   referrerPolicy="no-referrer"

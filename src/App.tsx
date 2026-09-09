@@ -8,6 +8,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import SEO from './components/SEO';
 import { ContactForm } from './components/ContactForm';
+import { QuickLeadModal } from './components/QuickLeadModal';
+import { trackLeadIntent } from './lib/leadTracking';
+import { resizedImage, imageSrcSet } from './lib/images';
 
 const AdminPage = lazy(() => import('./Admin').then(m => ({ default: m.AdminPage })));
 const LoginPage = lazy(() => import('./Admin').then(m => ({ default: m.LoginPage })));
@@ -348,6 +351,13 @@ function LandingPage({ initialContent }: { initialContent: any }) {
 
   const location = useLocation();
 
+  // Заявка відкривається модалкою в місці кліку, а не скролом у кінець сторінки
+  const [quickLeadOpen, setQuickLeadOpen] = useState(false);
+  const openQuickLead = React.useCallback((ctaName: string) => {
+    trackLeadIntent(ctaName, 'main');
+    setQuickLeadOpen(true);
+  }, []);
+
   // Scroll to section if hash is present
   React.useEffect(() => {
     if (location.hash) {
@@ -424,11 +434,14 @@ function LandingPage({ initialContent }: { initialContent: any }) {
         {/* Background Image with Deep Overlay */}
         <div className="absolute inset-0 z-0">
           <img 
-            src={content?.hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop"} 
+            src={resizedImage(content?.hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=1920&auto=format&fit=crop", 1280)}
+            srcSet={imageSrcSet(content?.hero_bg, [640, 960, 1280, 1920])}
+            sizes="100vw"
             alt="Kyokushin Karate Training Kyiv" 
             className="w-full h-full object-cover opacity-40"
             referrerPolicy="no-referrer"
             fetchPriority="high"
+            decoding="async"
           />
           <div className="absolute inset-0 bg-gradient-to-b from-black via-black/80 to-black" />
         </div>
@@ -450,7 +463,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             >
               <div className="w-2 h-2 rounded-full bg-red-600 animate-pulse" />
               <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-[0.08em] sm:tracking-[0.2em] text-red-500 leading-relaxed">
-                Перше тренування — БЕЗКОШТОВНО • Залишилось 3 місця
+                Перше тренування — безкоштовно • Набір у групи 4–7, 7–12, 12+
               </span>
             </motion.div>
 
@@ -471,15 +484,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                 id="cta-button-hero"
                 variant="primary" 
                 className="w-full sm:w-auto h-[58px] sm:h-[64px] px-6 sm:px-12 text-sm sm:text-lg" 
-                onClick={() => {
-                  if (window.fbq) {
-                    window.fbq('trackCustom', 'LeadIntent', {
-                      content_name: 'Hero CTA',
-                      location: 'hero'
-                    });
-                  }
-                  document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => openQuickLead('Hero CTA')}
               >
                 {content?.hero_button || "Записатися на пробне"}
               </Button>
@@ -494,7 +499,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             <div className="flex flex-wrap items-center justify-center gap-x-6 md:gap-x-12 gap-y-3 md:gap-y-4 text-[10px] md:text-[11px] font-black uppercase tracking-[0.12em] md:tracking-[0.3em] text-zinc-500">
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-red-600" />
-                <span>+50 учнів пройшли школу</span>
+                <span>Чемпіони та призери України і Європи</span>
               </div>
               <div className="flex items-center gap-2">
                 <CheckCircle2 size={14} className="text-red-600" />
@@ -648,7 +653,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                 <Button 
                   variant="primary" 
                   className="w-full mt-10"
-                  onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                  onClick={() => openQuickLead('Results CTA')}
                 >
                   Записатись на пробне
                 </Button>
@@ -729,7 +734,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               <Link to="/teens-12-plus" className="px-6 py-3 bg-white/5 backdrop-blur-sm border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest text-white hover:bg-red-600/20 hover:border-red-600/50 transition-all">Для підлітків 12+</Link>
             </div>
 
-            <Button variant="primary" className="px-12 py-6 text-base" onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}>
+            <Button variant="primary" className="px-12 py-6 text-base" onClick={() => openQuickLead('About CTA')}>
               Записатися на пробне тренування
             </Button>
           </div>
@@ -870,7 +875,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             <Button 
               variant="primary" 
               className="mx-auto h-[64px] px-12 shadow-[0_20px_50px_rgba(209,0,0,0.3)]"
-              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => openQuickLead('Directions CTA')}
             >
               Записати дитину на пробне
             </Button>
@@ -997,7 +1002,9 @@ function LandingPage({ initialContent }: { initialContent: any }) {
                   <div className={`absolute -inset-4 border border-red-600/20 rounded-3xl lg:rounded-[4rem] ${index % 2 !== 0 ? 'rotate-3' : '-rotate-3'} hidden sm:block`} />
                   <div className="relative aspect-[4/5] rounded-3xl lg:rounded-[3rem] overflow-hidden border border-white/10 bg-zinc-900">
                     <img 
-                      src={coach.photo || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop"} 
+                      src={resizedImage(coach.photo || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=800&auto=format&fit=crop", 800)}
+                      srcSet={imageSrcSet(coach.photo, [400, 800, 1200])}
+                      sizes="(max-width: 768px) 90vw, 400px" 
                       alt={coach.name} 
                       className="w-full h-full object-cover object-center grayscale hover:grayscale-0 transition-all duration-700"
                       referrerPolicy="no-referrer"
@@ -1182,7 +1189,7 @@ function LandingPage({ initialContent }: { initialContent: any }) {
             <Button 
               variant="primary"
               className="h-[64px] px-12 shadow-[0_15px_40px_rgba(220,38,38,0.2)]"
-              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+              onClick={() => openQuickLead('Schedule CTA')}
             >
               Записатися на пробне тренування
             </Button>
@@ -1249,6 +1256,10 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           
           <div className="max-w-3xl mx-auto space-y-4">
             {[
+              {
+                q: 'Як проходять тренування під час повітряної тривоги?',
+                a: 'Зал у безпечному приміщенні — тренування не зупиняється.\n\nЯкщо у вас є питання щодо конкретної локації, зателефонуйте тренеру перед записом: Ігор Котляревський — 095 475 65 00, Олег Крамаренко — 095 568 06 04.'
+              },
               { 
                 q: 'Чи безпечні тренування для дитини 4–12 років?', 
                 a: 'Так. Тренування проходять у вікових групах із поступовим навантаженням. Контактні елементи вводяться поетапно та під контролем тренера. Дисципліна в залі — обов’язкова умова. Пріоритет — техніка, координація, самоконтроль і правильна фізична база.' 
@@ -1322,26 +1333,46 @@ function LandingPage({ initialContent }: { initialContent: any }) {
               <Button 
                 variant="primary" 
                 className="w-full sm:w-auto h-[72px] px-16 text-xl shadow-[0_20px_50px_rgba(220,38,38,0.3)]"
-                onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => openQuickLead('Final CTA')}
               >
                 Записатись зараз
               </Button>
               
-              <div className="flex flex-col sm:flex-row items-center gap-6 p-4 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm">
-                <div className="flex -space-x-3">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="w-10 h-10 rounded-full border-2 border-zinc-900 bg-zinc-800 overflow-hidden">
-                      <img src={`https://i.pravatar.cc/100?img=${i+20}`} alt="User" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
-                    </div>
-                  ))}
-                </div>
-                <div className="text-left">
-                  <div className="text-white font-bold text-sm">+12 батьків записались сьогодні</div>
-                  <div className="text-zinc-500 text-[10px] uppercase tracking-widest">Залишилось 4 вільних місця у молодшій групі</div>
+              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 p-5 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-sm text-center sm:text-left">
+                <div>
+                  <div className="text-white font-bold text-sm">Перше тренування — безкоштовне, без зобовʼязань</div>
+                  <div className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">У клубі підготовлені чемпіони та призери України й Європи</div>
                 </div>
               </div>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Безпека — головне питання батьків у Києві, відповідь має бути до форми */}
+      <section className="py-16 md:py-20 bg-black border-t border-white/5">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="flex flex-col sm:flex-row items-start gap-6 p-7 md:p-9 rounded-[28px] bg-zinc-900/70 border border-white/10">
+            <div className="w-14 h-14 rounded-2xl bg-red-600/10 border border-red-600/20 flex items-center justify-center text-red-500 shrink-0">
+              <Shield size={26} />
+            </div>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-3">Безпека</div>
+              <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tight mb-4 leading-tight">
+                Тренування під час тривог
+              </h3>
+              <p className="text-zinc-400 text-base md:text-lg leading-relaxed mb-5">
+                Зал у безпечному приміщенні — тренування не зупиняється.
+              </p>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Питання щодо конкретної локації — телефонуйте тренеру перед записом:{' '}
+                <a href="tel:+380954756500" className="text-red-500 hover:text-red-400 transition-colors font-bold">095 475 65 00</a>
+                {' '}(Ігор Котляревський),{' '}
+                <a href="tel:+380955680604" className="text-red-500 hover:text-red-400 transition-colors font-bold">095 568 06 04</a>
+                {' '}(Олег Крамаренко).
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1379,13 +1410,20 @@ function LandingPage({ initialContent }: { initialContent: any }) {
           </div>
         </footer>
       
+      <QuickLeadModal
+        open={quickLeadOpen}
+        onClose={() => setQuickLeadOpen(false)}
+        source="main"
+        locations={locations}
+      />
+
       {/* Floating CTA for Mobile */}
       <div className="fixed bottom-4 left-4 right-4 z-50 md:hidden">
         <motion.button
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+          onClick={() => openQuickLead('Mobile Sticky CTA')}
           className="w-full h-[58px] bg-red-600 text-white font-black uppercase tracking-[0.12em] text-xs rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.4)] flex items-center justify-center gap-3"
         >
           <Send size={18} />
