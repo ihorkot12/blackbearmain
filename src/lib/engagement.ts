@@ -52,8 +52,15 @@ export const startEngagementTracking = (page: string): (() => void) => {
   const sectionName = (el: Element, index: number) =>
     el.id || (el as HTMLElement).dataset.track || `section-${index + 1}`;
 
-  const sections = Array.from(document.querySelectorAll<HTMLElement>('main section, section'))
-    .filter((el, i, arr) => arr.indexOf(el) === i);
+  // Секції можуть зʼявитись пізніше за ефект (lazy-чанки, контент з /api/init),
+  // тому список добираємо кількома проходами, а не одним запитом при старті.
+  const sections: HTMLElement[] = [];
+
+  // Секція «на екрані», якщо займає ≥50% вʼюпорту або видно ≥50% самої секції.
+  // Порогу лише по ratio недостатньо: на телефоні секція у 3 екрани ніколи не досягне 50%.
+  const isViewed = (entry: IntersectionObserverEntry) =>
+    entry.isIntersecting &&
+    (entry.intersectionRatio >= 0.5 || entry.intersectionRect.height >= window.innerHeight * 0.5);
 
   const observer = new IntersectionObserver(
     entries => {
@@ -61,14 +68,16 @@ export const startEngagementTracking = (page: string): (() => void) => {
         const el = entry.target as HTMLElement;
         const index = sections.indexOf(el);
         const name = sectionName(el, index);
-        if (entry.isIntersecting) {
+        const viewed = isViewed(entry);
+        const wasVisible = visibleSince.has(name);
+        if (viewed && !wasVisible) {
           if (!seen.includes(name)) {
             seen.push(name);
             send('section_view', { page, section: name, order: index + 1 }, true);
           }
           lastSection = name;
           visibleSince.set(name, Date.now());
-        } else if (visibleSince.has(name)) {
+        } else if (!viewed && wasVisible) {
           const ms = Date.now() - (visibleSince.get(name) || Date.now());
           visibleSince.delete(name);
           dwellTotal.set(name, (dwellTotal.get(name) || 0) + ms);
@@ -78,9 +87,18 @@ export const startEngagementTracking = (page: string): (() => void) => {
         }
       });
     },
-    { threshold: 0.5 }
+    { threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] }
   );
-  sections.forEach(el => observer.observe(el));
+  const scanSections = () => {
+    document.querySelectorAll<HTMLElement>('section').forEach(el => {
+      if (!sections.includes(el)) {
+        sections.push(el);
+        observer.observe(el);
+      }
+    });
+  };
+  scanSections();
+  const rescans = [300, 1000, 2500, 5000].map(ms => window.setTimeout(scanSections, ms));
 
   const onScroll = () => {
     const doc = document.documentElement;
@@ -139,6 +157,7 @@ export const startEngagementTracking = (page: string): (() => void) => {
 
   return () => {
     flushExit();
+    rescans.forEach(id => window.clearTimeout(id));
     observer.disconnect();
     window.removeEventListener('scroll', onScroll);
     document.removeEventListener('visibilitychange', onVisibility);
