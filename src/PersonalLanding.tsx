@@ -19,7 +19,9 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO, { SITE_URL } from './components/SEO';
-import { clubGraph } from './lib/structuredData';
+import { shuliavkaGraph } from './lib/structuredData';
+import { QuickLeadModal } from './components/QuickLeadModal';
+import { trackLeadIntent } from './lib/leadTracking';
 import { startEngagementTracking } from './lib/engagement';
 import { ContactForm } from './components/ContactForm';
 
@@ -39,6 +41,14 @@ const HAIRLINE = 'border-white/10';
 
 // Єдиний easing і тривалість — щоб рухи сприймались як один почерк
 const EASE = [0.22, 1, 0.36, 1] as const;
+
+/** Замість віку: на дорослому лендінгу питаємо ціль */
+const PERSONAL_GOALS = [
+  { value: 'Самооборона', label: 'Самооборона' },
+  { value: 'Фізична форма', label: 'Фізична форма' },
+  { value: 'Техніка карате / пояс', label: 'Техніка карате / пояс' },
+  { value: 'Ще не вирішив(ла)', label: 'Ще не вирішив(ла) — підкажіть' }
+];
 const DUR = 0.7;
 
 /** Scroll-reveal з повагою до prefers-reduced-motion */
@@ -220,48 +230,60 @@ export const PersonalLanding = () => {
   // Оффер діє один раз: тільки на перше відвідане заняття, не на перезапис
   const offerTerms = `Ціна ${priceFirst} грн діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений час. При перенесенні чи повторному записі заняття коштує ${priceSingle} грн.`;
 
+  // Тренує особисто Ігор — лише зал на Шулявці
+  const personalLocations = React.useMemo(() => {
+    const found = (locations || []).filter((l: any) => /Бродськ/i.test(l?.name || ''));
+    return found.length ? found : [{ id: 1, name: "Сім'ї Бродських", address: "вул. Сім'ї Бродських, 31/33\nКиїв, 03057 (м. Шулявська)" }];
+  }, [locations]);
+
+  const [quickLeadOpen, setQuickLeadOpen] = useState(false);
+  const openQuickLead = React.useCallback((ctaName: string) => {
+    trackLeadIntent(ctaName, 'personal');
+    setQuickLeadOpen(true);
+  }, []);
+
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
 
   const advantages = [
     {
-      title: 'Увага до техніки',
-      desc: 'Тренер бачить помилки одразу, пояснює простіше і допомагає відпрацювати рух у вашому темпі.',
+      title: 'Безпека',
+      desc: 'Дистанція, реакція, вихід із захвату, прості удари, що працюють у реальній ситуації, а не на показ. Мета — не потрапити в конфлікт, а якщо потрапили — вийти з нього.',
       icon: <Target size={22} />
     },
     {
-      title: 'Зручний темп',
-      desc: 'Навантаження підбирається під вік, рівень підготовки та ціль: форма, самооборона, пояс або впевненість.',
-      icon: <Clock size={22} />
-    },
-    {
-      title: 'Чітка ціль',
-      desc: 'Перед стартом визначаємо, над чим працюємо: база карате, координація, удари руками й ногами, витривалість.',
+      title: 'Практичність',
+      desc: 'Нічого заради ритуалу. Тільки те, що дає результат: техніка, реакція, дихання, контроль. Кожен рух — з поясненням, навіщо він.',
       icon: <Brain size={22} />
     },
     {
-      title: 'Зрозумілий прогрес',
-      desc: 'Після занять зрозуміло, що вже виходить, що потрібно підтягнути і який наступний крок у тренуваннях.',
+      title: 'Фізична форма',
+      desc: 'Удари руками й ногами, корпус, витривалість, гнучкість. Навантаження зростає поступово — без ривків і без травм.',
       icon: <TrendingUp size={22} />
+    },
+    {
+      title: 'Ваш темп, ваша ціль',
+      desc: 'Один на один: помилки видно одразу, темп під вас, план під вашу ціль. Після кожного заняття зрозуміло, що вже виходить і що далі.',
+      icon: <Clock size={22} />
     }
   ];
 
   const privileges = [
     {
-      title: 'Старт з розбору цілі',
-      desc: 'Узгоджуємо вік, досвід, стан підготовки та бажаний результат без зайвих обіцянок.'
+      title: 'Самооборона для міста',
+      desc: 'Як не опинитися в небезпечній ситуації, а якщо опинилися — дистанція, реакція, вихід із захвату, перші дії. Без ілюзій і без показухи.'
     },
     {
-      title: 'Робота над помилками',
-      desc: 'Більше повторень, детальніші пояснення і корекція техніки під час заняття.'
+      title: 'Форма без спортзалу',
+      desc: 'Кардіо, сила, гнучкість через карате. Регулярні заняття — і результат видно на тілі, а не лише на тренажері.'
     },
     {
-      title: 'Підготовка до іспитів',
-      desc: 'Відпрацювання ката, кіхону та базових вимог для складання на пояс.'
+      title: 'Впевненість у тілі',
+      desc: 'Стійка, рівновага, удар, який має вагу. Тіло, яке слухається, і спокій, який це дає.'
     },
     {
-      title: 'Практична самооборона',
-      desc: "Дистанція, реакція, стійка, прості зв'язки руками й ногами для впевненішої поведінки."
+      title: 'База карате з нуля',
+      desc: 'Кіхон, ката, робота в парах — від першого кроку до іспиту на пояс, якщо є така ціль.'
     }
   ];
 
@@ -276,7 +298,7 @@ export const PersonalLanding = () => {
     },
     {
       q: 'Чи потрібна попередня підготовка?',
-      a: 'Ні. Персональний формат і створений для того, щоб починати з будь-якого рівня: навантаження підбирається під ваш вік, стан і ціль. Більшість приходить без досвіду в карате.'
+      a: 'Ні. Персональний формат і створений для того, щоб починати з нуля: навантаження підбирається під ваш стан і ціль. Більшість приходить без досвіду в карате і без спортивного минулого.'
     },
     {
       q: 'Хто проводить персональні тренування?',
@@ -284,28 +306,32 @@ export const PersonalLanding = () => {
     },
     {
       q: 'Для кого підходить персональний формат?',
-      a: 'Для дітей, підлітків і дорослих. Найчастіше його беруть, коли треба підтягнути техніку перед іспитом на пояс, наздогнати групу, розібратися з базою з нуля або займатися в спокійному темпі без групи.'
+      a: 'Для дорослих — з нуля або з досвідом. Найчастіше приходять за самообороною, фізичною формою і впевненістю; частина — щоб розібратися з базою карате або підготуватися до іспиту на пояс. Програма будується під ваш рівень і ціль.'
     },
     {
       q: 'Де проходять заняття?',
-      a: "Основний зал — Шулявка, вул. Сім'ї Бродських, 31/33 (м. Шулявська). Також доступний зал на Сирці, вул. Віктора Некрасова, 1-3. Локацію і час узгоджуємо після заявки."
+      a: "Зал на Шулявці, вул. Сім'ї Бродських, 31/33 (м. Шулявська). Час узгоджуємо після заявки — персональні слоти окремо від групових тренувань."
+    },
+    {
+      q: 'Чи безпечно тренуватися під час тривог?',
+      a: 'Зал у безпечному приміщенні — тренування не зупиняється.'
     }
   ];
 
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.personal_seo_title || 'Персональні тренування з карате у Києві | Ігор Котляревський, 3 дан'}
+        title={content?.personal_seo_title || 'Персональні тренування з карате для дорослих Київ | Ігор Котляревський, 3 дан'}
         description={
           content?.personal_seo_description ||
-          `Персональні тренування з карате у Києві з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Перше тренування — ${priceFirst} грн замість ${priceSingle}. Розбір техніки, підготовка до іспитів, самооборона. Зал на Шулявці.`
+          `Персональні тренування з карате для дорослих у Києві з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Самооборона, фізична форма, техніка — один на один, з нуля. Перше тренування — ${priceFirst} грн замість ${priceSingle}. Зал на Шулявці.`
         }
         keywords={
           content?.personal_seo_keywords ||
           'персональні тренування карате київ, індивідуальні заняття карате київ, тренер з карате київ, ігор котляревський карате, приватні уроки карате київ, карате шулявка індивідуально'
         }
         url={`${SITE_URL}/personal-training`}
-        jsonLd={clubGraph()}
+        jsonLd={shuliavkaGraph()}
       />
 
       {/* Прогрес прокрутки */}
@@ -364,14 +390,14 @@ export const PersonalLanding = () => {
 
               <Reveal delay={0.16}>
                 <p className="mb-10 max-w-xl text-lg leading-relaxed text-zinc-300 md:text-xl">
-                  Один на один із засновником клубу: точний розбір техніки, темп під вас і повна увага
-                  все заняття. Починаємо зі знайомства — визначаємо рівень, ціль і план роботи.
+                  Один на один із засновником клубу — для дорослих, з нуля. Навичка постояти за себе,
+                  тіло, яке слухається, і форма без спортзалу. Починаємо зі знайомства: рівень, ціль, план.
                 </p>
               </Reveal>
 
               <Reveal delay={0.24}>
                 <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
-                  <Button onClick={() => scrollTo('contact')}>Записатись за {priceFirst} грн</Button>
+                  <Button onClick={() => openQuickLead('Personal CTA')}>Записатись за {priceFirst} грн</Button>
                   <Button variant="secondary" showIcon={false} onClick={() => scrollTo('pricing')}>
                     Вартість і формат
                   </Button>
@@ -380,7 +406,7 @@ export const PersonalLanding = () => {
 
               <Reveal delay={0.32}>
                 <ul className="flex flex-wrap items-center gap-x-7 gap-y-3">
-                  {['3 дан кіокушинкай', 'Майстер спорту України', 'Зал на Шулявці'].map(item => (
+                  {['Для дорослих · з нуля', '3 дан кіокушинкай', 'Майстер спорту України', 'Зал на Шулявці'].map(item => (
                     <li
                       key={item}
                       className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.12em] text-zinc-500"
@@ -422,7 +448,7 @@ export const PersonalLanding = () => {
                       повторному записі — {priceSingle} грн.
                     </p>
 
-                    <Button className="w-full" onClick={() => scrollTo('contact')}>
+                    <Button className="w-full" onClick={() => openQuickLead('Personal CTA')}>
                       Забронювати слот
                     </Button>
 
@@ -505,8 +531,8 @@ export const PersonalLanding = () => {
                 <figure className={`${CARD} mb-8 p-7 md:p-8`}>
                   <Quote size={26} className="mb-4 text-red-600" aria-hidden />
                   <blockquote className="mb-4 text-[15px] italic leading-relaxed text-zinc-300">
-                    {coach?.bio ||
-                      'Моя мета — не просто навчити битися, а сформувати характер, який допоможе дитині перемагати в житті.'}
+                    Персональне тренування — не про красиві рухи. Це про те, щоб ви вміли постояти за себе
+                    і почувалися сильними у власному тілі. Решта — техніка, і її я поставлю.
                   </blockquote>
                   <figcaption className="text-[10px] font-black uppercase tracking-[0.2em] text-white">
                     — {coach?.name || 'Ігор Котляревський'}
@@ -531,7 +557,7 @@ export const PersonalLanding = () => {
       <section id="advantages" className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
         <div className={CONTAINER}>
           <SectionHeading eyebrow="Чому персонально?">
-            Менше хаосу. <span className="text-zinc-600">Більше техніки</span>
+            Безпека. Практичність. <span className="text-zinc-600">Форма.</span>
           </SectionHeading>
 
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -639,7 +665,7 @@ export const PersonalLanding = () => {
                   час. При перенесенні чи повторному записі — {priceSingle} грн.
                 </p>
 
-                <Button className="mt-auto w-full" onClick={() => scrollTo('contact')}>
+                <Button className="mt-auto w-full" onClick={() => openQuickLead('Personal CTA')}>
                   Записатись
                 </Button>
               </article>
@@ -663,7 +689,7 @@ export const PersonalLanding = () => {
                   розсуд.
                 </p>
 
-                <Button variant="secondary" showIcon={false} className="mt-auto w-full" onClick={() => scrollTo('contact')}>
+                <Button variant="secondary" showIcon={false} className="mt-auto w-full" onClick={() => openQuickLead('Personal CTA')}>
                   Підібрати час
                 </Button>
               </article>
@@ -714,23 +740,17 @@ export const PersonalLanding = () => {
        * ---------------------------------------------------------------- */}
       <section id="locations" className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
         <div className={CONTAINER}>
-          <SectionHeading eyebrow="Де ми тренуємо">
-            Наші зали у <span className="text-zinc-600">Києві</span>
+          <SectionHeading eyebrow="Де проходять тренування">
+            Зал на <span className="text-zinc-600">Шулявці</span>
           </SectionHeading>
 
-          <div className="grid items-stretch gap-5 md:grid-cols-2">
+          <div className="mx-auto grid max-w-xl items-stretch gap-5">
             {[
               {
                 name: 'Шулявка',
                 address:
-                  "вул. Сім'ї Бродських, 31/33 (м. Шулявська). Зручна локація для мешканців КПІ, Шулявки та Лук'янівки.",
-                time: 'Пн, Ср, Пт: 17:00 – 20:30'
-              },
-              {
-                name: 'Відрадний / Сирець',
-                address:
-                  'вул. Віктора Некрасова, 1-3. Секція карате для мешканців Відрадного, Сирця та Нивок.',
-                time: 'Пн, Ср, Пт: 17:00 – 19:00'
+                  "вул. Сім'ї Бродських, 31/33, м. Шулявська. Зручно з КПІ, Шулявки та Лук'янівки.",
+                time: 'Час — за домовленістю, слоти окремо від груп'
               }
             ].map((loc, i) => (
               <Reveal key={loc.name} delay={i * 0.1} className="h-full">
@@ -758,15 +778,24 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * ЗАЯВКА
        * ---------------------------------------------------------------- */}
+      <QuickLeadModal
+        open={quickLeadOpen}
+        onClose={() => setQuickLeadOpen(false)}
+        source="personal_landing"
+        locations={personalLocations}
+        ageGroups={PERSONAL_GOALS}
+        ageLabel="Ціль"
+        title="Запис на персональне тренування"
+        subtitle={`Перше тренування — ${priceFirst} грн замість ${priceSingle}. Залиште номер — Ігор особисто зателефонує і підбере слот.`}
+      />
+
       <ContactForm
-        locations={locations}
+        locations={personalLocations}
+        contacts={[{ name: 'Ігор Котляревський', phone: '+380954756500' }]}
         title="Запис на персональне тренування"
         subtitle="Залиште номер — Ігор особисто зателефонує, уточнить ціль, рівень підготовки та підбере вільний слот."
-        ageGroups={[
-          { value: 'Дорослий', label: 'Дорослий' },
-          { value: 'Підліток', label: 'Підліток' },
-          { value: 'Дитина', label: 'Дитина' }
-        ]}
+        ageGroups={PERSONAL_GOALS}
+        ageLabel="Ціль"
         source="personal_landing"
         submitLabel={`Записатись за ${priceFirst} грн`}
         offerNote={
@@ -834,7 +863,7 @@ export const PersonalLanding = () => {
           animate={{ y: 0 }}
           transition={{ duration: DUR, ease: EASE, delay: 0.6 }}
           whileTap={{ scale: 0.97 }}
-          onClick={() => scrollTo('contact')}
+          onClick={() => openQuickLead('Personal CTA')}
           className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-b from-[#D10000] to-[#A80000] text-[13px] font-black uppercase tracking-[0.12em] text-white shadow-[0_16px_40px_-10px_rgba(209,0,0,0.8)]"
         >
           <Send size={17} />
