@@ -12,6 +12,10 @@ interface ContactFormProps {
   onSuccess?: () => void;
   submitLabel?: string;
   offerNote?: React.ReactNode;
+  /** Підпис поля вибору групи — на дорослих лендінгах це «Ціль», а не «Вік» */
+  ageLabel?: string;
+  /** Контакти в лівій колонці; за замовчуванням — обидва тренери */
+  contacts?: { name: string; phone: string }[];
 }
 
 export const ContactForm = ({
@@ -27,7 +31,12 @@ export const ContactForm = ({
   source = "main",
   onSuccess,
   submitLabel = "Записатись на пробне",
-  offerNote
+  offerNote,
+  ageLabel = "Вік / Група",
+  contacts = [
+    { name: "Ігор Котляревський", phone: "+380954756500" },
+    { name: "Олег Крамаренко", phone: "+380955680604" }
+  ]
 }: ContactFormProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -126,8 +135,9 @@ export const ContactForm = ({
                 <div>
                   <div className="text-[10px] text-zinc-500 uppercase font-black tracking-[0.2em] mb-3">Контакти</div>
                   <div className="space-y-4">
-                    <div className="text-white font-bold">Ігор Котляревський:<br/><a href="tel:+380954756500" className="inline-flex min-h-[44px] items-center text-red-500 hover:text-red-400 transition-colors">095 475 65 00</a></div>
-                    <div className="text-white font-bold">Олег Крамаренко:<br/><a href="tel:+380955680604" className="inline-flex min-h-[44px] items-center text-red-500 hover:text-red-400 transition-colors">095 568 06 04</a></div>
+                    {contacts.map(c => (
+                      <div key={c.phone} className="text-white font-bold">{c.name}:<br/><a href={`tel:${c.phone}`} className="inline-flex min-h-[44px] items-center text-red-500 hover:text-red-400 transition-colors">{c.phone.replace(/^\+38(\d{3})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4')}</a></div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -161,19 +171,23 @@ export const ContactForm = ({
                   placeholder="+38 (0__) ___ __ __"
                 />
               </div>
+              {locations.length === 1 ? (
+                <input type="hidden" name="location" value={locations[0].name} />
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Локація</label>
+                  <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                    <option value="">Оберіть локацію</option>
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Локація</label>
-                <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
-                  <option value="">Оберіть локацію</option>
-                  {locations.map(loc => (
-                    <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Вік / Група</label>
+                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">{ageLabel}</label>
                 <select name="age" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
-                  <option value="">Оберіть групу</option>
+                  <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
                   {ageGroups.map(group => (
                     <option key={group.value} value={group.value}>{group.label}</option>
                   ))}

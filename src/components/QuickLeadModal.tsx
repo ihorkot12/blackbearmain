@@ -11,6 +11,7 @@ interface QuickLeadModalProps {
   ageGroups?: { value: string; label: string }[];
   title?: string;
   subtitle?: string;
+  ageLabel?: string;
 }
 
 const DEFAULT_AGE_GROUPS = [
@@ -32,7 +33,8 @@ export const QuickLeadModal = ({
   locations = [],
   ageGroups = DEFAULT_AGE_GROUPS,
   title = 'Запис на пробне тренування',
-  subtitle = 'Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час.'
+  subtitle = 'Перше тренування безкоштовне. Залиште імʼя і номер — зателефонуємо та підберемо зручний час.',
+  ageLabel = 'Вік / група'
 }: QuickLeadModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -179,26 +181,30 @@ export const QuickLeadModal = ({
                     />
                   </div>
 
-                  <div className="grid sm:grid-cols-2 gap-4">
+                  <div className={`grid gap-4 ${locations.length === 1 ? '' : 'sm:grid-cols-2'}`}>
                     <div>
-                      <label className={labelClass} htmlFor="quick-lead-age">Вік / група</label>
+                      <label className={labelClass} htmlFor="quick-lead-age">{ageLabel}</label>
                       <select id="quick-lead-age" name="age" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer`}>
-                        <option value="">Оберіть групу</option>
+                        <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
                         {ageGroups.map(group => (
                           <option key={group.value} value={group.value}>{group.label}</option>
                         ))}
                       </select>
                     </div>
 
-                    <div>
-                      <label className={labelClass} htmlFor="quick-lead-location">Локація</label>
-                      <select id="quick-lead-location" name="location" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer`}>
-                        <option value="">Оберіть локацію</option>
-                        {locations.map(loc => (
-                          <option key={loc.id ?? loc.name} value={loc.name}>{loc.name}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {locations.length === 1 ? (
+                      <input type="hidden" name="location" value={locations[0].name} />
+                    ) : (
+                      <div>
+                        <label className={labelClass} htmlFor="quick-lead-location">Локація</label>
+                        <select id="quick-lead-location" name="location" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer`}>
+                          <option value="">Оберіть локацію</option>
+                          {locations.map(loc => (
+                            <option key={loc.id ?? loc.name} value={loc.name}>{loc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {error && (
