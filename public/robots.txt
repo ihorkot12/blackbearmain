@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /login
+Disallow: /auth
+Disallow: /portal
+Disallow: /parent
+Disallow: /dashboard
+Disallow: /profile
+Disallow: /register-member
+Disallow: /api/
+
+Sitemap: https://shin-karate.kyiv.ua/sitemap.xml
