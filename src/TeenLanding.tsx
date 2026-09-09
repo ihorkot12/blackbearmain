@@ -160,7 +160,7 @@ export const TeenLanding = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
+      <section id="hero" className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
             src={resizedImage(content?.teen_hero_bg || "https://images.unsplash.com/photo-1552072092-7f9b8d63efcb?q=80&w=2000&auto=format&fit=crop", 1280)}
@@ -255,7 +255,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* Unique Advantages Section */}
-      <section className="py-16 md:py-32 bg-black relative overflow-hidden">
+      <section id="advantages" className="py-16 md:py-32 bg-black relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-24 items-center">
             <div className="relative order-2 lg:order-1">
@@ -307,7 +307,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-16 md:py-32 bg-zinc-900/50 relative overflow-hidden">
+      <section id="perks" className="py-16 md:py-32 bg-zinc-900/50 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Привілеї клубу</h2>
@@ -336,7 +336,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* How it works / Steps */}
-      <section className="py-16 md:py-32 bg-zinc-950">
+      <section id="path" className="py-16 md:py-32 bg-zinc-950">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Твій шлях</h2>
@@ -360,7 +360,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-16 md:py-24 bg-black">
+      <section id="results" className="py-16 md:py-24 bg-black">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-12 md:mb-16">Що ти отримаєш?</h2>
           
@@ -381,7 +381,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* Locations Section */}
-      <section className="py-16 md:py-24 bg-black">
+      <section id="locations" className="py-16 md:py-24 bg-black">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-4">Де ми тренуємо</h2>
@@ -419,7 +419,7 @@ export const TeenLanding = () => {
       </section>
 
       {/* Testimonial Section */}
-      <section className="py-16 md:py-24 bg-zinc-950">
+      <section id="review" className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-4xl mx-auto px-6">
           <div className="bg-zinc-900 p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/5 relative">
             <Quote className="absolute top-8 right-8 text-red-600/20 w-24 h-24" />

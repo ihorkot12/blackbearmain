@@ -164,7 +164,7 @@ export const JuniorLanding = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-20 overflow-hidden max-w-full">
+      <section id="hero" className="relative min-h-screen flex items-center pt-20 overflow-hidden max-w-full">
         <div className="absolute inset-0 z-0">
           <img 
             src={resizedImage(content?.junior_hero_bg || "https://images.unsplash.com/photo-1552072805-2a9039d00e57?q=80&w=2000&auto=format&fit=crop", 1280)}
@@ -245,7 +245,7 @@ export const JuniorLanding = () => {
       </section>
 
       {/* Privileges Section */}
-      <section className="py-8 md:py-16 lg:py-32 bg-zinc-950 overflow-hidden max-w-full">
+      <section id="perks" className="py-8 md:py-16 lg:py-32 bg-zinc-950 overflow-hidden max-w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Клубні привілеї</h2>
@@ -269,7 +269,7 @@ export const JuniorLanding = () => {
       </section>
 
       {/* How it works / Steps */}
-      <section className="py-8 md:py-16 lg:py-32 bg-black overflow-hidden max-w-full">
+      <section id="path" className="py-8 md:py-16 lg:py-32 bg-black overflow-hidden max-w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-6">Шлях до результату</h2>
@@ -293,7 +293,7 @@ export const JuniorLanding = () => {
       </section>
 
       {/* Results Section */}
-      <section className="py-8 md:py-16 lg:py-24 bg-black overflow-hidden max-w-full">
+      <section id="results" className="py-8 md:py-16 lg:py-24 bg-black overflow-hidden max-w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16 text-center">
           <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-12 md:mb-16">Результати тренувань</h2>
           
@@ -314,7 +314,7 @@ export const JuniorLanding = () => {
       </section>
 
       {/* Locations Section */}
-      <section className="py-8 md:py-16 lg:py-24 bg-black overflow-hidden max-w-full">
+      <section id="locations" className="py-8 md:py-16 lg:py-24 bg-black overflow-hidden max-w-full">
         <div className="max-w-7xl mx-auto px-4 md:px-8 lg:px-16">
           <div className="text-center mb-16">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-4">Де ми тренуємо</h2>
@@ -352,7 +352,7 @@ export const JuniorLanding = () => {
       </section>
 
       {/* Testimonial Section */}
-      <section className="py-16 md:py-24 bg-zinc-950">
+      <section id="review" className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-4xl mx-auto px-6">
           <div className="bg-zinc-900 p-8 md:p-12 rounded-3xl lg:rounded-[3rem] border border-white/5 relative">
             <Quote className="absolute top-8 right-8 text-red-600/20 w-24 h-24" />

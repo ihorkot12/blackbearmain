@@ -147,7 +147,7 @@ export const WomenLanding = () => {
       <Navbar />
 
       {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center pt-20 overflow-hidden">
+      <section id="hero" className="relative min-h-screen flex items-center pt-20 overflow-hidden">
         <div className="absolute inset-0 z-0">
           <img 
             src={resizedImage(content?.women_hero_bg || "https://images.unsplash.com/photo-1555597673-b21d5c935865?q=80&w=2000&auto=format&fit=crop", 1280)}
@@ -194,7 +194,7 @@ export const WomenLanding = () => {
       </section>
 
       {/* Training Value Section */}
-      <section className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
+      <section id="benefits" className="py-16 md:py-24 bg-zinc-950 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-20">
             <h2 className="text-3xl sm:text-4xl md:text-6xl font-black uppercase tracking-tighter mb-6 leading-none">
@@ -248,7 +248,7 @@ export const WomenLanding = () => {
       </section>
 
       {/* Benefits Grid */}
-      <section className="py-16 md:py-24 relative">
+      <section id="format" className="py-16 md:py-24 relative">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {benefits.map((benefit, idx) => (
@@ -273,7 +273,7 @@ export const WomenLanding = () => {
       </section>
 
       {/* Closing Objections (FAQ Style) */}
-      <section className="py-16 md:py-24 bg-zinc-950">
+      <section id="faq" className="py-16 md:py-24 bg-zinc-950">
         <div className="max-w-4xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4">
@@ -299,7 +299,7 @@ export const WomenLanding = () => {
       </section>
 
       {/* Locations Section */}
-      <section className="py-16 md:py-24 bg-black border-t border-white/5">
+      <section id="locations" className="py-16 md:py-24 bg-black border-t border-white/5">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-xs font-bold text-red-600 uppercase tracking-[0.4em] mb-4">Де ми тренуємо</h2>

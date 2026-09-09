@@ -320,7 +320,7 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * HERO — офер одразу, у першому екрані
        * ---------------------------------------------------------------- */}
-      <section
+      <section id="hero"
         ref={heroRef as any}
         className="relative flex min-h-[100svh] items-center overflow-hidden pt-28 pb-20"
       >
@@ -553,7 +553,7 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * ФОРМАТ ЗАНЯТТЯ
        * ---------------------------------------------------------------- */}
-      <section className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
+      <section id="goals" className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
         <div className={CONTAINER}>
           <div className="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
             <Reveal y={32}>
@@ -681,7 +681,7 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * FAQ
        * ---------------------------------------------------------------- */}
-      <section className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
+      <section id="faq" className={`${SECTION_Y} border-t ${HAIRLINE} bg-zinc-950`}>
         <div className={CONTAINER}>
           <SectionHeading eyebrow="Часті запитання">
             Коротко про <span className="text-zinc-600">головне</span>
@@ -712,7 +712,7 @@ export const PersonalLanding = () => {
       {/* ---------------------------------------------------------------- *
        * ЗАЛИ
        * ---------------------------------------------------------------- */}
-      <section className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
+      <section id="locations" className={`${SECTION_Y} border-t ${HAIRLINE} bg-black`}>
         <div className={CONTAINER}>
           <SectionHeading eyebrow="Де ми тренуємо">
             Наші зали у <span className="text-zinc-600">Києві</span>
