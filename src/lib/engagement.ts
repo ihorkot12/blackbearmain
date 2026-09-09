@@ -82,7 +82,7 @@ export const startEngagementTracking = (page: string): (() => void) => {
           visibleSince.delete(name);
           dwellTotal.set(name, (dwellTotal.get(name) || 0) + ms);
           if (ms >= 1000) {
-            send('section_dwell', { page, section: name, seconds: bucketSeconds(ms) });
+            send('section_dwell', { page, section: name, seconds: bucketSeconds(ms) }, true);
           }
         }
       });
@@ -123,7 +123,7 @@ export const startEngagementTracking = (page: string): (() => void) => {
     visibleSince.forEach((since, name) => {
       const ms = Date.now() - since;
       dwellTotal.set(name, (dwellTotal.get(name) || 0) + ms);
-      if (ms >= 1000) send('section_dwell', { page, section: name, seconds: bucketSeconds(ms) });
+      if (ms >= 1000) send('section_dwell', { page, section: name, seconds: bucketSeconds(ms) }, true);
     });
     visibleSince.clear();
     send(
