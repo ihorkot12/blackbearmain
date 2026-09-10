@@ -304,7 +304,8 @@ export const KidsLanding = () => {
       {
         name: oleh?.name || 'Олег Крамаренко',
         role: 'Відрадний / Сирець',
-        photo: oleh?.id ? resizedImage(`/api/images/coaches/${oleh.id}`, 800) : null,
+        // у базі фото тренера може лежати і як /api/images/coaches/:id, і як /api/images/:id — беремо шлях з картки
+        photo: typeof oleh?.photo === 'string' && oleh.photo ? resizedImage(oleh.photo.split('?')[0], 800) : null,
         position: '50% 15%',
         facts: ['Дитячі та підліткові групи', 'Підготовка до змагань', 'Стандарти кіокушинкай']
       }
