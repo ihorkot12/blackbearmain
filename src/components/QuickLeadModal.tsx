@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Send, X, CheckCircle2 } from 'lucide-react';
+import { Send, X, CheckCircle2, ChevronDown } from 'lucide-react';
 import { submitLead } from '../lib/leadTracking';
 
 interface QuickLeadModalProps {
@@ -183,28 +183,38 @@ export const QuickLeadModal = ({
                     />
                   </div>
 
-                  <div className={`grid gap-4 ${locations.length === 1 ? '' : 'sm:grid-cols-2'}`}>
-                    <div>
-                      <label className={labelClass} htmlFor="quick-lead-age">{ageLabel}</label>
-                      <select id="quick-lead-age" name="age" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer`}>
-                        <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
-                        {ageGroups.map(group => (
-                          <option key={group.value} value={group.value}>{group.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className={`grid gap-4 ${locations.length === 1 || ageGroups.length === 1 ? '' : 'sm:grid-cols-2'}`}>
+                    {ageGroups.length === 1 ? (
+                      <input type="hidden" name="age" value={ageGroups[0].value} />
+                    ) : (
+                      <div>
+                        <label className={labelClass} htmlFor="quick-lead-age">{ageLabel}</label>
+                        <div className="relative">
+                          <select id="quick-lead-age" name="age" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
+                            <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
+                            {ageGroups.map(group => (
+                              <option key={group.value} value={group.value}>{group.label}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-red-600" aria-hidden />
+                        </div>
+                      </div>
+                    )}
 
                     {locations.length === 1 ? (
                       <input type="hidden" name="location" value={locations[0].name} />
                     ) : (
                       <div>
                         <label className={labelClass} htmlFor="quick-lead-location">Локація</label>
-                        <select id="quick-lead-location" name="location" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer`}>
-                          <option value="">Оберіть локацію</option>
-                          {locations.map(loc => (
-                            <option key={loc.id ?? loc.name} value={loc.name}>{loc.name}</option>
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select id="quick-lead-location" name="location" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
+                            <option value="">Оберіть локацію</option>
+                            {locations.map(loc => (
+                              <option key={loc.id ?? loc.name} value={loc.name}>{loc.name}</option>
+                            ))}
+                          </select>
+                          <ChevronDown size={18} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-red-600" aria-hidden />
+                        </div>
                       </div>
                     )}
                   </div>

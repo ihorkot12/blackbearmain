@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { MapPin, Send } from 'lucide-react';
+import { MapPin, Send, ChevronDown } from 'lucide-react';
 import { submitLead } from '../lib/leadTracking';
 
 interface ContactFormProps {
@@ -179,30 +179,40 @@ export const ContactForm = ({
               ) : (
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Локація</label>
-                  <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
-                    <option value="">Оберіть локацію</option>
-                    {locations.map(loc => (
-                      <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                      <option value="">Оберіть локацію</option>
+                      {locations.map(loc => (
+                        <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-red-600" aria-hidden />
+                  </div>
                 </div>
               )}
-              <div>
-                <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">{ageLabel}</label>
-                <select name="age" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
-                  <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
-                  {ageGroups.map(group => (
-                    <option key={group.value} value={group.value}>{group.label}</option>
-                  ))}
-                </select>
-              </div>
+              {ageGroups.length === 1 ? (
+                <input type="hidden" name="age" value={ageGroups[0].value} />
+              ) : (
+                <div>
+                  <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">{ageLabel}</label>
+                  <div className="relative">
+                    <select name="age" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                      <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
+                      {ageGroups.map(group => (
+                        <option key={group.value} value={group.value}>{group.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-red-600" aria-hidden />
+                  </div>
+                </div>
+              )}
               {error && (
                 <p className="text-sm text-red-400 leading-relaxed">{error}</p>
               )}
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full h-16 bg-gradient-to-b from-[#D10000] to-[#A80000] hover:-translate-y-0.5 disabled:from-zinc-800 disabled:to-zinc-800 disabled:hover:translate-y-0 text-white text-[13px] font-black uppercase tracking-[0.12em] rounded-2xl transition-all duration-300 shadow-[0_16px_40px_-10px_rgba(209,0,0,0.6)] flex items-center justify-center gap-2.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                className="w-full h-16 px-4 bg-gradient-to-b from-[#D10000] to-[#A80000] hover:-translate-y-0.5 disabled:from-zinc-800 disabled:to-zinc-800 disabled:hover:translate-y-0 text-white text-[13px] font-black uppercase tracking-[0.12em] rounded-2xl transition-all duration-300 shadow-[0_16px_40px_-10px_rgba(209,0,0,0.6)] flex items-center justify-center gap-2.5 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
               >
                 {isSubmitting ? (
                   <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
