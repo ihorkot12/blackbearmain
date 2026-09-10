@@ -169,6 +169,8 @@ export const KidsLanding = () => {
   }, []);
 
   // Липкий CTA на мобільному — лише після першого екрана (там уже є кнопки й картка)
+  // Фото тренера з бази може бути відсутнє (404) — тоді картка без порожнього блоку
+  const [failedPhotos, setFailedPhotos] = useState<Record<string, boolean>>({});
   const [pastHero, setPastHero] = useState(false);
   useEffect(() => {
     const check = () => {
@@ -188,7 +190,11 @@ export const KidsLanding = () => {
   const scrollTo = (id: string) =>
     document.getElementById(id)?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
 
-  const allLocations = locations.length ? locations : DEFAULT_LOCATIONS;
+  // Шулявка — першою: там веде засновник і найбільше молодших груп
+  const allLocations = React.useMemo(() => {
+    const list = locations.length ? [...locations] : [...DEFAULT_LOCATIONS];
+    return list.sort((a: any, b: any) => Number(districtOf(b.name) === 'Шулявка') - Number(districtOf(a.name) === 'Шулявка'));
+  }, [locations]);
   const kidsSchedule = React.useMemo(() => {
     const own = schedule.filter((s: any) => isKidsGroup(s?.group_name));
     return own.length ? own : DEFAULT_KIDS_SCHEDULE;
@@ -780,14 +786,16 @@ export const KidsLanding = () => {
           </SectionHeading>
 
           <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
-            {coachCards.map((c, i) => (
+            {coachCards.map((c, i) => {
+              const photo = c.photo && !failedPhotos[c.name] ? c.photo : null;
+              return (
               <Reveal key={c.name} delay={i * 0.1} className="h-full">
                 <article className={`${CARD} group flex h-full flex-col overflow-hidden`}>
-                  <div className={`relative overflow-hidden bg-black ${c.photo ? 'aspect-[4/3]' : 'h-28 bg-red-600/10'}`}>
+                  <div className={`relative overflow-hidden bg-black ${photo ? 'aspect-[4/3]' : 'h-28 bg-red-600/10'}`}>
                     <div className="absolute inset-0 flex items-center justify-center text-5xl font-black text-red-600/60" aria-hidden>
                       {c.name.charAt(0)}
                     </div>
-                    {c.photo && (
+                    {photo && (
                       <img
                         src={c.photo}
                         alt={`${c.name} — тренер з карате для дітей, Black Bear Dojo`}
@@ -795,10 +803,7 @@ export const KidsLanding = () => {
                         decoding="async"
                         className="relative h-full w-full object-cover transition-transform duration-[1200ms] group-hover:scale-105"
                         style={{ objectPosition: c.position }}
-                        onError={e => {
-                          // фото тренера в базі може бути відсутнє — ховаємо биту картинку
-                          e.currentTarget.style.display = 'none';
-                        }}
+                        onError={() => setFailedPhotos(prev => ({ ...prev, [c.name]: true }))}
                       />
                     )}
                     <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-zinc-950 to-transparent" aria-hidden />
@@ -818,7 +823,8 @@ export const KidsLanding = () => {
                   </div>
                 </article>
               </Reveal>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -903,7 +909,7 @@ export const KidsLanding = () => {
                             <span>
                               <span className="block text-sm font-black uppercase tracking-tight text-white">{r.group_name}</span>
                               <span className="block text-xs font-medium text-zinc-500">
-                                {/нова/i.test(r.group_name) ? 'для новачків · ' : /молодш/i.test(r.group_name) ? 'для тих, хто вже займається · ' : ''}
+                                {/новач|нова/i.test(r.group_name) ? 'для новачків · ' : /молодш/i.test(r.group_name) ? 'для тих, хто вже займається · ' : ''}
                                 {r.coach_name}
                               </span>
                             </span>
