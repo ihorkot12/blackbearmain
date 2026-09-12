@@ -52,7 +52,9 @@ import {
 /**
  * Головна сторінка клубу. Увесь текст лишається редагованим з адмінки через
  * content.* (ті самі ключі, що й раніше), а секції — вимикаються hide_section_*.
- * Фото — з клубної фотосесії (public/main, public/kids, public/juniors, public/personal).
+ * Фото — з клубної фотосесії (public/main, public/kids, public/juniors, public/personal);
+ * картинки з адмінки (hero_bg, about_image, modern_image, results_image) тут не
+ * використовуються — hero_bg лишається og:image для соцмереж.
  */
 const PHOTOS = {
   hero: '/kids/coach-kid.webp',
@@ -374,12 +376,19 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
               </Reveal>
 
               <Reveal delay={0.08}>
+                {/* hero_title з адмінки стає H1 (HTML), інакше — SEO-заголовок за замовчуванням */}
                 <h1 className="mb-7 text-[clamp(2.5rem,7vw,5.5rem)] font-black uppercase leading-[0.98] tracking-tight md:leading-[0.92]">
-                  Карате
-                  <br />
-                  <span className="text-red-600">для дітей</span>
-                  <br />
-                  у Києві
+                  {content?.hero_title ? (
+                    <span dangerouslySetInnerHTML={{ __html: content.hero_title }} />
+                  ) : (
+                    <>
+                      Карате
+                      <br />
+                      <span className="text-red-600">для дітей</span>
+                      <br />
+                      у Києві
+                    </>
+                  )}
                   <span className="mt-3 block text-[0.36em] font-black leading-tight tracking-[0.02em] text-zinc-400">
                     Шулявка · Сирець · Відрадний
                   </span>
@@ -387,16 +396,9 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
               </Reveal>
 
               <Reveal delay={0.16}>
-                {content?.hero_title ? (
-                  <div
-                    className="mb-4 text-xl font-black uppercase leading-tight tracking-tight text-white sm:text-2xl md:text-3xl"
-                    dangerouslySetInnerHTML={{ __html: content.hero_title }}
-                  />
-                ) : (
-                  <p className="mb-4 text-xl font-black uppercase leading-tight tracking-tight text-white sm:text-2xl md:text-3xl">
-                    Формуємо дисципліну, <span className="text-zinc-400">силу та впевненість.</span>
-                  </p>
-                )}
+                <p className="mb-4 text-xl font-black uppercase leading-tight tracking-tight text-white sm:text-2xl md:text-3xl">
+                  Формуємо дисципліну, <span className="text-zinc-400">силу та впевненість.</span>
+                </p>
                 <p className="mb-10 max-w-xl text-base leading-relaxed text-zinc-300 sm:text-lg md:text-xl">
                   {content?.hero_subtitle ||
                     'Кіокушинкай для дітей з 4 років і підлітків. Тренер — 3 дан, майстер спорту України. Групи до 12 дітей, два зали, вихованці — чемпіони України та Європи.'}
@@ -444,7 +446,7 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
                   <div className="pointer-events-none absolute -inset-10 rounded-full bg-red-600/20 blur-[90px]" aria-hidden />
                   <div className="relative h-full w-full overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950">
                     <img
-                      src={content?.hero_bg ? resizedImage(content.hero_bg, 960) : PHOTOS.hero}
+                      src={PHOTOS.hero}
                       alt="Карате для дітей у Києві — тренер Ігор Котляревський з маленьким учнем, Black Bear Dojo"
                       fetchPriority="high"
                       decoding="async"
@@ -468,7 +470,7 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
 
                     <div className="relative -mx-7 -mt-7 mb-7 aspect-[4/3] overflow-hidden md:-mx-8 md:-mt-8 lg:hidden">
                       <img
-                        src={content?.hero_bg ? resizedImage(content.hero_bg, 960) : PHOTOS.hero}
+                        src={PHOTOS.hero}
                         alt="Карате для дітей у Києві — тренер з маленьким учнем"
                         fetchPriority="high"
                         decoding="async"
@@ -642,7 +644,7 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
                 </div>
 
                 <PhotoReveal
-                  src={content?.modern_image || PHOTOS.kidsShape}
+                  src={PHOTOS.kidsShape}
                   alt="Учні клубу карате Black Bear Dojo на клубній фотосесії"
                   className="w-full max-w-lg lg:max-w-none"
                   imgClassName="aspect-[4/5] scale-[1.05]"
@@ -717,7 +719,7 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
       <section id="about" ref={clubRef as any} className="relative overflow-hidden bg-black">
         <div className="relative min-h-[600px] md:min-h-[720px]">
           <motion.img
-            src={content?.about_image || PHOTOS.club}
+            src={PHOTOS.club}
             alt="Black Bear Dojo — увесь клуб карате кіокушинкай на клубній фотосесії, Київ"
             loading="lazy"
             decoding="async"
@@ -897,7 +899,7 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
               <Reveal delay={0.1}>
                 <div className="group relative aspect-[4/5] overflow-hidden rounded-[28px] border border-white/10 sm:aspect-[21/9] md:rounded-[32px]">
                   <img
-                    src={content?.results_image || PHOTOS.teensMedals}
+                    src={PHOTOS.teensMedals}
                     alt="Учні Black Bear Dojo з медалями змагань з карате"
                     loading="lazy"
                     decoding="async"
