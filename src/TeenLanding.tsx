@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { clubGraph, courseOffer, faqPage } from './lib/structuredData';
 import { startEngagementTracking } from './lib/engagement';
 import { resizedImage } from './lib/images';
@@ -319,15 +320,11 @@ export const TeenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.teen_seo_title || 'Карате для підлітків 12+ у Києві — Шулявка, Сирець | Black Bear Dojo'}
-        description={
-          content?.teen_seo_description ||
-          'Секція карате для підлітків від 12 років у Києві: зали на Шулявці та Сирці. Самооборона, кіокушинкай, атестації на пояси, змагання за готовністю, тренер — 3 дан. Перше тренування безкоштовне.'
-        }
-        keywords={
-          content?.teen_seo_keywords ||
-          'карате для підлітків київ, секція карате для підлітків шулявка, самооборона для підлітків київ, карате кіокушинкай підлітки київ, карате сирець підлітки, карате 13 років київ, карате 15 років київ'
-        }
+        title={content?.teen_seo_title || PAGE_SEO['/teens-12-plus'].title}
+        description={content?.teen_seo_description || PAGE_SEO['/teens-12-plus'].description}
+        keywords={content?.teen_seo_keywords || PAGE_SEO['/teens-12-plus'].keywords}
+        image={PAGE_SEO['/teens-12-plus'].image}
+        imageAlt={PAGE_SEO['/teens-12-plus'].imageAlt}
         url={`${SITE_URL}/teens-12-plus`}
         jsonLd={clubGraph([
           courseOffer({

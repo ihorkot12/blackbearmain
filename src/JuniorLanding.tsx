@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { clubGraph, courseOffer, faqPage } from './lib/structuredData';
 import { startEngagementTracking } from './lib/engagement';
 import { resizedImage } from './lib/images';
@@ -318,15 +319,11 @@ export const JuniorLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.junior_seo_title || 'Карате для дітей 7–12 років у Києві — Шулявка, Сирець | Black Bear Dojo'}
-        description={
-          content?.junior_seo_description ||
-          'Секція карате для дітей 7–12 років у Києві: зали на Шулявці та Сирці. Техніка кіокушинкай, дисципліна, впевненість, змагання за бажанням, групи до 12 дітей, тренер — 3 дан. Перше тренування безкоштовне.'
-        }
-        keywords={
-          content?.junior_seo_keywords ||
-          'карате для дітей 7 років київ, карате для дітей 8 років київ, карате для дітей 10 років київ, дитяча секція карате київ, карате на шулявці для дітей, карате сирець, кіокушинкай для школярів, карате для дівчат київ'
-        }
+        title={content?.junior_seo_title || PAGE_SEO['/juniors-7-12'].title}
+        description={content?.junior_seo_description || PAGE_SEO['/juniors-7-12'].description}
+        keywords={content?.junior_seo_keywords || PAGE_SEO['/juniors-7-12'].keywords}
+        image={PAGE_SEO['/juniors-7-12'].image}
+        imageAlt={PAGE_SEO['/juniors-7-12'].imageAlt}
         url={`${SITE_URL}/juniors-7-12`}
         jsonLd={clubGraph([
           courseOffer({

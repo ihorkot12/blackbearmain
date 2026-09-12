@@ -22,6 +22,7 @@ import {
   Brain
 } from 'lucide-react';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { clubGraph, faqPage } from './lib/structuredData';
 import { startEngagementTracking } from './lib/engagement';
 import { resizedImage } from './lib/images';
@@ -318,9 +319,11 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title="Карате для дітей Київ — Шулявка, Сирець | Black Bear Dojo"
-        description="Карате Кіокушинкай для дітей від 4 років і підлітків у Києві: зали на Шулявці (вул. Сім'ї Бродських) і на Сирці (вул. Некрасова). Перше тренування безкоштовне. Тренер — 3 дан, майстер спорту України."
-        keywords="карате київ, карате для дітей київ, кіокушинкай карате київ, секція карате шулявка, карате сирець, карате відрадний, дитяче карате київ, карате для підлітків київ, black bear dojo"
+        title={PAGE_SEO['/'].title}
+        description={PAGE_SEO['/'].description}
+        keywords={PAGE_SEO['/'].keywords}
+        image={PAGE_SEO['/'].image}
+        imageAlt={PAGE_SEO['/'].imageAlt}
         url={`${SITE_URL}/`}
         jsonLd={clubGraph([faqPage(MAIN_FAQ)])}
       />

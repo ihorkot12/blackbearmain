@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { clubGraph, courseOffer, faqPage } from './lib/structuredData';
 import { startEngagementTracking } from './lib/engagement';
 import { resizedImage } from './lib/images';
@@ -321,15 +322,11 @@ export const WomenLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.women_seo_title || 'Карате для дівчат і жінок у Києві — Шулявка, Сирець | Black Bear Dojo'}
-        description={
-          content?.women_seo_description ||
-          'Карате для дівчат і жінок у Києві: кардіо, техніка руками й ногами, робота в парах під контролем, базова самооборона. Дівчата — у вікових групах, дорослі — персонально. Перше тренування безкоштовне.'
-        }
-        keywords={
-          content?.women_seo_keywords ||
-          'карате для дівчат київ, самооборона для дівчат київ, самооборона для жінок київ, фітнес карате київ, карате для жінок київ, секція карате шулявка, карате сирець дівчата'
-        }
+        title={content?.women_seo_title || PAGE_SEO['/women-karate'].title}
+        description={content?.women_seo_description || PAGE_SEO['/women-karate'].description}
+        keywords={content?.women_seo_keywords || PAGE_SEO['/women-karate'].keywords}
+        image={PAGE_SEO['/women-karate'].image}
+        imageAlt={PAGE_SEO['/women-karate'].imageAlt}
         url={`${SITE_URL}/women-karate`}
         jsonLd={clubGraph([
           courseOffer({

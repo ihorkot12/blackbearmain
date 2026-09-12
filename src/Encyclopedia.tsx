@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Navbar } from './components/Navbar';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { clubGraph } from './lib/structuredData';
 import { 
   Book, 
@@ -55,9 +56,11 @@ const Encyclopedia = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans selection:bg-red-600 selection:text-white">
       <SEO 
-        title={content?.encyclopedia_seo_title || "Нормативи на пояси Кіокушинкай — енциклопедія карате | Black Bear Dojo"}
-        description={content?.encyclopedia_seo_description || "Повна енциклопедія Кіокушинкай карате: історія, філософія, етикет та детальні нормативи на пояси (10 кю - 1 кю). Секція карате Київ Шулявка, Сирець, Відрадний."}
-        keywords={content?.encyclopedia_seo_keywords || "карате київ, нормативи на пояси карате, кіокушинкай карате нормативи, історія карате, сосай масутацу ояма, екзамен карате, карате шулявка, карате сирець, карате відрадний"}
+        title={content?.encyclopedia_seo_title || PAGE_SEO['/encyclopedia'].title}
+        description={content?.encyclopedia_seo_description || PAGE_SEO['/encyclopedia'].description}
+        keywords={content?.encyclopedia_seo_keywords || PAGE_SEO['/encyclopedia'].keywords}
+        image={PAGE_SEO['/encyclopedia'].image}
+        imageAlt={PAGE_SEO['/encyclopedia'].imageAlt}
         url={`${SITE_URL}/encyclopedia`}
         jsonLd={clubGraph()}
       />

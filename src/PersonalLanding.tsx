@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SEO, { SITE_URL } from './components/SEO';
+import { PAGE_SEO } from './lib/seoPages';
 import { shuliavkaGraph } from './lib/structuredData';
 import { QuickLeadModal } from './components/QuickLeadModal';
 import { trackLeadIntent } from './lib/leadTracking';
@@ -386,15 +387,14 @@ export const PersonalLanding = () => {
   return (
     <div className="min-h-screen bg-black text-zinc-100 font-sans antialiased selection:bg-red-600 selection:text-white">
       <SEO
-        title={content?.personal_seo_title || 'Персональні тренування з карате для дорослих у Києві — Шулявка | Ігор Котляревський, 3 дан'}
+        title={content?.personal_seo_title || PAGE_SEO['/personal-training'].title}
         description={
           content?.personal_seo_description ||
-          `Індивідуальні тренування з карате для дорослих у Києві (Шулявка) з Ігорем Котляревським — 3 дан кіокушинкай, майстер спорту України. Самооборона, фізична форма, техніка з нуля. Перше тренування — ${priceFirst} грн замість ${priceSingle}.`
+          `${PAGE_SEO['/personal-training'].description} Перше тренування — ${priceFirst} грн замість ${priceSingle}.`
         }
-        keywords={
-          content?.personal_seo_keywords ||
-          'персональні тренування карате київ, індивідуальні тренування карате київ, карате для дорослих київ, самооборона київ, самооборона для жінок київ, тренер з карате київ, карате шулявка, ігор котляревський карате'
-        }
+        keywords={content?.personal_seo_keywords || PAGE_SEO['/personal-training'].keywords}
+        image={PAGE_SEO['/personal-training'].image}
+        imageAlt={PAGE_SEO['/personal-training'].imageAlt}
         url={`${SITE_URL}/personal-training`}
         jsonLd={shuliavkaGraph()}
       />
