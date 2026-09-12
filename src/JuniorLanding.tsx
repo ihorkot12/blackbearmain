@@ -79,8 +79,8 @@ const DEFAULT_LOCATIONS = [
 const districtOf = (name: string) =>
   /Бродськ|Шуляв/i.test(name) ? 'Шулявка' : /Некрасов|Сирец|Відрадн/i.test(name) ? 'Відрадний / Сирець' : name;
 
-/** Середня група = 7–12. Ловимо «Середня», «7–12», «8–12» у назві */
-const isJuniorGroup = (name: string) => /середн|7\s*[–-]\s*12|8\s*[–-]\s*12/i.test(name || '');
+/** Групи для 7–12: «Середня», «7–12», «8–12», а на Сирці 10–12-річні ходять у «Старша (10+)» */
+const isJuniorGroup = (name: string) => /середн|7\s*[–-]\s*12|8\s*[–-]\s*12|10\s*\+/i.test(name || '');
 
 const JUNIOR_FAQ = [
   {
