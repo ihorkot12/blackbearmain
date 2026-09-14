@@ -203,7 +203,7 @@ export const PersonalLanding = () => {
   })();
 
   // Оффер діє один раз: тільки на перше відвідане заняття, не на перезапис
-  const offerTerms = `Ціна ${priceFirst} грн діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений час. При перенесенні чи повторному записі заняття коштує ${priceSingle} грн.`;
+  const offerTerms = `Знижка діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений час. При перенесенні чи повторному записі заняття коштує ${priceSingle} грн.`;
 
   // Тренує особисто Ігор — лише зал на Шулявці
   const personalLocations = React.useMemo(() => {
@@ -352,11 +352,11 @@ export const PersonalLanding = () => {
   const faq = [
     {
       q: 'Скільки коштує персональне тренування з карате в Києві?',
-      a: `Разове персональне тренування — ${priceSingle} грн, без абонемента і без зобовʼязань. Перше тренування — ${priceFirst} грн: знайомство, розбір рівня підготовки, постановка цілі та плану. ${offerTerms}`
+      a: `Разове персональне тренування — ${priceSingle} грн, без абонемента і без зобовʼязань. Перше тренування при записі — зі знижкою 50%: знайомство, розбір рівня підготовки, постановка цілі та плану. ${offerTerms}`
     },
     {
       q: 'Чому знижка 50% діє лише на перше тренування?',
-      a: `Це не акція заради знижки, а спосіб познайомитись: ви приходите, ми розбираємо ваш рівень і вирішуємо, чи є сенс працювати далі. Тому ${priceFirst} грн діє рівно один раз — на перше заняття, на яке ви записались і прийшли. Якщо запис переноситься або оформлюється заново, тренування коштує ${priceSingle} грн.`
+      a: `Це не акція заради знижки, а спосіб познайомитись: ви приходите, ми розбираємо ваш рівень і вирішуємо, чи є сенс працювати далі. Тому знижка діє рівно один раз — на перше заняття, на яке ви записались і прийшли. Якщо запис переноситься або оформлюється заново, тренування коштує ${priceSingle} грн.`
     },
     {
       q: 'Чи можна почати з нуля, без спортивного минулого?',
@@ -390,7 +390,7 @@ export const PersonalLanding = () => {
         title={content?.personal_seo_title || PAGE_SEO['/personal-training'].title}
         description={
           content?.personal_seo_description ||
-          `${PAGE_SEO['/personal-training'].description} Перше тренування — ${priceFirst} грн замість ${priceSingle}.`
+          `${PAGE_SEO['/personal-training'].description} Перше тренування при записі — знижка 50%.`
         }
         keywords={content?.personal_seo_keywords || PAGE_SEO['/personal-training'].keywords}
         image={PAGE_SEO['/personal-training'].image}
@@ -480,7 +480,7 @@ export const PersonalLanding = () => {
               <Reveal delay={0.24}>
                 <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
                   <Button className="whitespace-nowrap" onClick={() => openQuickLead('Personal CTA')}>
-                    Записатись — {priceFirst} грн
+                    Записатись на пробне
                   </Button>
                   <Button variant="secondary" showIcon={false} className="max-sm:hidden" onClick={() => scrollTo('process')}>
                     Як проходить перше тренування
@@ -548,18 +548,15 @@ export const PersonalLanding = () => {
                       <span className={`${EYEBROW} text-[10px]`}>Перше тренування</span>
                     </div>
 
-                    <div className="mb-5 flex items-end gap-3 lg:mb-4">
-                      <span className="text-6xl font-black leading-none text-red-600">
-                        {priceFirst}
-                      </span>
-                      <span className="mb-1.5 text-xl font-black leading-none text-zinc-400">грн</span>
-                      <span className="mb-1.5 text-2xl font-black leading-none text-zinc-600 line-through">
-                        {priceSingle}
+                    <div className="mb-5 lg:mb-4">
+                      <span className="block text-5xl font-black leading-none text-red-600">−50%</span>
+                      <span className="mt-2.5 block text-sm font-black uppercase tracking-tight text-white">
+                        при записі на перше тренування
                       </span>
                     </div>
 
                     <p className={`${BODY} mb-7 border-b ${HAIRLINE} pb-7 text-sm lg:hidden`}>
-                      Розминка, тест базових рухів, план під вашу ціль. Без зобовʼязань далі. Ціна діє один раз —
+                      Розминка, тест базових рухів, план під вашу ціль. Без зобовʼязань далі. Знижка діє один раз —
                       на перше заняття.
                     </p>
 
@@ -702,7 +699,7 @@ export const PersonalLanding = () => {
 
           <Reveal delay={0.3}>
             <div className="mx-auto mt-12 flex max-w-xl flex-col items-center gap-4 text-center">
-              <Button onClick={() => openQuickLead('Process CTA')}>Записатись за {priceFirst} грн</Button>
+              <Button onClick={() => openQuickLead('Process CTA')}>Записатись на пробне</Button>
               <p className="text-[11px] font-black uppercase tracking-[0.14em] text-zinc-500">
                 Без абонемента · без зобовʼязань · відповідь на заявку — особисто від Ігоря
               </p>
@@ -870,16 +867,15 @@ export const PersonalLanding = () => {
                   Знайомство, розбір рівня підготовки, постановка цілі та плану. Далі вирішуєте ви.
                 </p>
 
-                <div className="mb-6 flex items-end gap-3">
-                  <span className="text-6xl font-black leading-none text-red-600">{priceFirst}</span>
-                  <span className="mb-1.5 text-lg font-black leading-none text-zinc-400">грн</span>
-                  <span className="mb-1.5 text-2xl font-black leading-none text-zinc-600 line-through">
-                    {priceSingle}
+                <div className="mb-6">
+                  <span className="block text-6xl font-black leading-none text-red-600">−50%</span>
+                  <span className="mt-2.5 block text-sm font-black uppercase tracking-tight text-white">
+                    при записі на перше тренування
                   </span>
                 </div>
 
                 <p className={`${BODY} mb-8 border-b ${HAIRLINE} pb-8 text-sm`}>
-                  Ціна діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений
+                  Знижка діє один раз — на перше тренування, якщо ви записались і прийшли в узгоджений
                   час. При перенесенні чи повторному записі — {priceSingle} грн.
                 </p>
 
@@ -1016,19 +1012,19 @@ export const PersonalLanding = () => {
         ageLabel="Ціль"
         namePlaceholder="Імʼя"
         title="Запис на персональне тренування"
-        subtitle={`Перше тренування — ${priceFirst} грн замість ${priceSingle}. Залиште номер — Ігор особисто зателефонує і підбере слот.`}
+        subtitle="Перше тренування при записі — знижка 50%. Залиште номер — Ігор особисто зателефонує і підбере слот."
       />
 
       <ContactForm
         locations={personalLocations}
         contacts={[{ name: 'Ігор Котляревський', phone: '+380954756500' }]}
-        title={`Перше тренування — ${priceFirst} грн замість ${priceSingle}`}
+        title="Перше тренування при записі — знижка 50%"
         subtitle="Залиште імʼя і номер — Ігор особисто зателефонує, уточнить ціль і підбере слот на Шулявці. Без абонемента, без зобовʼязань."
         ageGroups={PERSONAL_GOALS}
         ageLabel="Ціль"
         namePlaceholder="Імʼя"
         source="personal_landing"
-        submitLabel={`Записатись за ${priceFirst} грн`}
+        submitLabel="Записатись на пробне"
         offerNote={
           <div className="flex items-center gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-600">
@@ -1036,7 +1032,7 @@ export const PersonalLanding = () => {
             </span>
             <span>
               <span className="mb-1 block text-sm font-black uppercase tracking-tight text-white">
-                Перше тренування — {priceFirst} грн замість {priceSingle}
+                Перше тренування при записі — знижка 50%
               </span>
               <span className="block text-xs font-medium leading-relaxed text-zinc-400">
                 {offerTerms}
@@ -1100,7 +1096,7 @@ export const PersonalLanding = () => {
           className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-b from-[#D10000] to-[#A80000] text-[13px] font-black uppercase tracking-[0.12em] text-white shadow-[0_16px_40px_-10px_rgba(209,0,0,0.8)]"
         >
           <Send size={17} />
-          Перше тренування — {priceFirst} грн
+          Перше тренування — знижка 50%
         </motion.button>
       </div>
     </div>
