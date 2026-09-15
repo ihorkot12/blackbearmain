@@ -40,9 +40,29 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <style>
+      #bb-boot{position:fixed;inset:0;z-index:2147483000;background:#050505;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+      #root:not(:empty)~#bb-boot{display:none}
+      #bb-boot .bb-brand{font-size:15px;font-weight:900;letter-spacing:.14em}
+      #bb-boot .bb-brand i{font-style:normal;color:#e11d2e}
+      #bb-boot h1{margin:0;font-size:30px;line-height:1.05;font-weight:900;letter-spacing:-.02em;text-transform:uppercase;max-width:9em}
+      #bb-boot p{margin:0;font-size:14px;color:#e11d2e;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+      #bb-boot .bb-bar{width:104px;height:2px;border-radius:2px;background:#232323;overflow:hidden}
+      #bb-boot .bb-bar i{display:block;width:40%;height:100%;background:#e11d2e;animation:bbrun 1.1s linear infinite}
+      @keyframes bbrun{0%{transform:translateX(-110%)}100%{transform:translateX(330%)}}
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="bb-boot">
+      <div class="bb-brand">BLACK BEAR <i>DOJO</i></div>
+      <h1 id="bb-boot-title">Кіокушин карате в Києві</h1>
+      <p id="bb-boot-offer">Шулявка · Сирець</p>
+      <div class="bb-bar"><i></i></div>
+    </div>
+    <script>
+      (function(){var m={"/personal-training":["Персональні тренування з карате","Знижка 50% на перше заняття"],"/kids-4-7":["Карате для дітей 4\u20137 років","Перше тренування безкоштовно"],"/juniors-7-12":["Карате для дітей 7\u201312 років","Перше тренування безкоштовно"],"/teens-12-plus":["Карате для підлітків","Перше тренування безкоштовно"],"/women-karate":["Карате для жінок","Перше тренування безкоштовно"]};var v=m[location.pathname.replace(/\/+$/,"")];if(v){document.getElementById("bb-boot-title").textContent=v[0];document.getElementById("bb-boot-offer").textContent=v[1];}})();
+    </script>
     <script src="/portal-guard.js"></script>
     <script type="module" src="/src/main.tsx"></script>
     <script src="/portal-route-loader.js" defer></script>
