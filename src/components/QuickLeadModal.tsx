@@ -44,6 +44,7 @@ export const QuickLeadModal = ({
   const [error, setError] = useState('');
   // Вікова група тримається в стані, бо від неї залежать доступні слоти розкладу.
   const [age, setAge] = useState(ageGroups.length === 1 ? ageGroups[0].value : '');
+  const [location, setLocation] = useState(locations.length === 1 ? locations[0].name : '');
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -213,7 +214,7 @@ export const QuickLeadModal = ({
                       <div>
                         <label className={labelClass} htmlFor="quick-lead-location">Локація</label>
                         <div className="relative">
-                          <select id="quick-lead-location" name="location" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
+                          <select id="quick-lead-location" name="location" value={location} onChange={(e) => setLocation(e.target.value)} className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
                             <option value="">Оберіть локацію</option>
                             {locations.map(loc => (
                               <option key={loc.id ?? loc.name} value={loc.name}>{loc.name}</option>
@@ -225,7 +226,7 @@ export const QuickLeadModal = ({
                     )}
                   </div>
 
-                  <ScheduleChoice ageValue={age} labelClass={labelClass} fieldClass={fieldClass} />
+                  <ScheduleChoice ageValue={age} locationValue={location} labelClass={labelClass} fieldClass={fieldClass} />
 
                   {error && (
                     <p className="text-sm text-red-400 leading-relaxed">{error}</p>
