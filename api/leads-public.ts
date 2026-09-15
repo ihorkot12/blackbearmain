@@ -140,7 +140,7 @@ async function sendMetaLeadEvent(body: any, req: any) {
     ) || '2370050340139768';
   const accessToken = await getConfiguredValue(
     ['META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN'],
-    ['meta_capi_access_token', 'meta_pixel_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN']
+    ['meta_capi_access_token', 'meta_pixel_access_token', 'meta_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN']
   );
 
   if (!accessToken) return false;
