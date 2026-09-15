@@ -153,6 +153,11 @@ async function sendTelegramMessage(text: string) {
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
   });
 
+  if (!response.ok) {
+    const details = await response.text().catch(() => '');
+    console.error('CAPI: Graph API rejected the event', response.status, details.slice(0, 500));
+  }
+
   return response.ok;
 }
 
@@ -167,7 +172,10 @@ async function sendMetaLeadEvent(body: any, req: any) {
     ['meta_capi_access_token', 'meta_pixel_access_token', 'meta_access_token', 'META_CAPI_ACCESS_TOKEN', 'META_PIXEL_ACCESS_TOKEN', 'META_ACCESS_TOKEN']
   );
 
-  if (!accessToken) return false;
+  if (!accessToken) {
+    console.error('CAPI: access token not configured');
+    return false;
+  }
 
   const event: any = {
     event_name: 'Lead',
