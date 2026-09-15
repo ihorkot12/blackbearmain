@@ -70,6 +70,10 @@ export interface LeadPayload {
   phone: string;
   age_group?: string;
   location?: string;
+  /** Зручні дні, як їх обрали у формі (напр. «Пн / Ср / Пт») */
+  preferred_days?: string;
+  /** Зручний час: слот розкладу або вільний текст, якщо жоден не підійшов */
+  preferred_time?: string;
   source: string;
 }
 
@@ -92,6 +96,8 @@ export const submitLead = async (payload: LeadPayload): Promise<LeadResult> => {
     phone: payload.phone,
     age_group: payload.age_group || undefined,
     location: payload.location || undefined,
+    preferred_days: payload.preferred_days || undefined,
+    preferred_time: payload.preferred_time || undefined,
     event_id: eventId,
     source: payload.source,
     ...trackingData
