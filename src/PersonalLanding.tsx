@@ -447,7 +447,7 @@ export const PersonalLanding = () => {
           <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 xl:gap-16">
             {/* Ліва колонка */}
             <div>
-              <Reveal y={16}>
+              <Reveal immediate y={16}>
                 <div className="mb-8 inline-flex items-center gap-3 rounded-full border border-red-600/25 bg-red-600/10 px-4 py-2">
                   <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-red-500" />
                   <span className="text-[10px] font-black uppercase tracking-[0.25em] text-red-400">
@@ -456,7 +456,7 @@ export const PersonalLanding = () => {
                 </div>
               </Reveal>
 
-              <Reveal delay={0.08}>
+              <Reveal immediate delay={0.08}>
                 <h1 className="mb-7 text-[clamp(2.5rem,7vw,5.5rem)] font-black uppercase leading-[0.98] tracking-tight md:leading-[0.92]">
                   Персональні
                   <br />
@@ -469,7 +469,7 @@ export const PersonalLanding = () => {
                 </h1>
               </Reveal>
 
-              <Reveal delay={0.16}>
+              <Reveal immediate delay={0.16}>
                 <p className="mb-10 max-w-xl text-base leading-relaxed text-zinc-300 sm:text-lg md:text-xl">
                   Один на один із засновником клубу. З нуля. Три речі, які відчуєте вже за перші тижні:
                   вмієте постояти за себе, тіло стає сильним і слухняним, форма зʼявляється без абонемента
@@ -477,7 +477,7 @@ export const PersonalLanding = () => {
                 </p>
               </Reveal>
 
-              <Reveal delay={0.24}>
+              <Reveal immediate delay={0.24}>
                 <div className="mb-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
                   <Button className="whitespace-nowrap" onClick={() => openQuickLead('Personal CTA')}>
                     Записатись на пробне
@@ -488,7 +488,7 @@ export const PersonalLanding = () => {
                 </div>
               </Reveal>
 
-              <Reveal delay={0.32}>
+              <Reveal immediate delay={0.32}>
                 <ul className="flex flex-wrap items-center gap-x-7 gap-y-3">
                   {['Для дорослих · з нуля', '3 дан кіокушинкай', 'Майстер спорту України', '27 років у карате', 'Зал на Шулявці'].map(item => (
                     <li
@@ -520,7 +520,7 @@ export const PersonalLanding = () => {
                 </div>
               )}
 
-            <Reveal delay={0.2} y={32} className="lg:absolute lg:inset-x-5 lg:bottom-0">
+            <Reveal immediate delay={0.2} y={32} className="lg:absolute lg:inset-x-5 lg:bottom-0">
               <div className="relative">
                 <div className="absolute -inset-px rounded-[32px] bg-gradient-to-b from-red-600/40 to-transparent" aria-hidden />
                 <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950/85 p-7 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl md:p-8 lg:p-6">
