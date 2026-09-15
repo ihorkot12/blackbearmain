@@ -214,6 +214,20 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Name and phone are required' });
   }
 
+  // Захист від сміття: випадкові натискання і боти заповнюють поля невалідними значеннями.
+  const phoneDigits = (phone.match(/\d/g) || []).length;
+  const nameHasLetters = /\p{L}{2}/u.test(name);
+  if (
+    name.length < 2 ||
+    name.length > 60 ||
+    !nameHasLetters ||
+    phone.length > 25 ||
+    phoneDigits < 9 ||
+    phoneDigits > 15
+  ) {
+    return res.status(400).json({ error: 'Вкажіть імʼя і коректний номер телефону' });
+  }
+
   try {
     if (pool) {
       await ensureLeadSchema();
