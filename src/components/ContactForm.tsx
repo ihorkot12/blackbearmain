@@ -47,6 +47,7 @@ export const ContactForm = ({
   const [error, setError] = useState('');
   // Вікова група тримається в стані, бо від неї залежать доступні слоти розкладу.
   const [age, setAge] = useState(ageGroups.length === 1 ? ageGroups[0].value : '');
+  const [location, setLocation] = useState(locations.length === 1 ? locations[0].name : '');
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,7 +187,7 @@ export const ContactForm = ({
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">Локація</label>
                   <div className="relative">
-                    <select name="location" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                    <select name="location" value={location} onChange={(e) => setLocation(e.target.value)} className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
                       <option value="">Оберіть локацію</option>
                       {locations.map(loc => (
                         <option key={loc.id} value={loc.name}>{loc.name} ({loc.address})</option>
@@ -214,6 +215,7 @@ export const ContactForm = ({
               )}
               <ScheduleChoice
                 ageValue={age}
+                locationValue={location}
                 labelClass="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2"
                 fieldClass="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm text-white placeholder:text-zinc-600"
               />
