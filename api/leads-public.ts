@@ -82,6 +82,8 @@ async function ensureLeadSchema() {
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_ip TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS user_agent TEXT;
+    ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_days TEXT;
+    ALTER TABLE leads ADD COLUMN IF NOT EXISTS preferred_time TEXT;
     CREATE INDEX IF NOT EXISTS leads_created_at_idx ON leads (created_at DESC);
 
     CREATE TABLE IF NOT EXISTS settings (
@@ -298,17 +300,21 @@ export default async function handler(req: any, res: any) {
           phone,
           age_group,
           location,
+          preferred_days,
+          preferred_time,
           client_ip,
           user_agent,
           ${leadColumns.join(', ')}
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
         )`,
         [
           name,
           phone,
           capped(body.age_group, 60),
           capped(body.location, 120),
+          capped(body.preferred_days, 60),
+          capped(body.preferred_time, 120),
           ip,
           userAgent,
           ...leadColumns.map((column) =>
@@ -326,6 +332,8 @@ export default async function handler(req: any, res: any) {
 <b>Телефон:</b> ${escapeHtml(phone)}
 <b>Вікова група:</b> ${escapeHtml(capped(body.age_group, 60) || 'Не вказано')}
 <b>Локація:</b> ${escapeHtml(capped(body.location, 120) || 'Не вказано')}
+<b>Зручні дні:</b> ${escapeHtml(capped(body.preferred_days, 60) || 'Не вказано')}
+<b>Зручний час:</b> ${escapeHtml(capped(body.preferred_time, 120) || 'Не вказано')}
 <b>Кампанія:</b> ${escapeHtml(capped(body.utm_campaign, 200) || 'Не вказано')}
     `;
 
