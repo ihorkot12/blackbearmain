@@ -53,7 +53,7 @@ export const ContactForm = ({
     const formData = new FormData(e.target as HTMLFormElement);
 
     try {
-      const ok = await submitLead({
+      const result = await submitLead({
         name: String(formData.get('name') || ''),
         phone: String(formData.get('phone') || ''),
         age_group: String(formData.get('age') || ''),
@@ -61,14 +61,14 @@ export const ContactForm = ({
         source
       });
 
-      if (ok) {
+      if (result.ok) {
         if (onSuccess) {
           onSuccess();
         } else {
           setIsSubmitted(true);
         }
       } else {
-        setError('Не вдалося відправити заявку. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
+        setError(result.error || 'Не вдалося відправити заявку. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
       }
     } catch (err) {
       console.error('Error submitting form:', err);
@@ -171,8 +171,9 @@ export const ContactForm = ({
                   name="phone"
                   type="tel" 
                   className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm placeholder:text-zinc-600"
-                  placeholder="+38 (0__) ___ __ __"
+                  placeholder="0XX XXX XX XX"
                 />
+                <p className="mt-2 text-[11px] text-zinc-500">Можна з +380 або з 0 — як вам зручно</p>
               </div>
               {locations.length === 1 ? (
                 <input type="hidden" name="location" value={locations[0].name} />
