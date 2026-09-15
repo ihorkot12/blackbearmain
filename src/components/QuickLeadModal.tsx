@@ -75,7 +75,7 @@ export const QuickLeadModal = ({
     const formData = new FormData(e.target as HTMLFormElement);
 
     try {
-      const ok = await submitLead({
+      const result = await submitLead({
         name: String(formData.get('name') || ''),
         phone: String(formData.get('phone') || ''),
         age_group: String(formData.get('age') || ''),
@@ -83,10 +83,10 @@ export const QuickLeadModal = ({
         source
       });
 
-      if (ok) {
+      if (result.ok) {
         setIsDone(true);
       } else {
-        setError('Не вдалося відправити заявку. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
+        setError(result.error || 'Не вдалося відправити заявку. Спробуйте ще раз або зателефонуйте: 095 475 65 00');
       }
     } catch (err) {
       console.error('Error submitting quick lead:', err);
@@ -179,8 +179,9 @@ export const QuickLeadModal = ({
                       inputMode="tel"
                       autoComplete="tel"
                       className={fieldClass}
-                      placeholder="+38 (0__) ___ __ __"
+                      placeholder="0XX XXX XX XX"
                     />
+                    <p className="mt-2 text-[11px] text-zinc-500">Можна з +380 або з 0 — як вам зручно</p>
                   </div>
 
                   <div className={`grid gap-4 ${locations.length === 1 || ageGroups.length === 1 ? '' : 'sm:grid-cols-2'}`}>
