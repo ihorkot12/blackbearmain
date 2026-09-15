@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Send, X, CheckCircle2, ChevronDown } from 'lucide-react';
 import { submitLead } from '../lib/leadTracking';
+import { ScheduleChoice } from './ScheduleChoice';
 
 interface QuickLeadModalProps {
   open: boolean;
@@ -41,6 +42,8 @@ export const QuickLeadModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDone, setIsDone] = useState(false);
   const [error, setError] = useState('');
+  // Вікова група тримається в стані, бо від неї залежать доступні слоти розкладу.
+  const [age, setAge] = useState(ageGroups.length === 1 ? ageGroups[0].value : '');
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -80,6 +83,8 @@ export const QuickLeadModal = ({
         phone: String(formData.get('phone') || ''),
         age_group: String(formData.get('age') || ''),
         location: String(formData.get('location') || ''),
+        preferred_days: String(formData.get('preferred_days') || ''),
+        preferred_time: String(formData.get('preferred_time') || ''),
         source
       });
 
@@ -191,7 +196,7 @@ export const QuickLeadModal = ({
                       <div>
                         <label className={labelClass} htmlFor="quick-lead-age">{ageLabel}</label>
                         <div className="relative">
-                          <select id="quick-lead-age" name="age" defaultValue="" className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
+                          <select id="quick-lead-age" name="age" value={age} onChange={(e) => setAge(e.target.value)} className={`${fieldClass} appearance-none cursor-pointer pr-12`}>
                             <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
                             {ageGroups.map(group => (
                               <option key={group.value} value={group.value}>{group.label}</option>
@@ -219,6 +224,8 @@ export const QuickLeadModal = ({
                       </div>
                     )}
                   </div>
+
+                  <ScheduleChoice ageValue={age} labelClass={labelClass} fieldClass={fieldClass} />
 
                   {error && (
                     <p className="text-sm text-red-400 leading-relaxed">{error}</p>
