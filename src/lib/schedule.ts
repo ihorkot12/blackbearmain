@@ -1,52 +1,70 @@
 /**
- * Розклад груп для вибору «зручні дні → зручний час» у формі заявки.
- * Джерело — чинний розклад локації Сім'ї Бродських з вересня 2026.
- * Тримається окремо від форм, щоб правка розкладу була в одному місці.
+ * Розклад для вибору «зручні дні → зручний час» у формі заявки.
+ * Джерело — той самий /api/schedule, що показує розклад на сайті і який
+ * тренер редагує у своєму модулі. Нічого не дублюємо в коді: змінив розклад
+ * в адмінці — форма одразу пропонує нові дні й часи.
  */
 
-export type DayBlockValue = 'mwf' | 'tt' | 'other';
-
-export interface DayBlock {
-  value: DayBlockValue;
-  label: string;
+export interface ScheduleRow {
+  id?: number;
+  day_of_week: string;
+  start_time: string;
+  end_time?: string | null;
+  group_name?: string | null;
+  location_name?: string | null;
+  order_index?: number;
 }
 
-export const DAY_BLOCKS: DayBlock[] = [
-  { value: 'mwf', label: 'Пн / Ср / Пт' },
-  { value: 'tt', label: 'Вт / Чт' },
-  { value: 'other', label: 'Інші дні' }
-];
+/** Порядок днів тижня для сортування блоків на кшталт «Пн, Ср, Пт». */
+const DAY_ORDER = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
 
-export interface Slot {
-  days: Exclude<DayBlockValue, 'other'>;
-  /** Час у вигляді, який бачить людина */
-  time: string;
-  /** Значення age_group, яким підходить слот */
-  ageValues: string[];
-  /** Коротка назва групи поруч із часом */
-  label: string;
-}
-
-export const SLOTS: Slot[] = [
-  { days: 'mwf', time: '17:00–17:40', ageValues: ['4-7 років'], label: 'нова група 4–7' },
-  { days: 'mwf', time: '17:40–18:20', ageValues: ['4-7 років'], label: 'молодша 4–7' },
-  { days: 'mwf', time: '18:30–19:30', ageValues: ['7-12 років'], label: 'середня 7–12' },
-  { days: 'mwf', time: '19:40–21:00', ageValues: ['12+ років'], label: 'старша 12+' },
-  { days: 'tt', time: '17:20–18:00', ageValues: ['4-7 років'], label: 'нова група 4–7' },
-  { days: 'tt', time: '18:10–18:50', ageValues: ['4-7 років'], label: 'молодша 4–7' },
-  { days: 'tt', time: '19:00–20:00', ageValues: ['Дорослий'], label: 'дорослі новачки' }
-];
-
-/** Групи, для яких розклад визначений. Для решти (цілі персоналок) вибір не показуємо. */
-export const KNOWN_AGE_VALUES = ['4-7 років', '7-12 років', '12+ років', 'Дорослий'];
-
-export const hasSchedule = (ageValue?: string) =>
-  !ageValue || KNOWN_AGE_VALUES.includes(ageValue);
-
-/** Слоти для обраних днів; за заданої групи — лише її слоти (порожньо = групи в ці дні немає). */
-export const slotsFor = (days: DayBlockValue | '', ageValue?: string): Slot[] => {
-  if (!days || days === 'other') return [];
-  const byDay = SLOTS.filter((slot) => slot.days === days);
-  if (!ageValue) return byDay;
-  return byDay.filter((slot) => slot.ageValues.includes(ageValue));
+export const dayBlockWeight = (dayOfWeek: string) => {
+  const index = DAY_ORDER.findIndex((day) => dayOfWeek.includes(day));
+  return index === -1 ? 99 : index;
 };
+
+/**
+ * Витягує віковий діапазон із довільного підпису: «(4-7 років)», «(12+ років)»,
+ * «Середня група (7–12 років)». Повертає null, якщо чисел немає.
+ */
+export const parseAgeRange = (text?: string | null): [number, number] | null => {
+  if (!text) return null;
+  const range = text.match(/(\d{1,2})\s*[–—-]\s*(\d{1,2})/);
+  if (range) return [Number(range[1]), Number(range[2])];
+  const openEnded = text.match(/(\d{1,2})\s*\+/);
+  if (openEnded) return [Number(openEnded[1]), 99];
+  return null;
+};
+
+/** Чи підходить заняття обраній віковій групі — діапазони мають перетинатись. */
+export const ageMatches = (groupName?: string | null, ageValue?: string) => {
+  const wanted = parseAgeRange(ageValue);
+  if (!wanted) return true;
+  const actual = parseAgeRange(groupName);
+  if (!actual) return false;
+  return wanted[0] <= actual[1] && actual[0] <= wanted[1];
+};
+
+/** Вантажить розклад із сайту. Порожній масив — форма просто не покаже блок. */
+export const fetchSchedule = async (): Promise<ScheduleRow[]> => {
+  try {
+    const response = await fetch('/api/schedule');
+    if (!response.ok) return [];
+    const rows = await response.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+};
+
+export const matchesLocation = (row: ScheduleRow, locationValue?: string) =>
+  !locationValue || !row.location_name || row.location_name === locationValue;
+
+/** Унікальні набори днів («Пн, Ср, Пт», «Вт, Чт») серед занять, що підходять. */
+export const dayBlocksFrom = (rows: ScheduleRow[]) => {
+  const unique = Array.from(new Set(rows.map((row) => row.day_of_week).filter(Boolean)));
+  return unique.sort((a, b) => dayBlockWeight(a) - dayBlockWeight(b));
+};
+
+export const formatSlotTime = (row: ScheduleRow) =>
+  row.end_time ? `${row.start_time}–${row.end_time}` : row.start_time;
