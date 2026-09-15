@@ -31,6 +31,25 @@ let schemaReady = false;
 
 const clean = (value: any) => (typeof value === 'string' && value.trim() ? value.trim() : null);
 
+/** Обрізає рядок до ліміту — щоб у базу не можна було залити мегабайти. */
+const capped = (value: any, max: number) => {
+  const v = clean(value);
+  return v ? v.slice(0, max) : null;
+};
+
+/** Екранування для Telegram parse_mode=HTML: інакше вміст заявки ламає розмітку. */
+const escapeHtml = (value: any) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+const ALLOWED_ORIGINS = [
+  'https://shin-karate.kyiv.ua',
+  'https://www.shin-karate.kyiv.ua',
+  'https://blackbear-nu.vercel.app',
+];
+
 async function ensureLeadSchema() {
   if (!pool || schemaReady) return;
 
@@ -61,6 +80,9 @@ async function ensureLeadSchema() {
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS landing_page TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS page_url TEXT;
     ALTER TABLE leads ADD COLUMN IF NOT EXISTS referrer TEXT;
+    ALTER TABLE leads ADD COLUMN IF NOT EXISTS client_ip TEXT;
+    ALTER TABLE leads ADD COLUMN IF NOT EXISTS user_agent TEXT;
+    CREATE INDEX IF NOT EXISTS leads_created_at_idx ON leads (created_at DESC);
 
     CREATE TABLE IF NOT EXISTS settings (
       key TEXT PRIMARY KEY,
@@ -200,13 +222,38 @@ async function sendMetaLeadEvent(body: any, req: any) {
   return response.ok;
 }
 
+/** Скільки заявок з цього IP або телефону вже прийнято за останні хвилини. */
+async function recentCount(column: string, value: string, minutes: number) {
+  if (!pool || !value) return 0;
+  const result = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM leads
+      WHERE ${column} = $1 AND created_at > NOW() - ($2 || ' minutes')::interval`,
+    [value, String(minutes)]
+  );
+  return result.rows[0]?.n ?? 0;
+}
+
 export default async function handler(req: any, res: any) {
+  res.setHeader('Cache-Control', 'no-store');
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Форма живе на нашому домені. Запит із чужого Origin — не наш відвідувач.
+  const origin = clean(req.headers?.origin);
+  if (origin && !ALLOWED_ORIGINS.includes(origin)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
   const body = req.body || {};
+
+  // Пастка для ботів: поле приховане від людей, заповнене — значить це скрипт.
+  if (clean(body.company) || clean(body.website)) {
+    return res.json({ success: true, telegramSent: false, metaSent: false });
+  }
+
   const name = clean(body.name);
   const phone = clean(body.phone);
 
@@ -228,38 +275,58 @@ export default async function handler(req: any, res: any) {
     return res.status(400).json({ error: 'Вкажіть імʼя і коректний номер телефону' });
   }
 
+  const ip = clientIp(req) || null;
+  const userAgent = capped(req.headers?.['user-agent'], 300);
+
   try {
     if (pool) {
       await ensureLeadSchema();
+
+      // Той самий номер протягом 10 хвилин — повторне натискання, а не нова заявка.
+      if (await recentCount('phone', phone, 10)) {
+        return res.json({ success: true, duplicate: true, telegramSent: false, metaSent: false });
+      }
+
+      // Не більше 3 заявок з одного IP за 15 хвилин.
+      if (ip && (await recentCount('client_ip', ip, 15)) >= 3) {
+        return res.status(429).json({ error: 'Забагато заявок. Спробуйте за кілька хвилин.' });
+      }
+
       await pool.query(
         `INSERT INTO leads (
           name,
           phone,
           age_group,
           location,
+          client_ip,
+          user_agent,
           ${leadColumns.join(', ')}
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
         )`,
         [
           name,
           phone,
-          clean(body.age_group),
-          clean(body.location),
-          ...leadColumns.map((column) => clean(body[column])),
+          capped(body.age_group, 60),
+          capped(body.location, 120),
+          ip,
+          userAgent,
+          ...leadColumns.map((column) =>
+            capped(body[column], column.endsWith('_page') || column === 'page_url' || column === 'referrer' ? 500 : 200)
+          ),
         ]
       );
     }
 
-    const source = clean(body.source) || 'main';
+    const source = capped(body.source, 60) || 'main';
     const message = `
 <b>Нова заявка на пробне заняття</b>
-<b>Джерело:</b> ${source}
-<b>Ім'я:</b> ${name}
-<b>Телефон:</b> ${phone}
-<b>Вікова група:</b> ${clean(body.age_group) || 'Не вказано'}
-<b>Локація:</b> ${clean(body.location) || 'Не вказано'}
-<b>Кампанія:</b> ${clean(body.utm_campaign) || 'Не вказано'}
+<b>Джерело:</b> ${escapeHtml(source)}
+<b>Ім'я:</b> ${escapeHtml(name)}
+<b>Телефон:</b> ${escapeHtml(phone)}
+<b>Вікова група:</b> ${escapeHtml(capped(body.age_group, 60) || 'Не вказано')}
+<b>Локація:</b> ${escapeHtml(capped(body.location, 120) || 'Не вказано')}
+<b>Кампанія:</b> ${escapeHtml(capped(body.utm_campaign, 200) || 'Не вказано')}
     `;
 
     const [telegramSent, metaSent] = await Promise.allSettled([
