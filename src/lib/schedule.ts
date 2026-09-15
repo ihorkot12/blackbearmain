@@ -36,13 +36,16 @@ export const parseAgeRange = (text?: string | null): [number, number] | null => 
   return null;
 };
 
-/** Чи підходить заняття обраній віковій групі — діапазони мають перетинатись. */
+/**
+ * Чи підходить заняття обраній віковій групі. Перетин строгий: сусідні групи
+ * 4–7 і 7–12 дотикаються в сімці, але це різні групи, тож дотик не рахуємо.
+ */
 export const ageMatches = (groupName?: string | null, ageValue?: string) => {
   const wanted = parseAgeRange(ageValue);
   if (!wanted) return true;
   const actual = parseAgeRange(groupName);
   if (!actual) return false;
-  return wanted[0] <= actual[1] && actual[0] <= wanted[1];
+  return wanted[0] < actual[1] && actual[0] < wanted[1];
 };
 
 /** Вантажить розклад із сайту. Порожній масив — форма просто не покаже блок. */
