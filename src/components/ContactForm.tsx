@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { MapPin, Send, ChevronDown } from 'lucide-react';
 import { submitLead } from '../lib/leadTracking';
+import { ScheduleChoice } from './ScheduleChoice';
 
 interface ContactFormProps {
   locations: any[];
@@ -44,6 +45,8 @@ export const ContactForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [error, setError] = useState('');
+  // Вікова група тримається в стані, бо від неї залежать доступні слоти розкладу.
+  const [age, setAge] = useState(ageGroups.length === 1 ? ageGroups[0].value : '');
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +61,8 @@ export const ContactForm = ({
         phone: String(formData.get('phone') || ''),
         age_group: String(formData.get('age') || ''),
         location: String(formData.get('location') || ''),
+        preferred_days: String(formData.get('preferred_days') || ''),
+        preferred_time: String(formData.get('preferred_time') || ''),
         source
       });
 
@@ -197,7 +202,7 @@ export const ContactForm = ({
                 <div>
                   <label className="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2">{ageLabel}</label>
                   <div className="relative">
-                    <select name="age" defaultValue="" className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
+                    <select name="age" value={age} onChange={(e) => setAge(e.target.value)} className="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 pr-12 focus:border-red-600 outline-none transition-all appearance-none text-sm text-white cursor-pointer">
                       <option value="">{/ціль/i.test(ageLabel) ? 'Оберіть ціль' : 'Оберіть групу'}</option>
                       {ageGroups.map(group => (
                         <option key={group.value} value={group.value}>{group.label}</option>
@@ -207,6 +212,11 @@ export const ContactForm = ({
                   </div>
                 </div>
               )}
+              <ScheduleChoice
+                ageValue={age}
+                labelClass="block text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-2"
+                fieldClass="w-full bg-black border border-white/10 rounded-2xl px-6 py-4 focus:border-red-600 outline-none transition-all text-sm text-white placeholder:text-zinc-600"
+              />
               {error && (
                 <p className="text-sm text-red-400 leading-relaxed">{error}</p>
               )}
