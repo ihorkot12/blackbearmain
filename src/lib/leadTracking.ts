@@ -77,7 +77,13 @@ export interface LeadPayload {
  * Єдина точка відправки заявки: POST /api/leads-public,
  * далі generate_lead (GA) і стандартна подія Lead (Meta) з тим самим event_id.
  */
-export const submitLead = async (payload: LeadPayload): Promise<boolean> => {
+export interface LeadResult {
+  ok: boolean;
+  /** Текст помилки від сервера — щоб показати людині, що саме виправити. */
+  error?: string;
+}
+
+export const submitLead = async (payload: LeadPayload): Promise<LeadResult> => {
   const eventId = createEventId();
   const trackingData = getTrackingData();
 
@@ -97,7 +103,10 @@ export const submitLead = async (payload: LeadPayload): Promise<boolean> => {
     body: JSON.stringify(body)
   });
 
-  if (!res.ok) return false;
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    return { ok: false, error: data?.error };
+  }
 
   if (typeof window !== 'undefined') {
     const conversion = {
@@ -126,5 +135,5 @@ export const submitLead = async (payload: LeadPayload): Promise<boolean> => {
     }
   }
 
-  return true;
+  return { ok: true };
 };
