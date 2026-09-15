@@ -153,11 +153,6 @@ async function sendTelegramMessage(text: string) {
     body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
   });
 
-  if (!response.ok) {
-    const details = await response.text().catch(() => '');
-    console.error('CAPI: Graph API rejected the event', response.status, details.slice(0, 500));
-  }
-
   return response.ok;
 }
 
@@ -228,6 +223,11 @@ async function sendMetaLeadEvent(body: any, req: any) {
       body: JSON.stringify(payload),
     }
   );
+
+  if (!response.ok) {
+    const details = await response.text().catch(() => '');
+    console.error('CAPI: Graph API rejected the event', response.status, details.slice(0, 500));
+  }
 
   return response.ok;
 }
