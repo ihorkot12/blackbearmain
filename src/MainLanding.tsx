@@ -70,6 +70,40 @@ const PHOTOS = {
   belt: '/kids/first-belt.webp'
 };
 
+/**
+ * Оживлене hero-фото (Higgsfield, Seedance 2.5): той самий кадр coach-kid,
+ * хлопець б'є в камеру і повертається у стійку. Без звуку, 6 с, цикл.
+ * Постер — оригінальне фото, тож до завантаження відео і при prefers-reduced-motion
+ * відвідувач бачить рівно те, що й раніше.
+ */
+const HERO_VIDEO = {
+  webm: '/kids/coach-kid-hero.webm',
+  mp4: '/kids/coach-kid-hero.mp4'
+};
+
+function HeroVideo({ reduce, className, alt }: { reduce: boolean | null; className: string; alt: string }) {
+  if (reduce) {
+    return <img src={PHOTOS.hero} alt={alt} fetchPriority="high" decoding="async" className={className} />;
+  }
+  return (
+    <video
+      className={className}
+      autoPlay
+      muted
+      loop
+      playsInline
+      preload="auto"
+      poster={PHOTOS.hero}
+      aria-label={alt}
+      disablePictureInPicture
+    >
+      <source src={HERO_VIDEO.webm} type="video/webm" />
+      <source src={HERO_VIDEO.mp4} type="video/mp4" />
+      <img src={PHOTOS.hero} alt={alt} className={className} />
+    </video>
+  );
+}
+
 export const MAIN_FAQ: { q: string; a: string }[] = [
   {
     q: 'Як проходять тренування під час повітряної тривоги?',
@@ -448,11 +482,9 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
                 <div className="relative aspect-[4/5] w-full">
                   <div className="pointer-events-none absolute -inset-10 rounded-full bg-red-600/20 blur-[90px]" aria-hidden />
                   <div className="relative h-full w-full overflow-hidden rounded-[32px] border border-white/10 bg-zinc-950">
-                    <img
-                      src={PHOTOS.hero}
+                    <HeroVideo
+                      reduce={reduce}
                       alt="Карате для дітей у Києві — тренер Ігор Котляревський з маленьким учнем, Black Bear Dojo"
-                      fetchPriority="high"
-                      decoding="async"
                       className="h-full w-full object-cover object-[50%_20%]"
                     />
                     <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/30 to-transparent" aria-hidden />
@@ -472,11 +504,9 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
                     <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-red-600/20 blur-3xl" aria-hidden />
 
                     <div className="relative -mx-7 -mt-7 mb-7 aspect-[4/3] overflow-hidden md:-mx-8 md:-mt-8 lg:hidden">
-                      <img
-                        src={PHOTOS.hero}
+                      <HeroVideo
+                        reduce={reduce}
                         alt="Карате для дітей у Києві — тренер з маленьким учнем"
-                        fetchPriority="high"
-                        decoding="async"
                         className="h-full w-full object-cover object-[50%_25%]"
                       />
                       <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" aria-hidden />
