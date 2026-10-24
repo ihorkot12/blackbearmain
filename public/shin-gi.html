@@ -103,7 +103,8 @@ h2.t em{font-style:normal;color:var(--red2)}
 .fmt ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;color:var(--fg2);font-size:17px}
 .fmt ul li{display:flex;gap:12px}
 .fmt ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:14px}
-.fmt .ph{margin-top:28px;aspect-ratio:3/2;overflow:hidden;border:1px solid var(--line)}
+.fmt .ph{margin-top:28px;aspect-ratio:4/5;overflow:hidden;border:1px solid var(--line);background:#050505}
+.fmt .ph video{width:100%;height:100%;object-fit:cover;transform:scale(1.75);transform-origin:50% 58%;filter:saturate(.85) contrast(1.05)}
 .fmt .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 25%;filter:saturate(.85);transition:transform .8s ease}
 .fmt:hover .ph img{transform:scale(1.03)}
 
@@ -268,7 +269,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
             <li>Повний захист: шолом, накладки, щитки</li>
             <li>Медаль і грамота кожному, хто вийшов на татамі</li>
           </ul>
-          <div class="ph"><img src="/main/teens-pair.webp" alt="Двоє юних бійців у доґі з помаранчевим і жовтим поясами" loading="lazy" width="2000" height="1335"></div>
+          <div class="ph"><video autoplay muted loop playsinline preload="metadata" poster="/main/teens-pair.webp" aria-label="Юний боєць Shin Gi відпрацьовує удар у залі-сховищі"><source src="/main/hf_20261019_233137_9feb4cbd-ea8b-4892-ac3a-4bcf44ab3ea0.mp4" type="video/mp4"></video></div>
         </article>
         <article class="fmt rv d1">
           <div class="tag">Блок 2 · день</div>
@@ -423,6 +424,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   var revealPast=function(){var h=innerHeight;document.querySelectorAll('.rv:not(.in)').forEach(function(el){if(el.getBoundingClientRect().top<h*0.95)el.classList.add('in')})};
   window.addEventListener('scroll',revealPast,{passive:true});window.addEventListener('hashchange',function(){setTimeout(revealPast,50)});
   setTimeout(function(){document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')})},6000);
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('video[autoplay]').forEach(function(v){v.removeAttribute('autoplay');v.pause()})}
   var btn=document.getElementById('copy'),num=document.getElementById('phone');
   if(btn){btn.addEventListener('click',function(){
     var done=function(){btn.textContent='Скопійовано';setTimeout(function(){btn.textContent='Скопіювати'},2000)};
