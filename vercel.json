@@ -168,6 +168,10 @@
       "destination": "/privacy.html"
     },
     {
+      "source": "/shin-gi",
+      "destination": "/shin-gi.html"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
