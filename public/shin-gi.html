@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SHIN GI · Kyokushin Open — спаринг-день у залі-сховищі, Київ</title>
+<meta name="description" content="Shin Gi — спаринг-день з кіокушин карате у залі-сховищі на Шулявці. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів. Медаль і грамота кожному.">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://shin-karate.kyiv.ua/shin-gi">
+<meta property="og:url" content="https://shin-karate.kyiv.ua/shin-gi">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SHIN GI · Kyokushin Open">
+<meta property="og:description" content="Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.">
+<meta property="og:image" content="https://shin-karate.kyiv.ua/og/default.jpg">
+<meta property="og:locale" content="uk_UA">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Golos+Text:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700&text=%E5%BF%83%E6%8A%80&display=swap">
+<style>
+:root{
+  --bg:#0A0A0A; --bg2:#0E0E0D; --fg:#F2F2F0; --fg2:#CFCFCB; --muted:#7A7A7A; --line:#242422; --edge:#33332F;
+  --red:#8B0000; --red2:#A3101A; --gold:#C9A227;
+  --display:"Oswald","Arial Narrow",Impact,sans-serif; --body:"Golos Text","Segoe UI",system-ui,sans-serif; --kanji:"Noto Serif JP","Yu Mincho","Hiragino Mincho ProN",serif;
+  --w:1080px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:18px;line-height:1.6;overflow-x:hidden}
+img{max-width:100%;display:block}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+.wrap{max-width:var(--w);margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+.grain{position:relative}
+.grain::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.045;mix-blend-mode:screen;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>")}
+
+.nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(10,10,10,.72);border-bottom:1px solid transparent;transition:border-color .3s}
+.nav.scrolled{border-color:var(--line)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+.mark{font-family:var(--display);font-weight:600;letter-spacing:.14em;font-size:14px;text-transform:uppercase;text-decoration:none;white-space:nowrap}
+.mark b{color:var(--red2);font-weight:600}
+.nav nav{display:flex;gap:26px}
+.nav nav a{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav nav a:hover{color:var(--fg)}
+.nav .cta{font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:10px 16px;border:1px solid var(--edge);text-decoration:none;transition:border-color .2s,background .2s;white-space:nowrap}
+.nav .cta:hover{border-color:var(--fg);background:#141413}
+
+.hero{position:relative;min-height:88vh;display:grid;align-items:end;overflow:hidden;padding-block:72px 64px}
+.hero .kanji{position:absolute;right:-2vw;top:4vh;font-family:var(--kanji);font-weight:700;font-size:clamp(220px,34vw,520px);line-height:1;color:#fff;opacity:.05;letter-spacing:-.04em;user-select:none;pointer-events:none;white-space:nowrap}
+.hero .photo{position:absolute;right:0;top:0;bottom:0;width:min(46vw,560px);opacity:.9;-webkit-mask-image:linear-gradient(90deg,transparent,#000 35%);mask-image:linear-gradient(90deg,transparent,#000 35%)}
+.hero .photo img{width:100%;height:100%;object-fit:cover;object-position:60% 30%;filter:saturate(.85) contrast(1.05)}
+.hero .diag{position:absolute;left:-10%;right:-10%;bottom:12%;height:1px;background:linear-gradient(90deg,transparent,var(--gold) 25%,var(--gold) 75%,transparent);transform:rotate(-4deg);opacity:.75;pointer-events:none}
+.eyebrow{display:flex;align-items:center;gap:12px;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.eyebrow::before{content:"";width:36px;height:2px;background:var(--red2);flex:none}
+.hero h1{position:relative;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(84px,17vw,228px);line-height:.92;letter-spacing:-.005em;margin:22px 0 0}
+.hero h1 em{font-style:normal;color:var(--red2)}
+.gloss{display:flex;align-items:baseline;gap:14px;margin-top:20px;flex-wrap:wrap}
+.gloss .k{font-family:var(--kanji);font-weight:700;font-size:30px;line-height:1;color:var(--gold)}
+.gloss .t{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.lead{max-width:30em;font-size:clamp(18px,2.2vw,22px);color:var(--fg2);margin:28px 0 0;position:relative}
+.hero-cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;margin-top:38px;position:relative}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:12px;font-family:var(--display);font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:15px;padding:18px 30px;background:var(--red);color:#fff;text-decoration:none;border:1px solid var(--red);transition:background .2s,border-color .2s,transform .2s}
+.btn:hover{background:var(--red2);border-color:var(--red2)}
+.btn.ghost{background:transparent;border-color:var(--edge);color:var(--fg)}
+.btn.ghost:hover{border-color:var(--fg);background:#141413}
+.btn .arr{display:inline-block;transition:transform .2s}
+.btn:hover .arr{transform:translateX(4px)}
+.facts{display:flex;gap:28px;flex-wrap:wrap;font-size:13px;letter-spacing:.06em;color:var(--muted)}
+.facts b{color:var(--fg);font-weight:500}
+
+section{position:relative}
+.sec{padding-block:120px}
+.label{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+h2.t{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(38px,6.2vw,80px);line-height:.98;margin:0;letter-spacing:.005em;text-wrap:balance}
+h2.t em{font-style:normal;color:var(--red2)}
+.sub{max-width:34em;color:var(--fg2);margin:26px 0 0;font-size:clamp(17px,1.6vw,20px)}
+.div{display:flex;align-items:center;gap:22px;color:var(--gold);font-family:var(--kanji);font-weight:700;font-size:22px;opacity:.9}
+.div::before,.div::after{content:"";flex:1;height:1px;background:var(--line)}
+
+.why{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.why .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end}
+.why .sub{margin-top:0}
+.why .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--edge);padding:10px 14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-top:26px}
+.why .pill i{width:8px;height:8px;background:var(--gold);border-radius:50%;display:inline-block}
+
+.rows{border-top:1px solid var(--line);margin-top:56px}
+.row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px 48px;padding:46px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.row h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(48px,8.4vw,96px);line-height:.95;margin:0;letter-spacing:.005em}
+.row p{margin:0;font-size:clamp(18px,1.7vw,21px);color:var(--fg2);max-width:26em}
+.row p b{color:var(--fg);font-weight:600}
+.row .n{font-size:12px;letter-spacing:.2em;color:var(--muted);margin-bottom:10px;display:block}
+
+.formats{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);margin-top:56px}
+.fmt{padding:40px 36px;position:relative;min-width:0}
+.fmt+.fmt{border-left:1px solid var(--line)}
+.fmt .tag{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+.fmt h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(34px,4vw,52px);line-height:1;margin:14px 0 18px}
+.fmt h3 em{font-style:normal;color:var(--red2)}
+.fmt ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;color:var(--fg2);font-size:17px}
+.fmt ul li{display:flex;gap:12px}
+.fmt ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:14px}
+.fmt .ph{margin-top:28px;aspect-ratio:3/2;overflow:hidden;border:1px solid var(--line)}
+.fmt .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 25%;filter:saturate(.85);transition:transform .8s ease}
+.fmt:hover .ph img{transform:scale(1.03)}
+
+.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;margin-top:56px}
+.cat{border-top:2px solid var(--edge);padding-top:22px}
+.cat .L{font-family:var(--display);font-weight:700;font-size:clamp(72px,9vw,112px);line-height:.9;color:var(--fg)}
+.cat .L small{display:block;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:10px;font-family:var(--body);font-weight:500}
+.belts{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:12px}
+.belts li{display:flex;align-items:center;gap:14px;font-size:16px;color:var(--fg2)}
+.sw{width:44px;height:12px;flex:none;position:relative;border:1px solid rgba(255,255,255,.12)}
+.sw.s::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);background:var(--s)}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:56px;border-top:1px solid var(--line);padding-top:26px}
+.rules dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.rules dd{margin:0;font-size:18px;color:var(--fg2)}
+.rules dd b{color:var(--fg);font-weight:600}
+
+.steps{list-style:none;margin:56px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;counter-reset:s}
+.steps li{counter-increment:s;border-top:2px solid var(--edge);padding-top:22px;min-width:0}
+.steps li::before{content:"0" counter(s);font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.16em;color:var(--red2);display:block;margin-bottom:14px}
+.steps li b{display:block;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(28px,3.2vw,40px);line-height:1;margin-bottom:12px}
+.steps li span{color:var(--fg2);font-size:17px}
+
+.who{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.who .grid{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:56px;align-items:center}
+.who .ph{aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line)}
+.who .ph img{width:100%;height:100%;object-fit:cover;filter:saturate(.8)}
+.who .hist{margin-top:26px;display:grid;gap:14px;border-top:1px solid var(--line);padding-top:22px}
+.who .hist div{display:grid;grid-template-columns:96px 1fr;gap:16px;font-size:17px;color:var(--fg2)}
+.who .hist div b{font-family:var(--display);font-weight:600;color:var(--gold);letter-spacing:.06em;font-size:18px}
+.coach{display:grid;grid-template-columns:120px 1fr;gap:22px;align-items:center;margin-top:36px;border-top:1px solid var(--line);padding-top:26px}
+.coach .av{width:120px;aspect-ratio:3/4;overflow:hidden;border:1px solid var(--line)}
+.coach .av img{width:100%;height:100%;object-fit:cover;object-position:50% 15%;filter:saturate(.8)}
+.coach b{display:block;font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:.02em;line-height:1.1}
+.coach .reg{color:var(--gold);font-size:14px;letter-spacing:.06em;margin-top:6px}
+.coach p{margin:8px 0 0;color:var(--fg2);font-size:16px}
+
+.terms .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:56px;align-items:start}
+.price{font-family:var(--display);font-weight:700;font-size:clamp(64px,10vw,128px);line-height:.9;letter-spacing:-.01em;margin:26px 0 0;font-variant-numeric:tabular-nums}
+.price small{font-size:.32em;letter-spacing:.06em;color:var(--muted);font-weight:500;margin-left:10px}
+.terms ul{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:12px;color:var(--fg2);font-size:17px;max-width:30em}
+.terms ul li{display:flex;gap:12px}
+.terms ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:14px}
+.jar{border-left:1px solid var(--line);padding-left:40px}
+.jar .qr{width:132px;height:132px;border:1px solid var(--edge);display:grid;place-items:center;margin-top:22px;background:#111}
+.jar p{color:var(--fg2);font-size:16px;margin:18px 0 0}
+.jar a.lnk{display:inline-block;margin-top:14px;font-size:14px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:2px}
+.jar a.lnk:hover{border-color:var(--fg)}
+
+.final{padding-block:120px 96px;overflow:hidden}
+.final .kanji{position:absolute;left:-2vw;bottom:-6vh;font-family:var(--kanji);font-weight:700;font-size:clamp(180px,28vw,420px);line-height:1;color:#fff;opacity:.04;pointer-events:none;user-select:none;white-space:nowrap}
+.final .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end;position:relative}
+.final .ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:36px}
+.contact{display:grid;gap:14px;font-size:16px;color:var(--fg2)}
+.contact dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.contact dd{margin:0}
+.contact dd a{text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:1px}
+.contact dd a:hover{border-color:var(--fg)}
+.ph-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.copy{background:transparent;color:var(--muted);border:1px solid var(--edge);font:inherit;font-size:13px;padding:6px 12px;cursor:pointer;letter-spacing:.04em}
+.copy:hover{color:var(--fg);border-color:var(--fg)}
+footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between}
+
+.rv{opacity:1;transform:none}
+.js .rv{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+.js .rv.in{opacity:1;transform:none}
+.js .rv.d1{transition-delay:.08s}.js .rv.d2{transition-delay:.16s}.js .rv.d3{transition-delay:.24s}
+.js .hero .h-in{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
+.js .hero .h-in.d1{animation-delay:.1s}.js .hero .h-in.d2{animation-delay:.2s}.js .hero .h-in.d3{animation-delay:.3s}.js .hero .h-in.d4{animation-delay:.4s}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.js .hero .h-in{animation:none}.fmt .ph img,.btn .arr{transition:none}}
+
+@media (max-width:900px){
+  .why .grid,.who .grid,.terms .grid,.final .grid{grid-template-columns:minmax(0,1fr);gap:36px}
+  .cats,.rules,.steps{grid-template-columns:minmax(0,1fr)}
+  .formats{grid-template-columns:minmax(0,1fr)}
+  .fmt+.fmt{border-left:0;border-top:1px solid var(--line)}
+  .jar{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:32px}
+  .row{grid-template-columns:minmax(0,1fr);padding:36px 0}
+  .sec{padding-block:88px}
+}
+@media (max-width:640px){
+  body{font-size:17px}
+  .nav nav{display:none}
+  .hero{min-height:auto;padding-block:56px 56px}
+  .hero .photo{width:70vw;opacity:.5;-webkit-mask-image:linear-gradient(90deg,transparent,#000 50%);mask-image:linear-gradient(90deg,transparent,#000 50%)}
+  .hero .kanji{font-size:62vw;top:2vh;right:-6vw}
+  .btn{width:100%}
+  .fmt{padding:30px 22px}
+  .coach{grid-template-columns:96px 1fr}
+  .coach .av{width:96px}
+}
+</style>
+</head>
+<body>
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="mark" href="#top">Black Bear <b>Dojo</b></a>
+    <nav>
+      <a href="#chomu">Чому зараз</a>
+      <a href="#format">Формат</a>
+      <a href="#kategorii">Категорії</a>
+      <a href="#umovy">Умови</a>
+    </nav>
+    <a class="cta" href="#zayavka">Заявка</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero grain">
+    <div class="kanji" aria-hidden="true">心技</div>
+    <div class="photo" aria-hidden="true"><img src="/kids/kid-kick.webp" alt="" fetchpriority="high" width="1335" height="2000"></div>
+    <div class="diag" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="eyebrow h-in">Спаринг-день · Kyokushin Open · Київ</div>
+      <h1 class="h-in d1">Shin <em>Gi</em></h1>
+      <div class="gloss h-in d2"><span class="k" aria-hidden="true">心技</span><span class="t">Дух і майстерність</span></div>
+      <p class="lead h-in d3">Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.</p>
+      <div class="hero-cta h-in d4">
+        <a class="btn" href="#zayavka">Зареєструвати команду <span class="arr">→</span></a>
+        <div class="facts"><span><b>Неділя</b> · дата в Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="why sec" id="chomu">
+    <div class="wrap grid">
+      <div>
+        <p class="label rv">Чому зараз</p>
+        <h2 class="t rv d1">Змагань з кіокушин майже немає. <em>Або вони з перервами на тривогу.</em></h2>
+      </div>
+      <div>
+        <p class="sub rv d2">Сітка зупиняється, діти чекають годинами, день втрачено. У залі-сховищі тривога бою не зупиняє: учасники вже в укритті, поєдинки йдуть за розкладом.</p>
+        <div class="pill rv d3"><i></i>Зал у безпечному приміщенні, тренування не зупиняється</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="pr-h">
+    <div class="wrap">
+      <p class="label rv">Переваги</p>
+      <h2 class="t rv d1" id="pr-h">Три речі, яких бракує</h2>
+      <div class="rows">
+        <div class="row rv"><h3><span class="n">01</span>Швидко</h3><p><b>Дві години замість дня.</b> Прийшов на свій блок, провів бої, поїхав додому.</p></div>
+        <div class="row rv"><h3><span class="n">02</span>Досвід</h3><p><b>Два–три бої з рівним суперником.</b> Групи за статтю, віком, вагою і категорією пояса.</p></div>
+        <div class="row rv"><h3><span class="n">03</span>Безпечно</h3><p><b>Зал — бомбосховище, 200 м².</b> Без перерв, без евакуацій, з медиком на місці.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="format" aria-labelledby="f-h">
+    <div class="wrap">
+      <div class="div rv" aria-hidden="true">心技</div>
+      <p class="label rv" style="margin-top:56px">Формат</p>
+      <h2 class="t rv d1" id="f-h">Один день. <em>Два блоки.</em></h2>
+      <div class="formats">
+        <article class="fmt rv">
+          <div class="tag">Блок 1 · ранок</div>
+          <h3>Shin Gi <em>Kids</em></h3>
+          <ul>
+            <li>Бійці до 18 років</li>
+            <li>Групи кроком 5 кг, категорії поясів A · B · C</li>
+            <li>Повний захист: шолом, накладки, щитки</li>
+            <li>Медаль і грамота кожному, хто вийшов на татамі</li>
+          </ul>
+          <div class="ph"><img src="/main/teens-pair.webp" alt="Двоє юних бійців у доґі з помаранчевим і жовтим поясами" loading="lazy" width="2000" height="1335"></div>
+        </article>
+        <article class="fmt rv d1">
+          <div class="tag">Блок 2 · день</div>
+          <h3>Shin Gi <em>Open</em></h3>
+          <ul>
+            <li>Підлітки від 14 і дорослі 18+</li>
+            <li>Групи кроком 10 кг, категорії поясів A · B · C</li>
+            <li>Захист і шолом із забралом — обов'язково</li>
+            <li>Формат, у якому Shin Gi проходить з 2024 року</li>
+          </ul>
+          <div class="ph"><img src="/personal/pair-blackbelts.webp" alt="Двоє дорослих бійців у чорних поясах" loading="lazy" width="1335" height="2000" style="object-position:50% 20%"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" id="kategorii" aria-labelledby="k-h">
+    <div class="wrap">
+      <p class="label rv">Поділ на групи</p>
+      <h2 class="t rv d1" id="k-h">Три категорії за поясом</h2>
+      <div class="cats">
+        <div class="cat rv">
+          <div class="L">A<small>Початок</small></div>
+          <ul class="belts">
+            <li><span class="sw" style="background:#F2F2F0"></span>Білий</li>
+            <li><span class="sw" style="background:#E8742A"></span>10 кю · помаранчевий</li>
+            <li><span class="sw s" style="background:#E8742A;--s:#2A5BD7"></span>9 кю · помаранчевий зі смужкою</li>
+          </ul>
+        </div>
+        <div class="cat rv d1">
+          <div class="L">B<small>Середина</small></div>
+          <ul class="belts">
+            <li><span class="sw" style="background:#2A5BD7"></span>8 кю · синій</li>
+            <li><span class="sw s" style="background:#2A5BD7;--s:#F2C230"></span>7 кю · синій зі смужкою</li>
+            <li><span class="sw" style="background:#F2C230"></span>6 кю · жовтий</li>
+            <li><span class="sw s" style="background:#F2C230;--s:#2E9E4F"></span>5 кю · жовтий зі смужкою</li>
+          </ul>
+        </div>
+        <div class="cat rv d2">
+          <div class="L">C<small>Старші</small></div>
+          <ul class="belts">
+            <li><span class="sw" style="background:#2E9E4F"></span>4 кю · зелений</li>
+            <li><span class="sw s" style="background:#2E9E4F;--s:#6B3F1D"></span>3 кю · зелений зі смужкою</li>
+            <li><span class="sw" style="background:#6B3F1D"></span>2 кю · коричневий</li>
+            <li><span class="sw s" style="background:#6B3F1D;--s:#000"></span>1 кю · коричневий зі смужкою</li>
+            <li><span class="sw" style="background:#0A0A0A"></span>Дан · чорний</li>
+          </ul>
+        </div>
+      </div>
+      <dl class="rules rv">
+        <div><dt>Стать</dt><dd>Хлопці та дівчата, чоловіки та жінки — <b>окремо</b>.</dd></div>
+        <div><dt>Вік</dt><dd><b>До 18</b> у блоці Kids, <b>14+ і 18+</b> у блоці Open.</dd></div>
+        <div><dt>Вага</dt><dd>Крок <b>5 кг</b> для дітей, <b>10 кг</b> для дорослих. Зважування перед блоком.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="s-h">
+    <div class="wrap">
+      <div class="div rv" aria-hidden="true">心技</div>
+      <p class="label rv" style="margin-top:56px">Як проходить</p>
+      <h2 class="t rv d1" id="s-h">Три кроки</h2>
+      <ol class="steps">
+        <li class="rv"><b>Заявка</b><span>Тренер реєструє команду і оплачує внесок за всіх одним платежем. Одиночні бійці та батьки реєструються самі.</span></li>
+        <li class="rv d1"><b>Групи</b><span>За п'ять днів до події бійців зводять у групи за статтю, віком, вагою і категорією пояса. Список публікується в Telegram.</span></li>
+        <li class="rv d2"><b>Бої</b><span>Свій блок близько двох годин: зважування, два–три поєдинки, нагородження. Медаль і грамота кожному.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="who sec" aria-labelledby="w-h">
+    <div class="wrap grid">
+      <div class="ph rv"><img src="/main/club-all.webp" alt="Команда Black Bear Dojo" loading="lazy" width="2400" height="1403"></div>
+      <div>
+        <p class="label rv">Хто ми</p>
+        <h2 class="t rv d1" id="w-h" style="font-size:clamp(34px,4.6vw,60px)">Shin Gi — з 2024 року</h2>
+        <div class="hist rv d2">
+          <div><b>2024</b><span>Перші спаринг-дні для 14+ і семінари. Добровільна банка Shin Gi: 500 000 грн на допомогу військовим.</span></div>
+          <div><b>2025</b><span>Спаринги у залі-сховищі на Шулявці. Тривога не зупинила жодного бою.</span></div>
+          <div><b>2026</b><span>Kyokushin Open: дитячий блок із категоріями A · B · C і відкриті двері для всіх клубів.</span></div>
+        </div>
+        <div class="coach rv d3">
+          <div class="av"><img src="/coach-igor-personal.jpg" alt="Ігор Котляревський" loading="lazy" width="904" height="1280"></div>
+          <div>
+            <b>Ігор Котляревський</b>
+            <div class="reg">3 дан · майстер спорту України · чемпіон України · призер Європи</div>
+            <p>27 років у карате, понад 10 років тренерства. Організатор семінарів і турнірів з кіокушин.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="terms sec" id="umovy" aria-labelledby="u-h">
+    <div class="wrap grid">
+      <div>
+        <p class="label rv">Умови</p>
+        <h2 class="t rv d1" id="u-h">Разовий внесок</h2>
+        <div class="price rv d2" id="price">___<small>грн / боєць</small></div>
+        <ul class="rv d3">
+          <li>Платить тренер за команду одним платежем через кабінет; одиночні бійці — самі.</li>
+          <li>У внесок входять бої, суддівство, медик, медаль і грамота.</li>
+          <li>Місце підтверджується внеском. Дедлайн заявок — за 10 днів до події, внеску — за 7.</li>
+          <li>Повернення — при скасуванні організатором. При неявці внесок не повертається.</li>
+          <li>Кількість місць обмежена площею залу; ліміт по кожному блоку.</li>
+        </ul>
+      </div>
+      <div class="jar rv d2">
+        <p class="label">Банка Shin Gi</p>
+        <div class="qr" id="qr"><img src="data:image/png;base64,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" alt="QR-код банки Shin Gi" width="130" height="130" loading="lazy" style="width:130px;height:130px"></div>
+        <p>Добровільна банка спільноти — традиція Shin Gi з 2024 року. Не є частиною внеску й ні на що не впливає.</p>
+        <a class="lnk" href="https://send.monobank.ua/jar/5HaEEAQFoy" target="_blank" rel="noopener">send.monobank.ua/jar/5HaEEAQFoy</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="final grain" id="zayavka" aria-labelledby="z-h">
+    <div class="kanji" aria-hidden="true">心技</div>
+    <div class="wrap grid">
+      <div>
+        <p class="label rv">Реєстрація</p>
+        <h2 class="t rv d1" id="z-h">Заявка на <em>Shin Gi</em></h2>
+        <p class="sub rv d2">Кабінет реєстрації відкривається разом з анонсом дати. До того заявки приймаються в Telegram: ім'я бійця, стать, вік, вага, пояс, клуб і контакт.</p>
+        <div class="ctas rv d3">
+          <a class="btn" id="cta-team" href="https://t.me/ihorkot" target="_blank" rel="noopener">Зареєструвати команду <span class="arr">→</span></a>
+          <a class="btn ghost" id="cta-solo" href="https://t.me/ihorkot" target="_blank" rel="noopener">Я одиночний боєць</a>
+        </div>
+      </div>
+      <dl class="contact rv d2">
+        <div><dt>Telegram</dt><dd><a href="https://t.me/ihorkot" target="_blank" rel="noopener">@ihorkot</a> · канал <a href="https://t.me/shin_Gii" target="_blank" rel="noopener">@shin_Gii</a></dd></div>
+        <div><dt>Телефон</dt><dd class="ph-row"><a href="tel:+380954756500" id="phone">095 475 65 00</a><button class="copy" type="button" id="copy">Скопіювати</button></dd></div>
+        <div><dt>Адреса</dt><dd>Київ, Шулявка, вул. Сім'ї Бродських, 31/33 — зал Black Bear Dojo</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <footer class="wrap">
+    <span>Shin Gi · Kyokushin Open · Black Bear Dojo · Київ · 2026</span>
+    <span>Не турнір. Не атестація. Бої.</span>
+  </footer>
+</main>
+
+<script>
+(function(){
+  document.documentElement.classList.add('js');
+  var nav=document.getElementById('nav');
+  var onS=function(){nav.classList.toggle('scrolled',window.scrollY>8)};onS();window.addEventListener('scroll',onS,{passive:true});
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{rootMargin:'0px 0px -8% 0px',threshold:.08});
+    document.querySelectorAll('.rv').forEach(function(el){io.observe(el)});
+  }else{document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')})}
+  var revealPast=function(){var h=innerHeight;document.querySelectorAll('.rv:not(.in)').forEach(function(el){if(el.getBoundingClientRect().top<h*0.95)el.classList.add('in')})};
+  window.addEventListener('scroll',revealPast,{passive:true});window.addEventListener('hashchange',function(){setTimeout(revealPast,50)});
+  setTimeout(function(){document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')})},6000);
+  var btn=document.getElementById('copy'),num=document.getElementById('phone');
+  if(btn){btn.addEventListener('click',function(){
+    var done=function(){btn.textContent='Скопійовано';setTimeout(function(){btn.textContent='Скопіювати'},2000)};
+    var fb=function(){try{var r=document.createRange();r.selectNodeContents(num);var s=getSelection();s.removeAllRanges();s.addRange(r)}catch(e){}};
+    try{navigator.clipboard.writeText('+380954756500').then(done,fb)}catch(e){fb()}
+  })}
+})();
+</script>
+</body>
+</html>
