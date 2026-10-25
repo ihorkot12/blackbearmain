@@ -42,7 +42,9 @@ a{color:inherit}
 .nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(10,10,10,.72);border-bottom:1px solid transparent;transition:border-color .3s}
 .nav.scrolled{border-color:var(--line)}
 .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
-.mark{font-family:var(--display);font-weight:600;letter-spacing:.14em;font-size:14px;text-transform:uppercase;text-decoration:none;white-space:nowrap}
+.mark{display:inline-flex;align-items:center;gap:10px;font-family:var(--display);font-weight:600;letter-spacing:.14em;font-size:14px;text-transform:uppercase;text-decoration:none;white-space:nowrap}
+.mark .bm{width:24px;height:24px;background:#C10000;clip-path:polygon(15% 0,100% 0,85% 100%,0 100%);display:grid;place-items:center;color:#fff;font-family:"Arial Black",Impact,var(--display);font-weight:900;font-style:italic;font-size:15px;letter-spacing:-.05em;box-shadow:inset 0 0 10px rgba(0,0,0,.3);transition:transform .3s,filter .3s}
+.mark:hover .bm{transform:skewX(-4deg) scale(1.06);filter:drop-shadow(0 0 8px rgba(193,0,0,.6))}
 .mark b{color:var(--red2);font-weight:600}
 .nav nav{display:flex;gap:26px}
 .nav nav a{position:relative;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .25s;padding:4px 0}
@@ -61,8 +63,12 @@ a{color:inherit}
 .hero .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 48%,rgba(10,10,10,.82) 90%,var(--bg) 100%)}
 .eyebrow{display:flex;align-items:center;gap:12px;font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
 .eyebrow::before{content:"";width:36px;height:2px;background:var(--red2);flex:none}
-.hero h1{position:relative;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(84px,17vw,228px);line-height:.92;letter-spacing:-.005em;margin:22px 0 0}
-.hero h1 em{font-style:normal;color:var(--red2)}
+.hero h1{position:relative;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(84px,17vw,228px);line-height:.92;letter-spacing:-.005em;margin:22px 0 0;filter:drop-shadow(0 0 28px rgba(163,16,26,.22))}
+.hero h1 .w,.hero h1 em{display:inline-block;background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:sheen 7s cubic-bezier(.4,0,.2,1) infinite}
+.hero h1 .w{background-image:linear-gradient(105deg,var(--fg) 0 38%,#fff 46%,rgba(201,162,39,.9) 50%,#fff 54%,var(--fg) 62% 100%)}
+.hero h1 em{font-style:normal;background-image:linear-gradient(105deg,var(--red2) 0 38%,#D8232F 46%,#FF5A5A 50%,#D8232F 54%,var(--red2) 62% 100%);animation-delay:.35s}
+@keyframes sheen{0%,55%{background-position:120% 0}85%,100%{background-position:-120% 0}}
+.hero h1:hover .w,.hero h1:hover em{animation-duration:2.2s}
 .gloss{display:flex;align-items:baseline;gap:14px;margin-top:20px;flex-wrap:wrap}
 .gloss .k{font-family:var(--kanji);font-weight:700;font-size:30px;line-height:1;color:var(--gold)}
 .gloss .t{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
@@ -86,7 +92,7 @@ a.ul:hover{color:var(--gold);border-color:var(--gold)}
 
 /* sections */
 section{position:relative}
-.sec{padding-block:84px}
+.sec{padding-block:72px}
 .label{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:12px}
 .label::before{content:"";width:22px;height:1px;background:var(--gold);flex:none;transform:scaleX(0);transform-origin:left;transition:transform .7s cubic-bezier(.2,.7,.2,1) .15s}
 .rv.in .label::before,.label.rv.in::before,html:not(.js) .label::before{transform:scaleX(1)}
@@ -100,7 +106,7 @@ h2.t em{font-style:normal;color:var(--red2)}
 
 /* why */
 .why{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.why .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end}
+.why .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:start}
 .why .sub{margin-top:0}
 .why .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--edge);padding:10px 14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-top:26px}
 .why .pill i{width:8px;height:8px;background:var(--gold);border-radius:50%;display:inline-block}
@@ -182,7 +188,7 @@ h2.t em{font-style:normal;color:var(--red2)}
 /* system */
 .sys{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden}
 .sys .kanji{position:absolute;right:-4vw;top:-8vh;font-family:var(--kanji);font-weight:700;font-size:clamp(200px,30vw,460px);line-height:1;color:#fff;opacity:.035;pointer-events:none;user-select:none;white-space:nowrap}
-.sys .head{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:end;position:relative}
+.sys .head{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:start;position:relative}
 .sys .head .sub{margin-top:0}
 .sys .claim{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 .sys .claim span{border:1px solid var(--edge);padding:8px 12px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg2);transition:border-color .3s,color .3s}
@@ -201,11 +207,12 @@ h2.t em{font-style:normal;color:var(--red2)}
 .mod ul li::before{content:"";width:12px;height:1px;background:var(--gold);flex:none;margin-top:11px}
 .mod .arrow{position:absolute;right:-9px;top:50%;width:16px;height:16px;transform:translateY(-50%) rotate(45deg);border-top:1px solid var(--edge);border-right:1px solid var(--edge);background:var(--bg2);z-index:2}
 .mod:last-child .arrow{display:none}
-.flow{display:flex;align-items:stretch;margin-top:28px;border:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.flow{display:flex;align-items:stretch;margin-top:0;border:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
 .flow::-webkit-scrollbar{display:none}
-.flow div{flex:1 1 0;min-width:120px;padding:16px 14px;border-right:1px solid var(--line);position:relative;transition:background .3s}
+.flow div{flex:1 1 0;min-width:140px;counter-increment:f;padding:16px 14px;border-right:1px solid var(--line);position:relative;transition:background .3s}
 .flow div:last-child{border-right:0}
 .flow div:hover{background:#121211}
+.flow{counter-reset:f}
 .flow small{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-family:var(--display);font-weight:600}
 .flow b{display:block;font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:15px;letter-spacing:.04em;line-height:1.1}
 .flow span{display:block;font-size:13px;color:var(--muted);margin-top:4px}
@@ -246,12 +253,26 @@ h2.t em{font-style:normal;color:var(--red2)}
 .jar a.lnk:hover{color:var(--gold);border-color:var(--gold)}
 
 /* final */
-.final{padding-block:96px 80px;overflow:hidden}
+.final{padding-block:88px 72px;overflow:hidden;border-top:1px solid var(--line)}
+.final::before{content:"";position:absolute;left:-10%;top:-20%;width:60%;height:140%;background:radial-gradient(closest-side,rgba(139,0,0,.18),transparent 70%);pointer-events:none}
+.final .sub{position:relative}
+.final .sub::after{content:"";display:block;width:64px;height:2px;margin-top:22px;background:linear-gradient(90deg,var(--red2),var(--gold));transform:scaleX(0);transform-origin:left;transition:transform .9s cubic-bezier(.2,.7,.2,1) .3s}
+.final .sub.in::after{transform:scaleX(1)}
+.panel{border:1px solid var(--line);background:rgba(14,14,13,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:6px 24px;position:relative;transition:border-color .4s,box-shadow .4s}
+.panel:hover{border-color:var(--edge);box-shadow:0 20px 60px -30px rgba(201,162,39,.35)}
+.panel::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,var(--gold),transparent 70%);transform:scaleX(0);transform-origin:left;transition:transform .7s cubic-bezier(.2,.7,.2,1)}
+.panel:hover::before{transform:scaleX(1)}
 .final .kanji{position:absolute;left:-2vw;bottom:-6vh;font-family:var(--kanji);font-weight:700;font-size:clamp(180px,28vw,420px);line-height:1;color:#fff;opacity:.04;pointer-events:none;user-select:none;white-space:nowrap}
 .final .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end;position:relative}
 .final .ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px}
-.contact{display:grid;gap:14px;font-size:16px;color:var(--fg2)}
-.contact dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.contact{display:grid;gap:0;font-size:16px;color:var(--fg2);margin:0}
+.contact>div{position:relative;padding:16px 0 16px 14px;border-bottom:1px solid var(--line);transition:padding-left .35s cubic-bezier(.2,.7,.2,1)}
+.contact>div:last-child{border-bottom:0}
+.contact>div::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:2px;background:var(--gold);transform:scaleY(0);transform-origin:top;transition:transform .35s cubic-bezier(.2,.7,.2,1)}
+.contact>div:hover{padding-left:22px}
+.contact>div:hover::before{transform:scaleY(1)}
+.contact dt{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;transition:color .3s}
+.contact>div:hover dt{color:var(--gold)}
 .contact dd{margin:0}
 .contact dd a{text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:1px;transition:color .25s,border-color .25s}
 .contact dd a:hover{color:var(--gold);border-color:var(--gold)}
@@ -271,7 +292,7 @@ footer a:hover{color:var(--gold)}
 .js .hero .h-in{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
 .js .hero .h-in.d1{animation-delay:.1s}.js .hero .h-in.d2{animation-delay:.2s}.js .hero .h-in.d3{animation-delay:.3s}.js .hero .h-in.d4{animation-delay:.4s}
 @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.js .hero .h-in{animation:none}.btn .arr,.btn::before,.row h3,.label::before,.div::before,.div::after{transition:none}.label::before,.div::before,.div::after{transform:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.js .hero .h-in{animation:none}.hero h1 .w,.hero h1 em{animation:none}.btn .arr,.btn::before,.row h3,.label::before,.div::before,.div::after{transition:none}.label::before,.div::before,.div::after{transform:none}}
 
 @media (max-width:1000px){
   .mods{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -285,7 +306,7 @@ footer a:hover{color:var(--gold)}
   .fmt+.fmt{border-left:0;border-top:1px solid var(--line)}
   .jar{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:28px}
   .row{grid-template-columns:minmax(0,1fr);padding:28px 0}
-  .sec{padding-block:68px}
+  .sec{padding-block:60px}
   .who .hist{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 }
 @media (max-width:640px){
@@ -301,14 +322,14 @@ footer a:hover{color:var(--gold)}
   .who .hist{grid-template-columns:minmax(0,1fr)}
   .coach{grid-template-columns:minmax(0,1fr)}
   .coach .dan{display:none}
-  .sec{padding-block:56px}
+  .sec{padding-block:52px}
 }
 </style>
 </head>
 <body>
 <header class="nav" id="nav">
   <div class="wrap">
-    <a class="mark" href="#top">Black Bear <b>Dojo</b></a>
+    <a class="mark" href="#top"><span class="bm" aria-hidden="true">B</span><span>Black Bear <b>Dojo</b></span></a>
     <nav>
       <a href="#chomu">Чому зараз</a>
       <a href="#format">Формат</a>
@@ -326,12 +347,12 @@ footer a:hover{color:var(--gold)}
     <div class="photo" aria-hidden="true"><img src="/kids/kid-kick.webp" alt="" fetchpriority="high" width="1335" height="2000"></div>
     <div class="wrap">
       <div class="eyebrow h-in">Спаринг-день · Kyokushin Open · Київ</div>
-      <h1 class="h-in d1">Shin <em>Gi</em></h1>
+      <h1 class="h-in d1"><span class="w">Shin</span> <em>Gi</em></h1>
       <div class="gloss h-in d2"><span class="k" aria-hidden="true">心技</span><span class="t">Дух і майстерність</span></div>
       <p class="lead h-in d3">Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.</p>
       <div class="hero-cta h-in d4">
         <a class="btn" href="#zayavka">Зареєструвати команду <span class="arr">→</span></a>
-        <div class="facts"><span><b>Неділя</b> · дата в Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
+        <div class="facts"><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
       </div>
     </div>
   </section>
@@ -340,11 +361,11 @@ footer a:hover{color:var(--gold)}
     <div class="wrap grid">
       <div>
         <p class="label rv">Чому зараз</p>
-        <h2 class="t rv d1">Змагань з кіокушин майже немає. <em>Або вони з перервами на тривогу.</em></h2>
+        <h2 class="t rv d1">Через дрони й ракети змагань з кіокушин мало. <em>А ті, що є, — з перервами на тривогу.</em></h2>
       </div>
       <div>
         <p class="sub rv d2">Сітка зупиняється, діти чекають годинами, день втрачено. У залі-сховищі тривога бою не зупиняє: учасники вже в укритті, поєдинки йдуть за розкладом.</p>
-        <div class="pill rv d3"><i></i>Зал у безпечному приміщенні, тренування не зупиняється</div>
+        <div class="pill rv d3"><i></i>Зал у безпечному приміщенні — спаринги не зупиняються</div>
       </div>
     </div>
   </section>
@@ -355,8 +376,8 @@ footer a:hover{color:var(--gold)}
       <h2 class="t rv d1" id="pr-h">Три речі, яких бракує</h2>
       <div class="rows">
         <div class="row rv"><h3><span class="n">01</span>Швидко</h3><p><b>Дві години замість дня.</b> Прийшов на свій блок, провів бої, поїхав додому.</p></div>
-        <div class="row rv"><h3><span class="n">02</span>Досвід</h3><p><b>Два–три бої з рівним суперником.</b> Групи за статтю, віком, вагою і категорією пояса.</p></div>
-        <div class="row rv"><h3><span class="n">03</span>Безпечно</h3><p><b>Зал — бомбосховище, 200 м².</b> Без перерв, без евакуацій, з медиком на місці.</p></div>
+        <div class="row rv"><h3><span class="n">02</span>Досвід</h3><p><b>Від двох до десяти боїв за день.</b> Групи ділимо якомога рівніше за статтю, віком, вагою і поясом.</p></div>
+        <div class="row rv"><h3><span class="n">03</span>Безпечно</h3><p><b>Зал — бомбосховище, 200 м².</b> Без перерв і без евакуацій: тривога бою не зупиняє.</p></div>
       </div>
     </div>
   </section>
@@ -365,13 +386,13 @@ footer a:hover{color:var(--gold)}
     <div class="wrap">
       <div class="div rv" aria-hidden="true">心技</div>
       <p class="label rv" style="margin-top:44px">Формат</p>
-      <h2 class="t rv d1" id="f-h">Один день. <em>Два блоки.</em></h2>
+      <h2 class="t rv d1" id="f-h">Перший блок — діти. <em>Другий — дорослі.</em></h2>
       <div class="formats">
         <article class="fmt rv">
           <div class="kj" aria-hidden="true">心</div>
-          <div class="tag"><i></i>Блок 1 · ранок<b>≈ 2 год</b></div>
+          <div class="tag"><i></i>Блок 1 · діти<b>≈ 2 год</b></div>
           <h3>Shin Gi <em>Kids</em></h3>
-          <p class="desc">Перші бої в безпечному залі: рівний суперник, повний захист, суддя поруч, батьки на лаві.</p>
+          <p class="desc">Перші бої в безпечному залі: рівний суперник, повний захист, батьки поруч.</p>
           <dl class="spec">
             <div><dt>Вік</dt><dd><b>до 18 років</b> — хлопці та дівчата окремо</dd></div>
             <div><dt>Групи</dt><dd>за віком і вагою кроком <b>5 кг</b></dd></div>
@@ -379,11 +400,10 @@ footer a:hover{color:var(--gold)}
             <div><dt>Захист</dt><dd>шолом, накладки, щитки, протектор — <b>повний комплект</b></dd></div>
             <div><dt>Нагорода</dt><dd><b>медаль і грамота</b> кожному, хто вийшов на татамі</dd></div>
           </dl>
-          <div class="foot"><span>2–3 бої</span><span>зважування перед блоком</span><span>медик у залі</span></div>
         </article>
         <article class="fmt rv d1">
           <div class="kj" aria-hidden="true">技</div>
-          <div class="tag"><i></i>Блок 2 · день<b>≈ 2 год</b></div>
+          <div class="tag"><i></i>Блок 2 · дорослі<b>≈ 2 год</b></div>
           <h3>Shin Gi <em>Open</em></h3>
           <p class="desc">Формат, у якому Shin Gi проходить з 2024 року: повноконтактні поєдинки для підлітків і дорослих.</p>
           <dl class="spec">
@@ -391,9 +411,7 @@ footer a:hover{color:var(--gold)}
             <div><dt>Групи</dt><dd>за вагою кроком <b>10 кг</b></dd></div>
             <div><dt>Пояси</dt><dd class="abc"><span class="ab a"><span>A<small>10–9 кю</small></span><i></i></span><span class="ab b"><span>B<small>8–5 кю</small></span><i></i></span><span class="ab c"><span>C<small>4 кю +</small></span><i></i></span></dd></div>
             <div><dt>Захист</dt><dd>шолом із забралом, накладки, щитки, протектор — <b>обов'язково</b></dd></div>
-            <div><dt>Нагорода</dt><dd><b>медаль і грамота</b> кожному учаснику блоку</dd></div>
           </dl>
-          <div class="foot"><span>2–3 бої</span><span>зважування перед блоком</span><span>медик у залі</span></div>
         </article>
       </div>
     </div>
@@ -435,7 +453,7 @@ footer a:hover{color:var(--gold)}
       <dl class="rules rv">
         <div><dt>Стать</dt><dd>Хлопці та дівчата, чоловіки та жінки — <b>окремо</b>.</dd></div>
         <div><dt>Вік</dt><dd><b>До 18</b> у блоці Kids, <b>14+ і 18+</b> у блоці Open.</dd></div>
-        <div><dt>Вага</dt><dd>Крок <b>5 кг</b> для дітей, <b>10 кг</b> для дорослих. Зважування перед блоком.</dd></div>
+        <div><dt>Вага</dt><dd>Крок <b>5 кг</b> для дітей, <b>10 кг</b> для дорослих — за вагою із заявки.</dd></div>
       </dl>
     </div>
   </section>
@@ -448,7 +466,7 @@ footer a:hover{color:var(--gold)}
       <ol class="steps">
         <li class="rv"><b>Заявка</b><span>Тренер входить через Telegram, вставляє список команди одним повідомленням і оплачує внесок за всіх. Одиночні бійці реєструються самі.</span></li>
         <li class="rv d1"><b>Групи</b><span>За п'ять днів до події система зводить бійців у групи за статтю, віком, вагою і категорією пояса. Список приходить тренеру і публікується в Telegram.</span></li>
-        <li class="rv d2"><b>Бої</b><span>Свій блок близько двох годин: зважування, два–три поєдинки, нагородження. Медаль і грамота кожному.</span></li>
+        <li class="rv d2"><b>Бої</b><span>Свій блок близько двох годин: поєдинки за розкладом і нагородження. Медаль і грамота кожному.</span></li>
       </ol>
     </div>
   </section>
@@ -491,25 +509,25 @@ footer a:hover{color:var(--gold)}
         <article class="mod">
           <div class="k"><span>Модуль</span><i>04</i></div>
           <h3>Штаб</h3>
-          <p>Панель організатора: усі команди й оплати, сортування в групи однією кнопкою, зважування з телефона в день події, грамоти та протоколи.</p>
+          <p>Панель організатора: усі команди й оплати, сортування в групи однією кнопкою, розклад блоків, грамоти та протоколи.</p>
           <ul><li>Групи за 5 / 10 кг і A · B · C</li><li>Статистика по клубах і датах</li></ul>
         </article>
       </div>
 
-      <div class="flow rv d1" role="list" aria-label="Механіка однієї дати">
-        <div role="listitem"><small>Д−21</small><b>Анонс</b><span>дата, ліміт місць</span></div>
-        <div role="listitem"><small>Д−10</small><b>Заявки</b><span>списки команд</span></div>
-        <div role="listitem"><small>Д−7</small><b>Внесок</b><span>місце підтверджено</span></div>
-        <div role="listitem"><small>Д−5</small><b>Групи</b><span>зведення, публікація</span></div>
-        <div role="listitem"><small>Д</small><b>Зважування</b><span>фінальні категорії</span></div>
-        <div role="listitem"><small>Д</small><b>Бої</b><span>два–три поєдинки</span></div>
-        <div role="listitem"><small>Д+1</small><b>Підсумки</b><span>статистика, грамоти</span></div>
+      <p class="label rv d1" style="margin-top:36px">Як проходить одна дата</p>
+      <div class="flow rv d1" role="list" aria-label="Як проходить одна дата">
+        <div role="listitem"><small>За 3 тижні</small><b>Анонс</b><span>дата і ліміт місць</span></div>
+        <div role="listitem"><small>За 10 днів</small><b>Заявки</b><span>тренери подають списки</span></div>
+        <div role="listitem"><small>За 7 днів</small><b>Внесок</b><span>місце підтверджено</span></div>
+        <div role="listitem"><small>За 5 днів</small><b>Групи</b><span>зведені й опубліковані</span></div>
+        <div role="listitem"><small>День події</small><b>Бої</b><span>свій блок ≈ 2 години</span></div>
+        <div role="listitem"><small>Наступного дня</small><b>Підсумки</b><span>статистика, грамоти</span></div>
       </div>
 
       <dl class="gain rv d2">
         <div><dt>Клубам</dt><dd><b>Бої без організації.</b> Приїхали на свій блок — усе інше зроблено.</dd></div>
         <div><dt>Тренерам</dt><dd><b>Команда за хвилину.</b> Список, оплата, групи й нагадування — в одному місці.</dd></div>
-        <div><dt>Бійцям</dt><dd><b>Регулярна практика.</b> Рівний суперник за вагою і поясом, без місяців очікування.</dd></div>
+        <div><dt>Бійцям</dt><dd><b>Регулярна практика.</b></dd></div>
         <div><dt>Спільноті</dt><dd><b>Єдиний календар.</b> Спаринги між турнірами, відкриті для всіх федерацій.</dd></div>
       </dl>
     </div>
@@ -524,7 +542,7 @@ footer a:hover{color:var(--gold)}
       </div>
       <div>
         <div class="hist rv d2">
-          <div><b>2024</b><i></i><span>Перші спаринг-дні для 14+ і семінари. Добровільна банка Shin Gi: 500 000 грн на допомогу військовим.</span></div>
+          <div><b>2024</b><i></i><span>Перші спаринг-дні для 14+ і семінари. Від початку повномасштабного вторгнення спільнота Shin Gi передала багато донатів на допомогу ЗСУ.</span></div>
           <div><b>2025</b><i></i><span>Спаринги у залі-сховищі на Шулявці. Тривога не зупинила жодного бою.</span></div>
           <div><b>2026</b><i></i><span>Kyokushin Open: дитячий блок із категоріями A · B · C, кабінет і бот, відкриті двері для всіх клубів.</span></div>
         </div>
@@ -545,10 +563,10 @@ footer a:hover{color:var(--gold)}
       <div>
         <p class="label rv">Умови</p>
         <h2 class="t rv d1" id="u-h">Разовий внесок</h2>
-        <div class="price rv d2" id="price">___<small>грн / боєць</small></div>
+        <div class="price rv d2" id="price">400<small>грн / боєць</small></div>
         <ul class="rv d3">
           <li>Платить тренер за команду одним платежем у кабінеті або в боті; одиночні бійці — самі. Статус оплати видно тренеру й організатору.</li>
-          <li>У внесок входять бої, суддівство, медик, медаль і грамота.</li>
+          <li>У внесок входять бої, медаль і грамота.</li>
           <li>Місце підтверджується внеском. Дедлайн заявок — за 10 днів до події, внеску — за 7.</li>
           <li>Повернення — при скасуванні організатором. При неявці внесок не повертається.</li>
           <li>Кількість місць обмежена площею залу; ліміт по кожному блоку.</li>
@@ -575,7 +593,7 @@ footer a:hover{color:var(--gold)}
           <a class="btn ghost" id="cta-solo" href="https://t.me/ihorkot" target="_blank" rel="noopener">Я одиночний боєць</a>
         </div>
       </div>
-      <dl class="contact rv d2">
+      <dl class="contact panel rv d2">
         <div><dt>Telegram</dt><dd><a href="https://t.me/ihorkot" target="_blank" rel="noopener">@ihorkot</a> · канал <a href="https://t.me/shin_Gii" target="_blank" rel="noopener">@shin_Gii</a></dd></div>
         <div><dt>Телефон</dt><dd class="ph-row"><a href="tel:+380954756500" id="phone">095 475 65 00</a><button class="copy" type="button" id="copy">Скопіювати</button></dd></div>
         <div><dt>Адреса</dt><dd>Київ, Шулявка, вул. Сім'ї Бродських, 31/33 — зал Black Bear Dojo</dd></div>
