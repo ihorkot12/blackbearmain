@@ -88,6 +88,8 @@ a.ul:hover{color:var(--gold);border-color:var(--gold)}
 .facts span{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--edge);padding:9px 12px;background:rgba(10,10,10,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:border-color .3s,color .3s}
 .facts span::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--gold);flex:none}
 .facts span:hover{border-color:var(--gold);color:var(--fg2)}
+.facts span.hi{border-color:rgba(201,162,39,.5);color:var(--fg2)}
+.facts span.hi b{color:var(--gold);font-family:var(--display);font-size:15px;letter-spacing:.04em}
 .facts b{color:var(--fg);font-weight:500}
 
 /* sections */
@@ -108,7 +110,10 @@ h2.t em{font-style:normal;color:var(--red2)}
 .why{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .why .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:start}
 .why .sub{margin-top:0}
-.why .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--edge);padding:10px 14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-top:26px}
+.why .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--edge);padding:10px 14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin:22px 10px 0 0;transition:border-color .3s}
+.why .pill:hover{border-color:var(--gold)}
+.why .pill.gold{border-color:rgba(201,162,39,.5)}
+.why .pill b{color:var(--gold);font-weight:600}
 .why .pill i{width:8px;height:8px;background:var(--gold);border-radius:50%;display:inline-block}
 
 /* benefits */
@@ -352,7 +357,7 @@ footer a:hover{color:var(--gold)}
       <p class="lead h-in d3">Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.</p>
       <div class="hero-cta h-in d4">
         <a class="btn" href="#zayavka">Зареєструвати команду <span class="arr">→</span></a>
-        <div class="facts"><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
+        <div class="facts"><span class="hi"><b>400 грн</b> · внесок за бійця</span><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
       </div>
     </div>
   </section>
@@ -366,6 +371,7 @@ footer a:hover{color:var(--gold)}
       <div>
         <p class="sub rv d2">Сітка зупиняється, діти чекають годинами, день втрачено. У залі-сховищі тривога бою не зупиняє: учасники вже в укритті, поєдинки йдуть за розкладом.</p>
         <div class="pill rv d3"><i></i>Зал у безпечному приміщенні — спаринги не зупиняються</div>
+        <div class="pill gold rv d3"><i></i><b>Внесок 400 грн</b> за бійця · медаль і грамота кожному</div>
       </div>
     </div>
   </section>
