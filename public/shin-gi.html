@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Golos+Text:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700&text=%E5%BF%83%E6%8A%80&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@700&text=%E5%BF%83%E6%8A%80%E5%8F%82%E6%AE%B5&display=swap">
 <style>
 :root{
   --bg:#0A0A0A; --bg2:#0E0E0D; --fg:#F2F2F0; --fg2:#CFCFCB; --muted:#7A7A7A; --line:#242422; --edge:#33332F;
@@ -38,17 +38,21 @@ a{color:inherit}
 .grain{position:relative}
 .grain::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.045;mix-blend-mode:screen;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>")}
 
+/* nav */
 .nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(10,10,10,.72);border-bottom:1px solid transparent;transition:border-color .3s}
 .nav.scrolled{border-color:var(--line)}
 .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
 .mark{font-family:var(--display);font-weight:600;letter-spacing:.14em;font-size:14px;text-transform:uppercase;text-decoration:none;white-space:nowrap}
 .mark b{color:var(--red2);font-weight:600}
 .nav nav{display:flex;gap:26px}
-.nav nav a{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .2s}
+.nav nav a{position:relative;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-decoration:none;transition:color .25s;padding:4px 0}
+.nav nav a::after{content:"";position:absolute;left:0;right:0;bottom:-2px;height:1px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.2,.7,.2,1)}
 .nav nav a:hover{color:var(--fg)}
-.nav .cta{font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:10px 16px;border:1px solid var(--edge);text-decoration:none;transition:border-color .2s,background .2s;white-space:nowrap}
-.nav .cta:hover{border-color:var(--fg);background:#141413}
+.nav nav a:hover::after{transform:scaleX(1)}
+.nav .cta{font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:10px 16px;border:1px solid var(--edge);text-decoration:none;transition:border-color .25s,background .25s,color .25s,box-shadow .25s;white-space:nowrap}
+.nav .cta:hover{border-color:var(--gold);color:var(--gold);background:#141413;box-shadow:0 0 0 1px rgba(201,162,39,.18),0 8px 24px -12px rgba(201,162,39,.45)}
 
+/* hero */
 .hero{position:relative;min-height:88vh;display:grid;align-items:end;overflow:hidden;padding-block:72px 64px}
 .hero .kanji{position:absolute;right:-2vw;top:4vh;font-family:var(--kanji);font-weight:700;font-size:clamp(220px,34vw,520px);line-height:1;color:#fff;opacity:.05;letter-spacing:-.04em;user-select:none;pointer-events:none;white-space:nowrap}
 .hero .photo{position:absolute;right:0;top:0;bottom:0;width:min(46vw,560px);opacity:.9;-webkit-mask-image:linear-gradient(90deg,transparent,#000 35%);mask-image:linear-gradient(90deg,transparent,#000 35%)}
@@ -63,127 +67,206 @@ a{color:inherit}
 .gloss .t{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 .lead{max-width:30em;font-size:clamp(18px,2.2vw,22px);color:var(--fg2);margin:28px 0 0;position:relative}
 .hero-cta{display:flex;flex-wrap:wrap;align-items:center;gap:14px 22px;margin-top:38px;position:relative}
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:12px;font-family:var(--display);font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:15px;padding:18px 30px;background:var(--red);color:#fff;text-decoration:none;border:1px solid var(--red);transition:background .2s,border-color .2s,transform .2s}
-.btn:hover{background:var(--red2);border-color:var(--red2)}
+.btn{position:relative;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;gap:12px;font-family:var(--display);font-weight:600;letter-spacing:.12em;text-transform:uppercase;font-size:15px;padding:17px 28px;background:var(--red);color:#fff;text-decoration:none;border:1px solid var(--red);transition:background .25s,border-color .25s,transform .25s,box-shadow .25s}
+.btn::before{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.14) 50%,transparent 70%);transform:translateX(-120%);transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.btn:hover{background:var(--red2);border-color:var(--red2);transform:translateY(-1px);box-shadow:0 10px 30px -14px rgba(163,16,26,.8)}
+.btn:hover::before{transform:translateX(120%)}
 .btn.ghost{background:transparent;border-color:var(--edge);color:var(--fg)}
-.btn.ghost:hover{border-color:var(--fg);background:#141413}
-.btn .arr{display:inline-block;transition:transform .2s}
+.btn.ghost:hover{border-color:var(--gold);color:var(--gold);background:#141413;box-shadow:0 10px 30px -16px rgba(201,162,39,.5)}
+.btn .arr{display:inline-block;transition:transform .25s}
 .btn:hover .arr{transform:translateX(4px)}
+a.ul{text-decoration:none;color:var(--fg);border-bottom:1px solid var(--edge);transition:color .25s,border-color .25s}
+a.ul:hover{color:var(--gold);border-color:var(--gold)}
 .facts{display:flex;gap:28px;flex-wrap:wrap;font-size:13px;letter-spacing:.06em;color:var(--muted)}
 .facts b{color:var(--fg);font-weight:500}
 
+/* sections */
 section{position:relative}
-.sec{padding-block:120px}
-.label{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:0 0 14px}
-h2.t{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(38px,6.2vw,80px);line-height:.98;margin:0;letter-spacing:.005em;text-wrap:balance}
+.sec{padding-block:84px}
+.label{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:0 0 12px;display:flex;align-items:center;gap:12px}
+.label::before{content:"";width:22px;height:1px;background:var(--gold);flex:none;transform:scaleX(0);transform-origin:left;transition:transform .7s cubic-bezier(.2,.7,.2,1) .15s}
+.rv.in .label::before,.label.rv.in::before,html:not(.js) .label::before{transform:scaleX(1)}
+h2.t{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(36px,5.6vw,72px);line-height:.98;margin:0;letter-spacing:.005em;text-wrap:balance}
 h2.t em{font-style:normal;color:var(--red2)}
-.sub{max-width:34em;color:var(--fg2);margin:26px 0 0;font-size:clamp(17px,1.6vw,20px)}
+.sub{max-width:34em;color:var(--fg2);margin:22px 0 0;font-size:clamp(17px,1.6vw,20px)}
 .div{display:flex;align-items:center;gap:22px;color:var(--gold);font-family:var(--kanji);font-weight:700;font-size:22px;opacity:.9}
-.div::before,.div::after{content:"";flex:1;height:1px;background:var(--line)}
+.div::before,.div::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--edge));transform:scaleX(0);transition:transform 1s cubic-bezier(.2,.7,.2,1)}
+.div::before{transform-origin:right}.div::after{transform-origin:left;background:linear-gradient(90deg,var(--edge),transparent)}
+.div.in::before,.div.in::after,html:not(.js) .div::before,html:not(.js) .div::after{transform:scaleX(1)}
 
+/* why */
 .why{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .why .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end}
 .why .sub{margin-top:0}
 .why .pill{display:inline-flex;gap:10px;align-items:center;border:1px solid var(--edge);padding:10px 14px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg2);margin-top:26px}
 .why .pill i{width:8px;height:8px;background:var(--gold);border-radius:50%;display:inline-block}
 
-.rows{border-top:1px solid var(--line);margin-top:56px}
-.row{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:14px 48px;padding:46px 0;border-bottom:1px solid var(--line);align-items:baseline}
-.row h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(48px,8.4vw,96px);line-height:.95;margin:0;letter-spacing:.005em}
-.row p{margin:0;font-size:clamp(18px,1.7vw,21px);color:var(--fg2);max-width:26em}
+/* benefits */
+.rows{border-top:1px solid var(--line);margin-top:44px}
+.row{position:relative;display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:12px 48px;padding:34px 0;border-bottom:1px solid var(--line);align-items:baseline}
+.row::after{content:"";position:absolute;left:0;bottom:-1px;height:1px;width:100%;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.row:hover::after{transform:scaleX(1)}
+.row h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(44px,7.4vw,84px);line-height:.95;margin:0;letter-spacing:.005em;transition:color .3s,transform .5s cubic-bezier(.2,.7,.2,1)}
+.row:hover h3{color:var(--fg);transform:translateX(6px)}
+.row p{margin:0;font-size:clamp(17px,1.6vw,20px);color:var(--fg2);max-width:26em}
 .row p b{color:var(--fg);font-weight:600}
-.row .n{font-size:12px;letter-spacing:.2em;color:var(--muted);margin-bottom:10px;display:block}
+.row .n{font-size:12px;letter-spacing:.2em;color:var(--muted);margin-bottom:8px;display:block;transition:color .3s}
+.row:hover .n{color:var(--gold)}
 
-.formats{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);margin-top:56px}
-.fmt{padding:40px 36px;position:relative;min-width:0}
+/* formats */
+.formats{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);margin-top:44px}
+.fmt{padding:32px 32px 32px;position:relative;min-width:0;transition:background .4s}
+.fmt::before{content:"";position:absolute;left:0;right:0;top:-1px;height:2px;background:linear-gradient(90deg,var(--red2),var(--gold));transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.fmt:hover{background:#0D0D0C}
+.fmt:hover::before{transform:scaleX(1)}
 .fmt+.fmt{border-left:1px solid var(--line)}
 .fmt .tag{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
-.fmt h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(34px,4vw,52px);line-height:1;margin:14px 0 18px}
+.fmt h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(32px,3.8vw,48px);line-height:1;margin:12px 0 16px}
 .fmt h3 em{font-style:normal;color:var(--red2)}
-.fmt ul{list-style:none;margin:0;padding:0;display:grid;gap:10px;color:var(--fg2);font-size:17px}
+.fmt ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;color:var(--fg2);font-size:16px}
 .fmt ul li{display:flex;gap:12px}
-.fmt ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:14px}
-.fmt .ph{margin-top:28px;aspect-ratio:4/5;overflow:hidden;border:1px solid var(--line);background:#050505}
-.fmt .ph video{width:100%;height:100%;object-fit:cover;transform:scale(1.55);transform-origin:50% 38%;filter:saturate(.85) contrast(1.05)}
-.fmt .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 25%;filter:saturate(.85);transition:transform .8s ease}
-.fmt:hover .ph img{transform:scale(1.03)}
+.fmt ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:13px}
+.fmt .ph{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line)}
+.fmt .ph figure{margin:0;aspect-ratio:4/5;overflow:hidden;background:#050505;position:relative}
+.fmt .ph figure::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(10,10,10,.55));opacity:.8;transition:opacity .5s}
+.fmt .ph img{width:100%;height:100%;object-fit:cover;object-position:50% 20%;filter:saturate(.85) contrast(1.04);transform:scale(1.14);transition:transform 1s cubic-bezier(.2,.7,.2,1),filter .5s}
+.fmt:hover .ph img{transform:scale(1.19);filter:saturate(.95) contrast(1.06)}
+.fmt:hover .ph figure::after{opacity:.4}
+.fmt .ph figure:nth-child(2) img{transition-delay:.05s}
 
-.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:40px;margin-top:56px}
-.cat{border-top:2px solid var(--edge);padding-top:22px}
+/* categories */
+.cats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;margin-top:44px}
+.cat{position:relative;border-top:2px solid var(--edge);padding-top:20px}
+.cat::before{content:"";position:absolute;left:0;top:-2px;height:2px;width:100%;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.cat:hover::before{transform:scaleX(1)}
 .cat .L{font-family:var(--display);font-weight:700;font-size:clamp(72px,9vw,112px);line-height:.9;color:var(--fg)}
 .cat .L small{display:block;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-top:10px;font-family:var(--body);font-weight:500}
 .belts{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:12px}
 .belts li{display:flex;align-items:center;gap:14px;font-size:16px;color:var(--fg2)}
 .sw{width:44px;height:12px;flex:none;position:relative;border:1px solid rgba(255,255,255,.12)}
 .sw.s::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;transform:translateY(-50%);background:var(--s)}
-.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:56px;border-top:1px solid var(--line);padding-top:26px}
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;margin-top:44px;border-top:1px solid var(--line);padding-top:24px}
 .rules dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
 .rules dd{margin:0;font-size:18px;color:var(--fg2)}
 .rules dd b{color:var(--fg);font-weight:600}
 
-.steps{list-style:none;margin:56px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px;counter-reset:s}
-.steps li{counter-increment:s;border-top:2px solid var(--edge);padding-top:22px;min-width:0}
-.steps li::before{content:"0" counter(s);font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.16em;color:var(--red2);display:block;margin-bottom:14px}
-.steps li b{display:block;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(28px,3.2vw,40px);line-height:1;margin-bottom:12px}
-.steps li span{color:var(--fg2);font-size:17px}
+/* steps */
+.steps{list-style:none;margin:44px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;counter-reset:s}
+.steps li{position:relative;counter-increment:s;border-top:2px solid var(--edge);padding-top:20px;min-width:0}
+.steps li::after{content:"";position:absolute;left:0;top:-2px;height:2px;width:100%;background:var(--red2);transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.steps li:hover::after{transform:scaleX(1)}
+.steps li::before{content:"0" counter(s);font-family:var(--display);font-weight:600;font-size:14px;letter-spacing:.16em;color:var(--red2);display:block;margin-bottom:12px}
+.steps li b{display:block;font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(26px,3vw,36px);line-height:1;margin-bottom:10px}
+.steps li span{color:var(--fg2);font-size:16px}
 
-.who{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.who .grid{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:56px;align-items:center}
-.who .ph{aspect-ratio:4/3;overflow:hidden;border:1px solid var(--line)}
-.who .ph img{width:100%;height:100%;object-fit:cover;filter:saturate(.8)}
-.who .hist{margin-top:26px;display:grid;gap:14px;border-top:1px solid var(--line);padding-top:22px}
-.who .hist div{display:grid;grid-template-columns:96px 1fr;gap:16px;font-size:17px;color:var(--fg2)}
-.who .hist div b{font-family:var(--display);font-weight:600;color:var(--gold);letter-spacing:.06em;font-size:18px}
-.coach{display:grid;grid-template-columns:120px 1fr;gap:22px;align-items:center;margin-top:36px;border-top:1px solid var(--line);padding-top:26px}
-.coach .av{width:120px;aspect-ratio:3/4;overflow:hidden;border:1px solid var(--line)}
-.coach .av img{width:100%;height:100%;object-fit:cover;object-position:50% 15%;filter:saturate(.8)}
+/* system */
+.sys{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);overflow:hidden}
+.sys .kanji{position:absolute;right:-4vw;top:-8vh;font-family:var(--kanji);font-weight:700;font-size:clamp(200px,30vw,460px);line-height:1;color:#fff;opacity:.035;pointer-events:none;user-select:none;white-space:nowrap}
+.sys .head{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:40px;align-items:end;position:relative}
+.sys .head .sub{margin-top:0}
+.sys .claim{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.sys .claim span{border:1px solid var(--edge);padding:8px 12px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg2);transition:border-color .3s,color .3s}
+.sys .claim span:hover{border-color:var(--gold);color:var(--gold)}
+.mods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);margin-top:44px;position:relative}
+.mod{background:var(--bg2);padding:26px 24px 28px;min-width:0;position:relative;transition:background .4s}
+.mod::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--gold);transform:scaleX(0);transform-origin:left;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.mod:hover{background:#121211}
+.mod:hover::before{transform:scaleX(1)}
+.mod .k{display:flex;align-items:center;justify-content:space-between;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+.mod .k i{font-style:normal;color:var(--red2);font-family:var(--display);font-weight:600}
+.mod h3{font-family:var(--display);font-weight:700;text-transform:uppercase;font-size:clamp(24px,2.4vw,30px);line-height:1;margin:14px 0 12px}
+.mod p{margin:0;color:var(--fg2);font-size:15px;line-height:1.55}
+.mod ul{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:6px;font-size:14px;color:var(--fg2)}
+.mod ul li{display:flex;gap:10px}
+.mod ul li::before{content:"";width:12px;height:1px;background:var(--gold);flex:none;margin-top:11px}
+.mod .arrow{position:absolute;right:-9px;top:50%;width:16px;height:16px;transform:translateY(-50%) rotate(45deg);border-top:1px solid var(--edge);border-right:1px solid var(--edge);background:var(--bg2);z-index:2}
+.mod:last-child .arrow{display:none}
+.flow{display:flex;align-items:stretch;margin-top:28px;border:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.flow::-webkit-scrollbar{display:none}
+.flow div{flex:1 1 0;min-width:120px;padding:16px 14px;border-right:1px solid var(--line);position:relative;transition:background .3s}
+.flow div:last-child{border-right:0}
+.flow div:hover{background:#121211}
+.flow small{display:block;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin-bottom:6px;font-family:var(--display);font-weight:600}
+.flow b{display:block;font-family:var(--display);font-weight:600;text-transform:uppercase;font-size:15px;letter-spacing:.04em;line-height:1.1}
+.flow span{display:block;font-size:13px;color:var(--muted);margin-top:4px}
+.gain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:28px;margin-top:40px;border-top:1px solid var(--line);padding-top:22px}
+.gain dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.gain dd{margin:0;font-size:15px;color:var(--fg2)}
+.gain dd b{color:var(--fg);font-weight:600}
+
+/* who */
+.who{border-top:1px solid var(--line)}
+.who .grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:56px;align-items:start}
+.who .hist{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;border-top:1px solid var(--line);padding-top:22px}
+.who .hist div{position:relative;min-width:0}
+.who .hist div b{display:block;font-family:var(--display);font-weight:700;color:var(--fg);letter-spacing:.01em;font-size:clamp(44px,5.4vw,64px);line-height:.95;transition:color .3s}
+.who .hist div:hover b{color:var(--gold)}
+.who .hist div i{display:block;width:28px;height:2px;background:var(--red2);margin:14px 0 12px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.who .hist div:hover i{width:56px}
+.who .hist div span{font-size:15px;color:var(--fg2);display:block}
+.coach{margin-top:34px;border-top:1px solid var(--line);padding-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:start}
 .coach b{display:block;font-family:var(--display);font-weight:600;font-size:24px;letter-spacing:.02em;line-height:1.1}
 .coach .reg{color:var(--gold);font-size:14px;letter-spacing:.06em;margin-top:6px}
-.coach p{margin:8px 0 0;color:var(--fg2);font-size:16px}
+.coach p{margin:8px 0 0;color:var(--fg2);font-size:16px;max-width:34em}
+.coach .dan{font-family:var(--kanji);font-weight:700;font-size:44px;color:var(--gold);opacity:.6;line-height:1}
 
+/* terms */
+.terms{background:var(--bg2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .terms .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:56px;align-items:start}
-.price{font-family:var(--display);font-weight:700;font-size:clamp(64px,10vw,128px);line-height:.9;letter-spacing:-.01em;margin:26px 0 0;font-variant-numeric:tabular-nums}
+.price{font-family:var(--display);font-weight:700;font-size:clamp(60px,9vw,112px);line-height:.9;letter-spacing:-.01em;margin:22px 0 0;font-variant-numeric:tabular-nums}
 .price small{font-size:.32em;letter-spacing:.06em;color:var(--muted);font-weight:500;margin-left:10px}
-.terms ul{list-style:none;margin:28px 0 0;padding:0;display:grid;gap:12px;color:var(--fg2);font-size:17px;max-width:30em}
+.terms ul{list-style:none;margin:24px 0 0;padding:0;display:grid;gap:10px;color:var(--fg2);font-size:16px;max-width:30em}
 .terms ul li{display:flex;gap:12px}
-.terms ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:14px}
+.terms ul li::before{content:"";width:18px;height:1px;background:var(--gold);flex:none;margin-top:13px}
 .jar{border-left:1px solid var(--line);padding-left:40px}
-.jar .qr{width:132px;height:132px;border:1px solid var(--edge);display:grid;place-items:center;margin-top:22px;background:#111}
-.jar p{color:var(--fg2);font-size:16px;margin:18px 0 0}
-.jar a.lnk{display:inline-block;margin-top:14px;font-size:14px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:2px}
-.jar a.lnk:hover{border-color:var(--fg)}
+.jar .qr{width:132px;height:132px;border:1px solid var(--edge);display:grid;place-items:center;color:var(--muted);font-size:12px;letter-spacing:.2em;margin-top:18px;background:#111;transition:border-color .3s,box-shadow .3s}
+.jar .qr:hover{border-color:var(--gold);box-shadow:0 0 0 1px rgba(201,162,39,.2)}
+.jar p{color:var(--fg2);font-size:15px;margin:16px 0 0}
+.jar a.lnk{display:inline-block;margin-top:12px;font-size:14px;color:var(--fg);text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:2px;transition:color .25s,border-color .25s}
+.jar a.lnk:hover{color:var(--gold);border-color:var(--gold)}
 
-.final{padding-block:120px 96px;overflow:hidden}
+/* final */
+.final{padding-block:96px 80px;overflow:hidden}
 .final .kanji{position:absolute;left:-2vw;bottom:-6vh;font-family:var(--kanji);font-weight:700;font-size:clamp(180px,28vw,420px);line-height:1;color:#fff;opacity:.04;pointer-events:none;user-select:none;white-space:nowrap}
 .final .grid{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:48px;align-items:end;position:relative}
-.final .ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:36px}
+.final .ctas{display:flex;flex-wrap:wrap;gap:14px;margin-top:30px}
 .contact{display:grid;gap:14px;font-size:16px;color:var(--fg2)}
 .contact dt{font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
 .contact dd{margin:0}
-.contact dd a{text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:1px}
-.contact dd a:hover{border-color:var(--fg)}
+.contact dd a{text-decoration:none;border-bottom:1px solid var(--edge);padding-bottom:1px;transition:color .25s,border-color .25s}
+.contact dd a:hover{color:var(--gold);border-color:var(--gold)}
 .ph-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.copy{background:transparent;color:var(--muted);border:1px solid var(--edge);font:inherit;font-size:13px;padding:6px 12px;cursor:pointer;letter-spacing:.04em}
-.copy:hover{color:var(--fg);border-color:var(--fg)}
-footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between}
+.copy{background:transparent;color:var(--muted);border:1px solid var(--edge);font:inherit;font-size:13px;padding:6px 12px;cursor:pointer;letter-spacing:.04em;transition:color .25s,border-color .25s,background .25s}
+.copy:hover{color:var(--gold);border-color:var(--gold);background:#141413}
+footer{border-top:1px solid var(--line);padding-block:24px 36px;font-size:13px;color:var(--muted);display:flex;flex-wrap:wrap;gap:10px 28px;justify-content:space-between}
+footer a{text-decoration:none;color:var(--muted);transition:color .25s}
+footer a:hover{color:var(--gold)}
 
+/* reveal */
 .rv{opacity:1;transform:none}
 .js .rv{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
 .js .rv.in{opacity:1;transform:none}
 .js .rv.d1{transition-delay:.08s}.js .rv.d2{transition-delay:.16s}.js .rv.d3{transition-delay:.24s}
+.js .hero .rv{opacity:1;transform:none}
 .js .hero .h-in{animation:rise .9s cubic-bezier(.2,.7,.2,1) both}
 .js .hero .h-in.d1{animation-delay:.1s}.js .hero .h-in.d2{animation-delay:.2s}.js .hero .h-in.d3{animation-delay:.3s}.js .hero .h-in.d4{animation-delay:.4s}
 @keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
-@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.js .hero .h-in{animation:none}.fmt .ph img,.btn .arr{transition:none}}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}.js .rv{opacity:1;transform:none;transition:none}.js .hero .h-in{animation:none}.fmt .ph img,.btn .arr,.btn::before,.row h3,.label::before,.div::before,.div::after{transition:none}.label::before,.div::before,.div::after{transform:none}}
 
+@media (max-width:1000px){
+  .mods{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mod .arrow{display:none}
+  .gain{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
 @media (max-width:900px){
-  .why .grid,.who .grid,.terms .grid,.final .grid{grid-template-columns:minmax(0,1fr);gap:36px}
+  .why .grid,.who .grid,.terms .grid,.final .grid,.sys .head{grid-template-columns:minmax(0,1fr);gap:32px}
   .cats,.rules,.steps{grid-template-columns:minmax(0,1fr)}
   .formats{grid-template-columns:minmax(0,1fr)}
   .fmt+.fmt{border-left:0;border-top:1px solid var(--line)}
-  .jar{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:32px}
-  .row{grid-template-columns:minmax(0,1fr);padding:36px 0}
-  .sec{padding-block:88px}
+  .jar{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:28px}
+  .row{grid-template-columns:minmax(0,1fr);padding:28px 0}
+  .sec{padding-block:68px}
+  .who .hist{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 }
 @media (max-width:640px){
   body{font-size:17px}
@@ -192,9 +275,12 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   .hero .photo{width:70vw;opacity:.5;-webkit-mask-image:linear-gradient(90deg,transparent,#000 50%);mask-image:linear-gradient(90deg,transparent,#000 50%)}
   .hero .kanji{font-size:62vw;top:2vh;right:-6vw}
   .btn{width:100%}
-  .fmt{padding:30px 22px}
-  .coach{grid-template-columns:96px 1fr}
-  .coach .av{width:96px}
+  .fmt{padding:26px 20px}
+  .mods,.gain{grid-template-columns:minmax(0,1fr)}
+  .who .hist{grid-template-columns:minmax(0,1fr)}
+  .coach{grid-template-columns:minmax(0,1fr)}
+  .coach .dan{display:none}
+  .sec{padding-block:56px}
 }
 </style>
 </head>
@@ -206,6 +292,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
       <a href="#chomu">Чому зараз</a>
       <a href="#format">Формат</a>
       <a href="#kategorii">Категорії</a>
+      <a href="#systema">Система</a>
       <a href="#umovy">Умови</a>
     </nav>
     <a class="cta" href="#zayavka">Заявка</a>
@@ -257,7 +344,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   <section class="sec" id="format" aria-labelledby="f-h">
     <div class="wrap">
       <div class="div rv" aria-hidden="true">心技</div>
-      <p class="label rv" style="margin-top:56px">Формат</p>
+      <p class="label rv" style="margin-top:44px">Формат</p>
       <h2 class="t rv d1" id="f-h">Один день. <em>Два блоки.</em></h2>
       <div class="formats">
         <article class="fmt rv">
@@ -269,7 +356,10 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
             <li>Повний захист: шолом, накладки, щитки</li>
             <li>Медаль і грамота кожному, хто вийшов на татамі</li>
           </ul>
-          <div class="ph"><video autoplay muted loop playsinline preload="metadata" poster="/main/teens-pair.webp" aria-label="Юний боєць Shin Gi відпрацьовує удар у залі-сховищі"><source src="/main/hf_20261019_233137_9feb4cbd-ea8b-4892-ac3a-4bcf44ab3ea0.mp4" type="video/mp4"></video></div>
+          <div class="ph">
+            <figure><img src="/juniors/boy-kick-orange.webp" alt="Хлопець у помаранчевому поясі б'є маваші" loading="lazy" width="1335" height="2000"></figure>
+            <figure><img src="/juniors/girl-kick.webp" alt="Дівчина б'є йоко-гері" loading="lazy" width="1335" height="2000" style="object-position:50% 30%"></figure>
+          </div>
         </article>
         <article class="fmt rv d1">
           <div class="tag">Блок 2 · день</div>
@@ -280,7 +370,10 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
             <li>Захист і шолом із забралом — обов'язково</li>
             <li>Формат, у якому Shin Gi проходить з 2024 року</li>
           </ul>
-          <div class="ph"><img src="/personal/pair-blackbelts.webp" alt="Двоє дорослих бійців у чорних поясах" loading="lazy" width="1335" height="2000" style="object-position:50% 20%"></div>
+          <div class="ph">
+            <figure><img src="/personal/kick.webp" alt="Боєць у чорному поясі б'є високий удар ногою" loading="lazy" width="1335" height="2000" style="object-position:50% 35%"></figure>
+            <figure><img src="/personal/pair-blackbelts.webp" alt="Двоє дорослих бійців у чорних поясах" loading="lazy" width="1335" height="2000" style="object-position:50% 15%"></figure>
+          </div>
         </article>
       </div>
     </div>
@@ -330,34 +423,98 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   <section class="sec" aria-labelledby="s-h">
     <div class="wrap">
       <div class="div rv" aria-hidden="true">心技</div>
-      <p class="label rv" style="margin-top:56px">Як проходить</p>
+      <p class="label rv" style="margin-top:44px">Як проходить</p>
       <h2 class="t rv d1" id="s-h">Три кроки</h2>
       <ol class="steps">
-        <li class="rv"><b>Заявка</b><span>Тренер реєструє команду і оплачує внесок за всіх одним платежем. Одиночні бійці та батьки реєструються самі.</span></li>
-        <li class="rv d1"><b>Групи</b><span>За п'ять днів до події бійців зводять у групи за статтю, віком, вагою і категорією пояса. Список публікується в Telegram.</span></li>
+        <li class="rv"><b>Заявка</b><span>Тренер входить через Telegram, вставляє список команди одним повідомленням і оплачує внесок за всіх. Одиночні бійці реєструються самі.</span></li>
+        <li class="rv d1"><b>Групи</b><span>За п'ять днів до події система зводить бійців у групи за статтю, віком, вагою і категорією пояса. Список приходить тренеру і публікується в Telegram.</span></li>
         <li class="rv d2"><b>Бої</b><span>Свій блок близько двох годин: зважування, два–три поєдинки, нагородження. Медаль і грамота кожному.</span></li>
       </ol>
     </div>
   </section>
 
+  <section class="sys sec" id="systema" aria-labelledby="sys-h">
+    <div class="kanji" aria-hidden="true">技</div>
+    <div class="wrap">
+      <div class="head">
+        <div>
+          <p class="label rv">Як це влаштовано</p>
+          <h2 class="t rv d1" id="sys-h">Не разовий турнір. <em>Система спарингів.</em></h2>
+        </div>
+        <div>
+          <p class="sub rv d2">Shin Gi — авторський формат Black Bear Dojo: мережа регулярних спаринг-днів з однією базою клубів, тренерів і бійців. Кожна дата — ланка, а не окрема подія: склади, ваги, пояси та бої зберігаються й накопичуються.</p>
+          <div class="claim rv d3"><span>Вперше у кіокушин</span><span>Відкрито для всіх клубів</span><span>Одна база · багато дат</span></div>
+        </div>
+      </div>
+
+      <div class="mods rv">
+        <article class="mod">
+          <div class="k"><span>Модуль</span><i>01</i></div>
+          <h3>Лендинг</h3>
+          <p>Вітрина формату: блоки, категорії, умови, дата. Звідси тренер або боєць потрапляє в реєстрацію одним натисканням.</p>
+          <span class="arrow" aria-hidden="true"></span>
+        </article>
+        <article class="mod">
+          <div class="k"><span>Модуль</span><i>02</i></div>
+          <h3>Кабінет тренера</h3>
+          <p>Вхід через Telegram, без паролів. Команда, список бійців, оплата, групи, історія минулих дат і статистика клубу.</p>
+          <ul><li>Список вставляється одним повідомленням</li><li>Повтор складу з минулої дати</li><li>Статус оплати підсвічено</li></ul>
+          <span class="arrow" aria-hidden="true"></span>
+        </article>
+        <article class="mod">
+          <div class="k"><span>Модуль</span><i>03</i></div>
+          <h3>Бот у Telegram</h3>
+          <p>Те саме в чаті: реєстрація, нагадування про дедлайни, групи й розклад, локація, миттєве питання організаторам.</p>
+          <ul><li>Сповіщення від штабу всім тренерам</li><li>Термінові — з підтвердженням «прочитав»</li></ul>
+          <span class="arrow" aria-hidden="true"></span>
+        </article>
+        <article class="mod">
+          <div class="k"><span>Модуль</span><i>04</i></div>
+          <h3>Штаб</h3>
+          <p>Панель організатора: усі команди й оплати, сортування в групи однією кнопкою, зважування з телефона в день події, грамоти та протоколи.</p>
+          <ul><li>Групи за 5 / 10 кг і A · B · C</li><li>Статистика по клубах і датах</li></ul>
+        </article>
+      </div>
+
+      <div class="flow rv d1" role="list" aria-label="Механіка однієї дати">
+        <div role="listitem"><small>Д−21</small><b>Анонс</b><span>дата, ліміт місць</span></div>
+        <div role="listitem"><small>Д−10</small><b>Заявки</b><span>списки команд</span></div>
+        <div role="listitem"><small>Д−7</small><b>Внесок</b><span>місце підтверджено</span></div>
+        <div role="listitem"><small>Д−5</small><b>Групи</b><span>зведення, публікація</span></div>
+        <div role="listitem"><small>Д</small><b>Зважування</b><span>фінальні категорії</span></div>
+        <div role="listitem"><small>Д</small><b>Бої</b><span>два–три поєдинки</span></div>
+        <div role="listitem"><small>Д+1</small><b>Підсумки</b><span>статистика, грамоти</span></div>
+      </div>
+
+      <dl class="gain rv d2">
+        <div><dt>Клубам</dt><dd><b>Бої без організації.</b> Приїхали на свій блок — усе інше зроблено.</dd></div>
+        <div><dt>Тренерам</dt><dd><b>Команда за хвилину.</b> Список, оплата, групи й нагадування — в одному місці.</dd></div>
+        <div><dt>Бійцям</dt><dd><b>Регулярна практика.</b> Рівний суперник за вагою і поясом, без місяців очікування.</dd></div>
+        <div><dt>Спільноті</dt><dd><b>Єдиний календар.</b> Спаринги між турнірами, відкриті для всіх федерацій.</dd></div>
+      </dl>
+    </div>
+  </section>
+
   <section class="who sec" aria-labelledby="w-h">
     <div class="wrap grid">
-      <div class="ph rv"><img src="/main/club-all.webp" alt="Команда Black Bear Dojo" loading="lazy" width="2400" height="1403"></div>
       <div>
         <p class="label rv">Хто ми</p>
         <h2 class="t rv d1" id="w-h" style="font-size:clamp(34px,4.6vw,60px)">Shin Gi — з 2024 року</h2>
+        <p class="sub rv d2">Формат народився в Black Bear Dojo і виріс із клубних спарингів у відкриту систему для всього кіокушин.</p>
+      </div>
+      <div>
         <div class="hist rv d2">
-          <div><b>2024</b><span>Перші спаринг-дні для 14+ і семінари. Добровільна банка Shin Gi: 500 000 грн на допомогу військовим.</span></div>
-          <div><b>2025</b><span>Спаринги у залі-сховищі на Шулявці. Тривога не зупинила жодного бою.</span></div>
-          <div><b>2026</b><span>Kyokushin Open: дитячий блок із категоріями A · B · C і відкриті двері для всіх клубів.</span></div>
+          <div><b>2024</b><i></i><span>Перші спаринг-дні для 14+ і семінари. Добровільна банка Shin Gi: 500 000 грн на допомогу військовим.</span></div>
+          <div><b>2025</b><i></i><span>Спаринги у залі-сховищі на Шулявці. Тривога не зупинила жодного бою.</span></div>
+          <div><b>2026</b><i></i><span>Kyokushin Open: дитячий блок із категоріями A · B · C, кабінет і бот, відкриті двері для всіх клубів.</span></div>
         </div>
         <div class="coach rv d3">
-          <div class="av"><img src="/coach-igor-personal.jpg" alt="Ігор Котляревський" loading="lazy" width="904" height="1280"></div>
           <div>
             <b>Ігор Котляревський</b>
             <div class="reg">3 дан · майстер спорту України · чемпіон України · призер Європи</div>
-            <p>27 років у карате, понад 10 років тренерства. Організатор семінарів і турнірів з кіокушин.</p>
+            <p>27 років у карате, понад 10 років тренерства. Організатор семінарів і турнірів з кіокушин. Засновник Black Bear Dojo і автор формату Shin Gi.</p>
           </div>
+          <div class="dan" aria-hidden="true">参段</div>
         </div>
       </div>
     </div>
@@ -370,7 +527,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
         <h2 class="t rv d1" id="u-h">Разовий внесок</h2>
         <div class="price rv d2" id="price">___<small>грн / боєць</small></div>
         <ul class="rv d3">
-          <li>Платить тренер за команду одним платежем через кабінет; одиночні бійці — самі.</li>
+          <li>Платить тренер за команду одним платежем у кабінеті або в боті; одиночні бійці — самі. Статус оплати видно тренеру й організатору.</li>
           <li>У внесок входять бої, суддівство, медик, медаль і грамота.</li>
           <li>Місце підтверджується внеском. Дедлайн заявок — за 10 днів до події, внеску — за 7.</li>
           <li>Повернення — при скасуванні організатором. При неявці внесок не повертається.</li>
@@ -392,7 +549,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
       <div>
         <p class="label rv">Реєстрація</p>
         <h2 class="t rv d1" id="z-h">Заявка на <em>Shin Gi</em></h2>
-        <p class="sub rv d2">Кабінет реєстрації відкривається разом з анонсом дати. До того заявки приймаються в Telegram: ім'я бійця, стать, вік, вага, пояс, клуб і контакт.</p>
+        <p class="sub rv d2">Кабінет тренера і бот відкриваються разом з анонсом дати. До того заявки приймаються в Telegram: ім'я бійця, стать, вік, вага, пояс, клуб і контакт.</p>
         <div class="ctas rv d3">
           <a class="btn" id="cta-team" href="https://t.me/ihorkot" target="_blank" rel="noopener">Зареєструвати команду <span class="arr">→</span></a>
           <a class="btn ghost" id="cta-solo" href="https://t.me/ihorkot" target="_blank" rel="noopener">Я одиночний боєць</a>
@@ -407,7 +564,7 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   </section>
 
   <footer class="wrap">
-    <span>Shin Gi · Kyokushin Open · Black Bear Dojo · Київ · 2026</span>
+    <span>Shin Gi · Kyokushin Open · <a href="https://shin-karate.kyiv.ua/" >Black Bear Dojo</a> · Київ · 2026</span>
     <span>Не турнір. Не атестація. Бої.</span>
   </footer>
 </main>
@@ -424,8 +581,6 @@ footer{border-top:1px solid var(--line);padding-block:26px 40px;font-size:13px;c
   var revealPast=function(){var h=innerHeight;document.querySelectorAll('.rv:not(.in)').forEach(function(el){if(el.getBoundingClientRect().top<h*0.95)el.classList.add('in')})};
   window.addEventListener('scroll',revealPast,{passive:true});window.addEventListener('hashchange',function(){setTimeout(revealPast,50)});
   setTimeout(function(){document.querySelectorAll('.rv').forEach(function(el){el.classList.add('in')})},6000);
-  var vids=document.querySelectorAll('video[autoplay]');if('IntersectionObserver' in window){var vio=new IntersectionObserver(function(es){es.forEach(function(e){var v=e.target;if(e.isIntersecting){var p=v.play();if(p&&p.catch)p.catch(function(){})}else{v.pause()}})},{threshold:.2});vids.forEach(function(v){vio.observe(v)})}
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('video[autoplay]').forEach(function(v){v.removeAttribute('autoplay');v.pause()})}
   var btn=document.getElementById('copy'),num=document.getElementById('phone');
   if(btn){btn.addEventListener('click',function(){
     var done=function(){btn.textContent='Скопійовано';setTimeout(function(){btn.textContent='Скопіювати'},2000)};
