@@ -172,6 +172,10 @@
       "destination": "/shin-gi.html"
     },
     {
+      "source": "/api/shingi/:path*",
+      "destination": "/api/shingi.ts?path=:path*"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
