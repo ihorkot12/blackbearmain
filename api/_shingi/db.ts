@@ -4,14 +4,22 @@ import { BELT_CODES } from './belts.js';
 const { Pool, types } = pkg;
 
 // DATE лишаємо рядком YYYY-MM-DD (без зсуву часових поясів), NUMERIC — числом.
-types.setTypeParser(1082, (value: string) => value);
-types.setTypeParser(1700, (value: string) => parseFloat(value));
+// Лише для нашого пулу: api/index.ts живе в тому самому бандлі, глобальний setTypeParser
+// змінив би розбір DATE/NUMERIC в усіх його запитах.
+const shingiTypes = {
+  getTypeParser: (oid: number, format?: any) => {
+    if (oid === 1082) return (value: string) => value;
+    if (oid === 1700) return (value: string) => parseFloat(value);
+    return types.getTypeParser(oid, format);
+  },
+};
 
 export const pool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 3,
+      types: shingiTypes as any,
     })
   : null;
 

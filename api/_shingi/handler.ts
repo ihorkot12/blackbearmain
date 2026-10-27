@@ -1,10 +1,10 @@
-import { SESSION_COOKIE, readCookie, verifySession } from './_shingi/auth.js';
-import { originAllowed, resolveAdmin } from './_shingi/admin-auth.js';
-import { pool } from './_shingi/db.js';
-import { HttpError, RawReply, Reply, readJsonBody, type Ctx, type Profile, type Route } from './_shingi/http.js';
-import { adminRoutes } from './_shingi/routes-admin.js';
-import { publicRoutes } from './_shingi/routes-public.js';
-import { getProfileById } from './_shingi/store.js';
+import { SESSION_COOKIE, readCookie, verifySession } from './auth.js';
+import { originAllowed, resolveAdmin } from './admin-auth.js';
+import { pool } from './db.js';
+import { HttpError, RawReply, Reply, readJsonBody, type Ctx, type Profile, type Route } from './http.js';
+import { adminRoutes } from './routes-admin.js';
+import { publicRoutes } from './routes-public.js';
+import { getProfileById } from './store.js';
 
 const routes: Route[] = [...publicRoutes, ...adminRoutes];
 
