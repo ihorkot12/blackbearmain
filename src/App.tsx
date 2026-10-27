@@ -18,6 +18,8 @@ const WomenLanding = lazy(() => import('./WomenLanding').then(m => ({ default: m
 const RegisterMember = lazy(() => import('./RegisterMember').then(m => ({ default: m.RegisterMember })));
 const Encyclopedia = lazy(() => import('./Encyclopedia'));
 const Portal = lazy(() => import('./Portal').then(m => ({ default: m.Portal })));
+const ShinGiRegister = lazy(() => import('./shingi/Register'));
+const ShinGiCabinet = lazy(() => import('./shingi/Cabinet'));
 
 import { MainLanding } from './MainLanding';
 
@@ -167,6 +169,8 @@ export default function App() {
           <Route path="/women-karate" element={<WomenLanding />} />
           <Route path="/register-member" element={<RegisterMember />} />
           <Route path="/encyclopedia" element={<Encyclopedia />} />
+          <Route path="/shin-gi/register" element={<ShinGiRegister />} />
+          <Route path="/shin-gi/cabinet" element={<ShinGiCabinet />} />
         </Routes>
       </Suspense>
     </>

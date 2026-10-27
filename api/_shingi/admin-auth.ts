@@ -57,15 +57,24 @@ export function originAllowed(req: any): boolean {
     .filter(Boolean)
     .map((v) => String(v).replace(/\/+$/, ''));
   const allowed = [...ALLOWED_ORIGINS, ...extra];
+  // той самий хост, що й у запиту (прод, preview-аліас гілки, тестовий домен) — це наш власний сайт
+  const forwarded = req.headers?.['x-forwarded-host'];
+  const requestHost = String((Array.isArray(forwarded) ? forwarded[0] : forwarded) || req.headers?.host || '').toLowerCase();
+  const sameHost = (host: string) => Boolean(requestHost) && host.toLowerCase() === requestHost;
+
   const origin = req.headers?.origin;
   if (typeof origin === 'string' && origin) {
-    return allowed.includes(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin);
+    try {
+      return allowed.includes(origin) || sameHost(new URL(origin).host) || /^http:\/\/localhost(:\d+)?$/.test(origin);
+    } catch {
+      return false;
+    }
   }
   const referer = req.headers?.referer;
   if (typeof referer === 'string' && referer) {
     try {
       const u = new URL(referer);
-      return allowed.includes(u.origin) || u.hostname === 'localhost';
+      return allowed.includes(u.origin) || sameHost(u.host) || u.hostname === 'localhost';
     } catch {
       return false;
     }
