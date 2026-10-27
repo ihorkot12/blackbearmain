@@ -20,6 +20,7 @@ import { SMMModule } from './components/SMMModule';
 import { BELT_OPTIONS, getBeltColorClass, hasSilverStripe, normalizeBeltName } from './belts';
 import KarateManual from './KarateManual';
 import { HomeworkCoachModule } from './HomeworkModules';
+import { AdminShinGi } from './shingi/AdminShinGi';
 
 const toDateInputValue = (date = new Date()) => {
   const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
@@ -1219,6 +1220,7 @@ export const AdminPage = () => {
         { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin'] },
         { id: 'crm', label: 'CRM & Фінанси', icon: BarChart3, roles: ['admin', 'coach'] },
         { id: 'smm', label: 'SMM Agency', icon: Sparkles, roles: ['admin'] },
+        { id: 'shingi', label: 'SHIN GI', icon: Trophy, roles: ['admin'] },
         { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },
         { id: 'coaches', label: 'Тренери', icon: Users, roles: ['admin'] },
         { id: 'locations', label: 'Локації', icon: MapPin, roles: ['admin', 'coach'] },
@@ -1551,6 +1553,7 @@ export const AdminPage = () => {
             >
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
               {activeTab === 'smm' && <SMMModule />}
+              {activeTab === 'shingi' && role === 'admin' && <AdminShinGi />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'audit_logs' && <AuditLogsViewer />}
       {activeTab === 'leads' && <LeadsViewer />}

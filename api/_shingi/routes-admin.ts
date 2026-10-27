@@ -25,6 +25,7 @@ import {
   type Ctx,
   type Route,
 } from './http.js';
+import { parseFighters } from './parser.js';
 import { GROUPABLE_ENTRY_STATUSES, getEventById, eventCounters, type EventRow } from './store.js';
 
 const actor = (ctx: Ctx) => ctx.admin || 'admin';
@@ -420,6 +421,19 @@ export const adminRoutes: Route[] = [
       if (!rows[0]) throw new HttpError(404, 'Заявку не знайдено');
       await logAction(actor(ctx), 'entry.update', 'entry', id, Object.keys(b));
       return { entry: rows[0] };
+    },
+  },
+
+  {
+    // той самий парсер, що в тренера, але без прив'язки до профілю — для ручного додавання команди
+    method: 'POST',
+    path: 'admin/fighters/parse',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx, 'body');
+      const text = typeof ctx.body?.text === 'string' ? ctx.body.text : '';
+      if (text.length > 30000 || text.split('\n').length > 400) throw new HttpError(413, 'Забагато рядків — розбийте список на частини');
+      return parseFighters(text, event.event_date);
     },
   },
 
