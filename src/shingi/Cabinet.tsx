@@ -1,17 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BELT_CODES, BELT_LABELS, beltCategory, type BeltCode } from '../../api/_shingi/belts';
+import { beltCat, blockRule, groupKeyOf, groupLabel, plausibilityWarnings, resolveBlock } from '../../api/_shingi/rules';
 import { ApiError, ageOnDate, errorText, fmtDate, fmtMoney, kyivToday, sg } from './api';
 import { Badge, BeltDot, Card, Chip, H2, Label, Shell, Spinner, Stepper, btnCls, display, inputCls, usePageSetup, useSession } from './ui';
 
 const beltLabel = (belt?: string | null) => (belt && belt in BELT_LABELS ? BELT_LABELS[belt as BeltCode] : belt || '—');
 
-const groupLabel = (key: string) => {
-  const [block, sex, age, weight, cat] = key.split('|');
-  const ageText = age === '18+' || age === '14-17' ? age : `${age} р.`;
-  const weightText = weight === '?' ? 'вага ?' : `${weight.replace('-', '–')} кг`;
-  return `${block === 'kids' ? 'Kids' : 'Open'} · ${sex === 'm' ? 'Ч' : 'Ж'} · ${ageText} · ${weightText} · ${cat}`;
-};
 
 const ENTRY_LABEL: Record<string, string> = {
   draft: 'Чернетка',
@@ -42,6 +37,35 @@ const NoticeBox = ({ notice }: { notice: Notice }) =>
       {notice.text}
     </p>
   ) : null;
+
+/** Куди потрапить боєць і чому — щоб алгоритм був прозорий. */
+const GroupLine = ({ age, sex, weight, belt, override = false }: { age: number | null; sex: 'm' | 'f'; weight: number | null; belt: string; override?: boolean }) => {
+  if (age === null || Number.isNaN(age)) return null;
+  const block = resolveBlock(age, override);
+  const key = groupKeyOf({ block, sex, age, weight_kg: weight && Number.isFinite(weight) ? weight : null, belt });
+  return (
+    <p className="mt-1 text-[12px] text-[#9a9a95]">
+      <span className="text-[#C9A227]">Група:</span> {groupLabel(key)} <span className="text-[#85857f]">· {blockRule(age, override)}</span>
+    </p>
+  );
+};
+
+const WarnLine = ({ warnings }: { warnings: string[] }) =>
+  warnings.length > 0 ? <p className="mt-1 text-[12px] text-[#C9A227]">⚠ {warnings.join('; ')}</p> : null;
+
+const RulesInfo = () => (
+  <details className="mb-4 border border-[#242422] p-3 text-[14px] text-[#b9b9b4]">
+    <summary className={`${display} cursor-pointer text-[12px] text-[#C9A227]`}>Як формуються групи</summary>
+    <ol className="mt-3 list-decimal space-y-1 pl-5">
+      <li><b>Блок.</b> До 14 років — Kids. 14–17 — Kids, але можна заявити в Open. 18+ — Open.</li>
+      <li><b>Група</b> = блок · стать · вік · вага · категорія пояса. Хлопці й дівчата окремо.</li>
+      <li><b>Вік.</b> Kids — повних років на дату події. Open — лише 14–17 або 18+.</li>
+      <li><b>Вага.</b> Береться та, що ви вказали (зважування не буде). Kids — крок 5 кг, Open — крок 10 кг. Межа входить у верхню групу: 40,0 кг — це 40–45.</li>
+      <li><b>Категорія пояса.</b> A — білий, 10 і 9 кю. B — 8, 7, 6, 5 кю. C — 4, 3, 2, 1 кю і всі дани.</li>
+      <li>Якщо в групі лише один боєць, організатор об’єднає його з сусідньою вручну.</li>
+    </ol>
+  </details>
+);
 
 /* ───────────── Додати бійців ───────────── */
 
@@ -110,6 +134,7 @@ const AddFighters = ({ event, onSaved }: { event: any; onSaved: (text: string) =
   return (
     <Card>
       <H2 n="01">Додати бійців</H2>
+      <RulesInfo />
       <div className="mb-4 flex gap-2">
         {[
           { id: 'paste', label: 'Вставити список' },
@@ -163,7 +188,8 @@ const AddFighters = ({ event, onSaved }: { event: any; onSaved: (text: string) =
                           {f.sex === 'm' ? 'Ч' : 'Ж'} · {f.birth_date ? ageOnDate(f.birth_date, event?.event_date || kyivToday()) : f.age_years} р. · {f.weight_kg} кг · {beltLabel(f.belt)} ({beltCategory(f.belt)})
                         </span>
                       </div>
-                      {f.warnings?.length > 0 && <p className="mt-1 text-[12px] text-[#C9A227]">⚠ {f.warnings.join('; ')}</p>}
+                      <GroupLine age={f.birth_date ? ageOnDate(f.birth_date, event?.event_date || kyivToday()) : f.age_years} sex={f.sex} weight={f.weight_kg} belt={f.belt} />
+                      <WarnLine warnings={f.warnings || []} />
                     </div>
                   ))}
                   <button type="button" className={btnCls()} onClick={saveParsed} disabled={busy}>Зберегти {result.parsed.length}</button>
@@ -189,6 +215,10 @@ const AddFighters = ({ event, onSaved }: { event: any; onSaved: (text: string) =
                 {BELT_CODES.map((b) => <option key={b} value={b}>{BELT_LABELS[b]}</option>)}
               </select>
               <button type="button" className="px-2 text-[#85857f] hover:text-[#ff6b6b]" onClick={() => setRows((l) => l.filter((_, idx) => idx !== i))} aria-label="Прибрати рядок">✕</button>
+              <div className="col-span-full">
+                <GroupLine age={r.age === '' ? null : Number(r.age)} sex={r.sex} weight={r.weight === '' ? null : Number(r.weight)} belt={r.belt} />
+                <WarnLine warnings={plausibilityWarnings({ age: r.age === '' ? null : Number(r.age), weight_kg: r.weight === '' ? null : Number(r.weight), belt: r.belt })} />
+              </div>
             </div>
           ))}
           <div className="flex flex-wrap gap-3">
@@ -217,6 +247,10 @@ export default function CabinetPage() {
   const [busy, setBusy] = useState(false);
   const [question, setQuestion] = useState('');
   const [repeatFrom, setRepeatFrom] = useState('');
+  const [fBlock, setFBlock] = useState('');
+  const [fCat, setFCat] = useState('');
+  const [fStatus, setFStatus] = useState('');
+  const [fQuery, setFQuery] = useState('');
 
   useEffect(() => {
     if (!me) return;
@@ -243,6 +277,17 @@ export default function CabinetPage() {
   const registrationOpen = Boolean(event && event.status === 'registration' && (!event.deadline_apps || kyivToday() <= event.deadline_apps));
 
   const ageOf = (f: any) => (event ? (f.birth_date ? ageOnDate(f.birth_date, event.event_date) : f.age_years) : f.age_years);
+  const isActive = (f: any) => ['submitted', 'paid', 'fought'].includes(entryOf.get(f.id)?.status);
+  const visibleFighters = fighters.filter((f) => {
+    const age = ageOf(f);
+    const block = entryOf.get(f.id)?.block ?? (age === null ? '' : resolveBlock(age, openIds.has(f.id)));
+    return (
+      (!fBlock || block === fBlock) &&
+      (!fCat || beltCat(f.belt) === fCat) &&
+      (!fStatus || (fStatus === 'active' ? isActive(f) : !isActive(f))) &&
+      (!fQuery || String(f.full_name).toLowerCase().includes(fQuery.toLowerCase()))
+    );
+  });
 
   const toggle = (set: Set<number>, id: number, on: boolean) => {
     const next = new Set(set);
@@ -409,8 +454,32 @@ export default function CabinetPage() {
       <Card>
         <H2 n="02">Мої бійці ({fighters.length})</H2>
         {fighters.length === 0 && <p className="text-[#9a9a95]">Поки нікого немає. Додайте бійців вище.</p>}
+        {fighters.length > 0 && (
+          <>
+            <div className="mb-2 grid gap-2 sm:grid-cols-4">
+              <select className={inputCls} value={fBlock} onChange={(e) => setFBlock(e.target.value)} aria-label="Блок">
+                <option value="">Усі блоки</option>
+                <option value="kids">Kids</option>
+                <option value="open">Open</option>
+              </select>
+              <select className={inputCls} value={fCat} onChange={(e) => setFCat(e.target.value)} aria-label="Категорія пояса">
+                <option value="">Усі категорії</option>
+                <option value="A">A · білий, 10–9 кю</option>
+                <option value="B">B · 8–5 кю</option>
+                <option value="C">C · 4–1 кю, дани</option>
+              </select>
+              <select className={inputCls} value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Статус">
+                <option value="">Усі статуси</option>
+                <option value="active">У заявці</option>
+                <option value="pending">Не подані</option>
+              </select>
+              <input className={inputCls} value={fQuery} onChange={(e) => setFQuery(e.target.value)} placeholder="Пошук за ПІБ" aria-label="Пошук" />
+            </div>
+            <p className="mb-3 text-[12px] text-[#85857f]">Показано {visibleFighters.length} з {fighters.length}</p>
+          </>
+        )}
         <div className="divide-y divide-[#242422] border-y border-[#242422]">
-          {fighters.map((f) => {
+          {visibleFighters.map((f) => {
             const entry = entryOf.get(f.id);
             const active = entry && ['submitted', 'paid', 'fought'].includes(entry.status);
             const age = ageOf(f);
@@ -439,6 +508,8 @@ export default function CabinetPage() {
                       <span className="text-[#3a3a37]">|</span>
                       <span>блок {entry ? (entry.block === 'kids' ? 'Kids' : 'Open') : age !== null && age >= 18 ? 'Open' : 'Kids'}</span>
                     </p>
+                    <GroupLine age={age} sex={f.sex} weight={f.weight_kg} belt={f.belt} override={Boolean(entry?.block_override) || openIds.has(f.id)} />
+                    <WarnLine warnings={plausibilityWarnings({ age, weight_kg: f.weight_kg, belt: f.belt })} />
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <input
                         key={`${f.id}-${f.weight_kg}`}
@@ -485,10 +556,10 @@ export default function CabinetPage() {
             {fighters.some((f) => registrationOpen && !['submitted', 'paid', 'fought'].includes(entryOf.get(f.id)?.status)) && (
               <button
                 className={btnCls('ghost')}
-                onClick={() => setSelected(new Set(fighters.filter((f) => !['submitted', 'paid', 'fought'].includes(entryOf.get(f.id)?.status)).map((f) => f.id)))}
+                onClick={() => setSelected(new Set(visibleFighters.filter((f) => !isActive(f)).map((f) => f.id)))}
                 disabled={!registrationOpen}
               >
-                Обрати всіх
+                Обрати показаних
               </button>
             )}
           </div>

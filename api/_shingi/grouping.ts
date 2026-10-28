@@ -1,15 +1,9 @@
-import { beltCategory, type BeltCategory, type BeltCode } from './belts.js';
+import type { BeltCategory, BeltCode } from './belts.js';
+import { groupKeyOf, DEFAULT_GROUPING, type Block, type GroupingOptions, type Sex } from './rules.js';
 
-export type Block = 'kids' | 'open';
-export type Sex = 'm' | 'f';
-
-export type GroupingOptions = {
-  kidsAgeStep: number;
-  kidsWeightStep: number;
-  openWeightStep: number;
-};
-
-export const DEFAULT_GROUPING: GroupingOptions = { kidsAgeStep: 1, kidsWeightStep: 5, openWeightStep: 10 };
+// Правила (блок, відра, категорія) живуть у rules.ts — їх використовує й кабінет.
+export { ageOnDate, resolveBlock, ageBucket, weightBand, DEFAULT_GROUPING } from './rules.js';
+export type { Block, Sex, GroupingOptions } from './rules.js';
 
 export type GroupableEntry = {
   id: number;
@@ -36,52 +30,16 @@ export type Group = {
   single: boolean;
 };
 
-/** Вік на дату події (повних років). Дати — рядки YYYY-MM-DD. */
-export function ageOnDate(birthDate: string, eventDate: string): number {
-  const [by, bm, bd] = birthDate.split('-').map(Number);
-  const [ey, em, ed] = eventDate.split('-').map(Number);
-  let age = ey - by;
-  if (em < bm || (em === bm && ed < bd)) age -= 1;
-  return age;
-}
-
 export function resolveAge(fighter: { birth_date?: string | null; age_years?: number | null }, eventDate: string): number | null {
-  if (fighter.birth_date) return ageOnDate(fighter.birth_date, eventDate);
+  if (fighter.birth_date) {
+    const [by, bm, bd] = fighter.birth_date.split('-').map(Number);
+    const [ey, em, ed] = eventDate.split('-').map(Number);
+    return ey - by - (em < bm || (em === bm && ed < bd) ? 1 : 0);
+  }
   return typeof fighter.age_years === 'number' ? fighter.age_years : null;
 }
 
-/** До 14 — завжди kids; 14–17 — kids, якщо тренер явно не заявив в open; 18+ — open. */
-export function resolveBlock(age: number, blockOverride = false): Block {
-  if (age >= 18) return 'open';
-  if (age >= 14 && blockOverride) return 'open';
-  return 'kids';
-}
-
-export function ageBucket(block: Block, age: number, opts: GroupingOptions = DEFAULT_GROUPING): string {
-  if (block === 'open') return age >= 18 ? '18+' : '14-17';
-  const step = Math.max(1, Math.floor(opts.kidsAgeStep));
-  if (step === 1) return String(age);
-  const lo = Math.floor(age / step) * step;
-  return `${lo}-${lo + step - 1}`;
-}
-
-export function weightBand(block: Block, weight: number | null, opts: GroupingOptions = DEFAULT_GROUPING): string {
-  if (weight === null || !Number.isFinite(weight)) return '?';
-  const step = block === 'kids' ? opts.kidsWeightStep : opts.openWeightStep;
-  const w = Math.round(weight * 10) / 10;
-  const lo = Math.floor(w / step) * step;
-  return `${lo}-${lo + step}`;
-}
-
-export function groupKeyFor(entry: GroupableEntry, opts: GroupingOptions = DEFAULT_GROUPING): string {
-  return [
-    entry.block,
-    entry.sex,
-    ageBucket(entry.block, entry.age, opts),
-    weightBand(entry.block, entry.weight_kg, opts),
-    beltCategory(entry.belt),
-  ].join('|');
-}
+export const groupKeyFor = (entry: GroupableEntry, opts: GroupingOptions = DEFAULT_GROUPING): string => groupKeyOf(entry, opts);
 
 export function parseGroupKey(key: string) {
   const [block, sex, ageB, weightB, beltCat] = key.split('|');

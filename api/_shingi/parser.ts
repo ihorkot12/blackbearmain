@@ -1,5 +1,5 @@
 import { danToBelt, kyuToBelt, type BeltCode } from './belts.js';
-import { ageOnDate } from './grouping.js';
+import { ageOnDate, plausibilityWarnings } from './rules.js';
 
 export type ParsedFighter = {
   line: number;
@@ -179,6 +179,7 @@ export function parseFighterLine(raw: string, line: number, eventDate: string): 
   }
   if (ageYears === null || ageYears < 4 || ageYears > 60) return fail('вік поза межами 4–60 років');
   if (assumed) warnings.push('колір без смужки — вказано молодший кю, перевірте пояс');
+  warnings.push(...plausibilityWarnings({ age: ageYears, weight_kg: weight, belt }));
 
   return {
     line,
