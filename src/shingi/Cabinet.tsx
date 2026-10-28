@@ -153,7 +153,7 @@ const AddFighters = ({ event, onSaved }: { event: any; onSaved: (text: string) =
 
       {tab === 'paste' && (
         <div className="space-y-3">
-          <Label text="Один боєць на рядок" hint="Прізвище Ім’я, стать (ч/ж), вік, вага, пояс — у будь-якому порядку. Пояс: 8кю, 1 дан або колір.">
+          <Label text="Один боєць на рядок" hint="Прізвище Ім’я, вік (або рік народження), вага, пояс — у будь-якому порядку. Пояс: 8кю, 1 дан або колір. Стать (ч/ж) додайте, якщо ім’я неоднозначне.">
             <textarea
               rows={7}
               className={inputCls}
@@ -162,7 +162,7 @@ const AddFighters = ({ event, onSaved }: { event: any; onSaved: (text: string) =
                 setText(e.target.value);
                 setResult(null);
               }}
-              placeholder={'Іваненко Максим ч 12 38 8кю\nКоваль Софія, ж, 10, 31, 10 кю\nПетренко Артем — м, 16 р, 62 кг, 4 кю'}
+              placeholder={'Іваненко Максим 12 38 8кю\nКоваль Софія, 10 років, 31 кг, жовтий\nПетренко Артем — 2010, 62 кг, 4 кю'}
             />
           </Label>
           <button type="button" className={btnCls('ghost')} onClick={parse} disabled={busy || !text.trim()}>Розібрати список</button>

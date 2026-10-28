@@ -170,7 +170,7 @@ export const Navbar = () => {
             })}
             <a
               href="/shin-gi"
-              className="group relative flex items-center gap-2 rounded-full border border-[#C9A227]/60 px-4 py-2 text-[11px] font-black uppercase tracking-[0.15em] text-[#C9A227] transition-colors duration-300 hover:bg-[#C9A227] hover:text-black"
+              className="group relative flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full border border-[#C9A227]/60 px-4 py-2 text-[11px] font-black uppercase tracking-[0.15em] text-[#C9A227] transition-colors duration-300 hover:bg-[#C9A227] hover:text-black"
             >
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#C9A227] opacity-75 group-hover:bg-black" />

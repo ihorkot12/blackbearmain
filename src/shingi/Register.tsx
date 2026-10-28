@@ -12,8 +12,9 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { me, error, inTelegram, reload, loginWithWidget } = useSession();
+  const roleParam = params.get('role') === 'solo' ? 'solo' : params.get('role') === 'coach' ? 'coach' : '';
   const [form, setForm] = useState({
-    role: params.get('role') === 'solo' ? 'solo' : 'coach',
+    role: roleParam || 'coach',
     federation: '',
     club: '',
     city: 'Київ',
@@ -33,7 +34,7 @@ export default function RegisterPage() {
     if (p) {
       setForm((f) => ({
         ...f,
-        role: p.role || f.role,
+        role: roleParam || p.role || f.role,
         federation: p.federation || f.federation,
         club: p.club || f.club,
         city: p.city || f.city,
@@ -41,15 +42,19 @@ export default function RegisterPage() {
         phone: p.phone || f.phone,
       }));
     }
-  }, [me, navigate]);
+  }, [me, navigate, roleParam]);
 
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
   const solo = form.role === 'solo';
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
     setFormError('');
+    if (form.coach_full_name.trim().split(/\s+/).length < 2) {
+      setFormError('Вкажіть прізвище та ім’я тренера');
+      return;
+    }
+    setSaving(true);
     try {
       await sg('profile', { method: 'PUT', body: form });
       await reload();
@@ -85,7 +90,7 @@ export default function RegisterPage() {
             <Chip strong="Медаль і грамота">кожному</Chip>
           </div>
           <div className="mt-8">
-            {inTelegram ? (
+            {inTelegram && !error ? (
               <p className="text-[#b9b9b4]">Входимо через Telegram…</p>
             ) : (
               <>

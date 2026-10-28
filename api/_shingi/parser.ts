@@ -40,6 +40,36 @@ const STRIPE = '(?:\\s+(?:зі|із|з)\\s+(?:смужк\\p{L}*|полоск\\p{
 
 const NAME_TOKEN = /^[\p{L}][\p{L}'’ʼ`-]*\.?$/u;
 
+const MALE_NAMES = new Set(
+  `іван олександр андрій максим дмитро артем богдан владислав данило даніїл денис єгор захар назар нікіта микита олег роман сергій
+  тимофій ярослав матвій михайло марк кирило костянтин віктор володимир василь петро павло тарас станіслав святослав руслан ілля гліб
+  лев юрій євген арсен антон артур вадим віталій анатолій георгій ігор леонід борис едуард тимур давид остап мирослав орест любомир
+  макар платон семен степан федір ростислав олексій дем'ян всеволод влад діма даня тім стас слава`.split(/\s+/),
+);
+const FEMALE_NAMES = new Set(
+  `марія анна софія анастасія вікторія дарина дар'я олена катерина єва єлизавета поліна аліса валерія вероніка діана злата ірина іванна
+  христина кіра ксенія лілія марина мілана наталія оксана олександра олеся тетяна уляна юлія яна ярослава аміна емілія ліза людмила
+  надія маргарита дана анжеліка альона аріна варвара влада таїсія ольга світлана леся мирослава соломія мар'яна ангеліна лариса
+  міла настя соня даша катя вікторія`.split(/\s+/),
+);
+
+/** Стать за по-батькові, іменем або закінченням прізвища. Невпевнено — null, і користувач вказує «ч/ж» сам. */
+export function guessSex(nameTokens: string[]): 'm' | 'f' | null {
+  const lower = nameTokens.map((t) => t.toLowerCase().replace(/[’ʼ`]/g, "'"));
+  for (const t of lower) {
+    if (/(?:ович|йович|іч|ьич)$/u.test(t)) return 'm';
+    if (/(?:івна|ївна|овна|ївна|ична)$/u.test(t)) return 'f';
+  }
+  for (const t of lower) {
+    if (MALE_NAMES.has(t)) return 'm';
+    if (FEMALE_NAMES.has(t)) return 'f';
+  }
+  const surname = lower[0];
+  if (/(?:ська|цька|зька|ова|ева|єва|іна|їна)$/u.test(surname)) return 'f';
+  if (/(?:ський|цький|зький|ов|ев|єв)$/u.test(surname)) return 'm';
+  return null;
+}
+
 function validDate(y: number, m: number, d: number): boolean {
   const date = new Date(Date.UTC(y, m - 1, d));
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
@@ -161,13 +191,20 @@ export function parseFighterLine(raw: string, line: number, eventDate: string): 
     const t = token.toLowerCase();
     if (MALE.has(t) || FEMALE.has(t)) sexIndex = i;
   });
-  if (sexIndex < 0) return fail('не зрозумів стать (ч/ж)');
-  const sex: 'm' | 'f' = MALE.has(tokens[sexIndex].toLowerCase()) ? 'm' : 'f';
-
   const nameTokens = tokens.filter((token, i) => i !== sexIndex && !NOISE.has(token.toLowerCase()));
   const badToken = nameTokens.find((token) => !NAME_TOKEN.test(token));
   if (badToken) return fail(`не зрозумів «${badToken}»`);
   if (nameTokens.length < 2) return fail("вкажіть прізвище та ім'я");
+
+  let sex: 'm' | 'f';
+  if (sexIndex >= 0) {
+    sex = MALE.has(tokens[sexIndex].toLowerCase()) ? 'm' : 'f';
+  } else {
+    const guessed = guessSex(nameTokens);
+    if (!guessed) return fail('не зрозумів стать (ч/ж)');
+    sex = guessed;
+    warnings.push('стать вгадано за ім’ям — перевірте');
+  }
 
   if (!belt) return fail('не знайшов пояс');
 
