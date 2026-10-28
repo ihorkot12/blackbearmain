@@ -19,6 +19,9 @@ export const pool = process.env.DATABASE_URL
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 3,
+      // без таймаутів запит, що чекає з'єднання чи лок, висить вічно; з ними — падає з помилкою за секунди
+      connectionTimeoutMillis: 10_000,
+      statement_timeout: 20_000,
       types: shingiTypes as any,
     })
   : null;
@@ -168,16 +171,24 @@ export function requirePool() {
   return pool;
 }
 
-const SCHEMA_LOCK_ID = 727301;
+// Інший ключ, ніж у попередній версії: сесійний лок 727301 міг лишитися висіти на з'єднанні пулера.
+const SCHEMA_LOCK_ID = 727302;
 
-/** DDL під advisory-lock: паралельні холодні старти інстансів не змагаються за каталог Postgres. */
+/**
+ * DDL під транзакційним advisory-lock: паралельні холодні старти не змагаються за каталог Postgres.
+ * Лок знімається разом із транзакцією, тож не переживає з'єднання через пулер (на відміну від pg_advisory_lock).
+ */
 async function runMigration() {
   const client = await requirePool().connect();
   try {
-    await client.query('SELECT pg_advisory_lock($1::bigint)', [SCHEMA_LOCK_ID]);
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1::bigint)', [SCHEMA_LOCK_ID]);
     await client.query(SCHEMA_SQL);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
   } finally {
-    await client.query('SELECT pg_advisory_unlock($1::bigint)', [SCHEMA_LOCK_ID]).catch(() => undefined);
     client.release();
   }
 }
