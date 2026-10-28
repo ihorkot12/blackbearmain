@@ -30,6 +30,7 @@ import { ContactForm } from './components/ContactForm';
 import { QuickLeadModal } from './components/QuickLeadModal';
 import { Navbar } from './components/Navbar';
 import { BrandLogo } from './components/BrandLogo';
+import { AudienceSection } from './components/AudienceSection';
 import { trackLeadIntent } from './lib/leadTracking';
 import {
   CONTAINER,
@@ -749,6 +750,8 @@ export const MainLanding = ({ initialContent }: { initialContent: any }) => {
       {/* ---------------------------------------------------------------- *
        * КЛУБ — широкий кадр усього клубу, паралакс
        * ---------------------------------------------------------------- */}
+      <AudienceSection />
+
       <section id="about" ref={clubRef as any} className="relative overflow-hidden bg-black">
         <div className="relative min-h-[600px] md:min-h-[720px]">
           <motion.img

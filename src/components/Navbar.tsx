@@ -168,6 +168,16 @@ export const Navbar = () => {
                 </Link>
               );
             })}
+            <a
+              href="/shin-gi"
+              className="group relative flex items-center gap-2 rounded-full border border-[#C9A227]/60 px-4 py-2 text-[11px] font-black uppercase tracking-[0.15em] text-[#C9A227] transition-colors duration-300 hover:bg-[#C9A227] hover:text-black"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#C9A227] opacity-75 group-hover:bg-black" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#C9A227] group-hover:bg-black" />
+              </span>
+              SHIN GI
+            </a>
             <Link to="/login" className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#EAEAEA] hover:text-red-500 transition-all duration-300 flex items-center gap-2">
               <User size={14} />
               Вхід
@@ -271,8 +281,18 @@ export const Navbar = () => {
                   );
                 })}
                 
-                <Link 
-                  to="/login" 
+                <a
+                  href="/shin-gi"
+                  className="px-4 py-5 rounded-2xl border border-[#C9A227]/60 bg-[#C9A227]/10 text-xl font-black text-[#C9A227] uppercase tracking-tight flex items-center gap-4 active:bg-[#C9A227] active:text-black transition-colors"
+                >
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#C9A227] opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-[#C9A227]" />
+                  </span>
+                  SHIN GI · спаринг-день
+                </a>
+                <Link
+                  to="/login"
                   onClick={() => setIsMenuOpen(false)}
                   className="px-4 py-5 bg-white/5 rounded-2xl text-xl font-bold text-white uppercase tracking-tight flex items-center gap-4 active:bg-red-600 transition-colors"
                 >
