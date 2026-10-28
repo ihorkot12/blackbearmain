@@ -33,7 +33,8 @@ import {
   resolveEvent,
 } from './store.js';
 import { originAllowed } from './admin-auth.js';
-import { getBotToken } from './telegram-client.js';
+import { publicBaseUrl, secretMatches, startReply } from './bot.js';
+import { getBotToken, sendMessage } from './telegram-client.js';
 
 const isSecure = (ctx: Ctx) => !/^localhost(:\d+)?$/.test(String(ctx.req.headers?.host || ''));
 
@@ -497,6 +498,33 @@ export const publicRoutes: Route[] = [
         history,
         club_stats: { ...clubStats, by_category: byCategory },
       };
+    },
+  },
+
+  // --- бот @shingii_bot: /start → кнопка «Відкрити кабінет» (Mini App, вхід без пароля й номера) ---
+  {
+    method: 'POST',
+    path: 'bot/webhook',
+    auth: 'public',
+    handler: async (ctx) => {
+      const token = getBotToken();
+      if (!secretMatches(ctx.req.headers?.['x-telegram-bot-api-secret-token'], token)) throw new HttpError(401, 'Unauthorized');
+      const message = ctx.body?.message;
+      const chatId = message?.chat?.id;
+      if (message?.chat?.type === 'private' && typeof message.text === 'string' && chatId) {
+        const reply = startReply(message.text, publicBaseUrl());
+        if (reply) {
+          try {
+            await sendMessage(chatId, reply.text, {
+              reply_markup: { inline_keyboard: [[{ text: reply.buttonText, web_app: { url: reply.url } }]] },
+            });
+          } catch (error) {
+            // відповідаємо Telegram 200 у будь-якому разі, щоб він не повторював оновлення
+            console.error('shingi bot reply failed:', (error as Error).message);
+          }
+        }
+      }
+      return { ok: true };
     },
   },
 

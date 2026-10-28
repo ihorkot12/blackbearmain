@@ -25,6 +25,8 @@ import {
   type Ctx,
   type Route,
 } from './http.js';
+import { publicBaseUrl, webhookSecret } from './bot.js';
+import { getBotToken, tgCall } from './telegram-client.js';
 import { parseFighters } from './parser.js';
 import { GROUPABLE_ENTRY_STATUSES, getEventById, eventCounters, type EventRow } from './store.js';
 
@@ -641,5 +643,35 @@ export const adminRoutes: Route[] = [
   { method: 'POST', path: 'admin/broadcast', auth: 'admin', handler: notReady(4, 'Розсилки') },
   { method: 'GET', path: 'admin/questions', auth: 'admin', handler: notReady(4, 'Питання тренерів') },
   { method: 'POST', path: 'admin/questions/:id/answer', auth: 'admin', handler: notReady(4, 'Відповіді на питання') },
-  { method: 'GET', path: 'admin/bot/setup', auth: 'admin', handler: notReady(4, 'Налаштування бота') },
+  {
+    // Одна кнопка в адмінці: вебхук, команда /start і кнопка меню «Кабінет» (Mini App).
+    // `base` — домен, на якому працює кабінет (https). Запускати з головного домену, не з preview.
+    method: 'POST',
+    path: 'admin/bot/setup',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const token = getBotToken();
+      if (!token) throw new HttpError(503, 'SHINGI_BOT_TOKEN не задано для цього середовища', 'bot_not_configured');
+      let base = publicBaseUrl();
+      if (ctx.body?.base) {
+        try {
+          const u = new URL(String(ctx.body.base));
+          if (u.protocol !== 'https:') throw new Error('not https');
+          base = u.origin;
+        } catch {
+          throw new HttpError(400, 'base має бути адресою https://…');
+        }
+      }
+      await tgCall('setWebhook', {
+        url: `${base}/api/shingi/bot/webhook`,
+        secret_token: webhookSecret(token),
+        allowed_updates: ['message'],
+      });
+      await tgCall('setMyCommands', { commands: [{ command: 'start', description: 'Відкрити кабінет SHIN GI' }] });
+      await tgCall('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Кабінет', web_app: { url: `${base}/shin-gi/cabinet` } } });
+      const info = await tgCall('getWebhookInfo');
+      await logAction(actor(ctx), 'bot.setup', 'bot', null, { base });
+      return { ok: true, base, webhook_url: info.url, pending_updates: info.pending_update_count, last_error: info.last_error_message || null };
+    },
+  },
 ];

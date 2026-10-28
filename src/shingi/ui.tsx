@@ -260,6 +260,7 @@ export const TelegramLogin = ({ onAuth }: { onAuth: (user: any) => void }) => {
     script.setAttribute('data-telegram-login', BOT_USERNAME);
     script.setAttribute('data-size', 'large');
     script.setAttribute('data-radius', '0');
+    script.setAttribute('data-lang', 'uk');
     script.setAttribute('data-userpic', 'false');
     script.setAttribute('data-request-access', 'write');
     script.setAttribute('data-onauth', 'onShinGiTelegramAuth(user)');

@@ -166,6 +166,49 @@ type EventRow = {
 
 /* ───────────── Подія ───────────── */
 
+/** Налаштування бота однією кнопкою: вебхук + /start + кнопка меню «Кабінет». */
+const BotCard = () => {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<any | null>(null);
+  const onPreview = /\.vercel\.app$/.test(window.location.hostname);
+
+  const setup = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      setResult(await api('admin/bot/setup', { method: 'POST', body: { base: window.location.origin } }));
+      toast.success('Бота налаштовано');
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+
+  return (
+    <div className={card}>
+      <h4 className="mb-2 text-[11px] font-black uppercase tracking-widest text-zinc-500">Бот @shingii_bot</h4>
+      <p className="text-sm text-zinc-400">
+        Кнопка підключає вебхук і меню «Кабінет». Після цього тренер пише боту /start, натискає «Відкрити кабінет» і заходить без номера й паролів.
+      </p>
+      {onPreview && (
+        <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[13px] text-amber-200">
+          Ви на тестовому домені Vercel. Telegram не відкриє його всередині застосунку (там потрібен вхід у Vercel), тому запускайте це з головного домену сайту.
+        </p>
+      )}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button className={btnPrimary} onClick={setup} disabled={busy}>
+          {busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Налаштувати бота
+        </button>
+        {result && (
+          <span className="text-[13px] text-emerald-300">
+            Вебхук: {result.webhook_url} {result.last_error ? `· помилка Telegram: ${result.last_error}` : '· без помилок'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const eventToForm = (e: EventRow) => ({
   title: e.title || '',
   event_date: e.event_date || '',
@@ -329,6 +372,8 @@ const EventTab = ({ event, onSaved, onCreated }: { event: EventRow; onSaved: () 
           </div>
         </div>
       )}
+
+      <BotCard />
     </div>
   );
 };
