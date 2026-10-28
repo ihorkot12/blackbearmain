@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, UserPlus, ArrowLeft, LayoutDashboard, LogIn, ShieldCheck } from 'lucide-react';
+import { Shield, Users, UserPlus, ArrowLeft, LayoutDashboard, LogIn, ShieldCheck, Trophy } from 'lucide-react';
 import { BrandLogo } from './components/BrandLogo';
 
 export const Portal = () => {
@@ -63,6 +63,7 @@ export const Portal = () => {
           <p className="text-zinc-500 font-medium">Оберіть розділ для продовження роботи з системою</p>
         </motion.div>
 
+        <p className="mb-3 w-full text-[10px] font-bold uppercase tracking-[0.25em] text-zinc-500">Клуб Black Bear Dojo</p>
         <div className="grid grid-cols-1 gap-4 w-full">
           {portalOptions.map((option, idx) => (
             <motion.button
@@ -92,7 +93,29 @@ export const Portal = () => {
           ))}
         </div>
 
-        <motion.div 
+        <p className="mb-3 mt-10 w-full text-[10px] font-bold uppercase tracking-[0.25em] text-[#C9A227]">Окремий розділ · турнір для всіх клубів</p>
+        <motion.a
+          href="/shin-gi"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+          className="group relative block w-full overflow-hidden rounded-[2rem] border border-[#C9A227]/50 bg-gradient-to-br from-[#14100a] via-black to-[#1a0507] p-6 text-left transition-colors hover:border-[#C9A227]"
+        >
+          <div className="relative z-10 flex items-center gap-6">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C9A227] shadow-lg transition-transform duration-500 group-hover:scale-110">
+              <Trophy size={28} className="text-black" />
+            </div>
+            <div className="flex-1">
+              <h3 className="mb-1 text-xl font-black uppercase tracking-tight">SHIN <span className="text-red-600">GI</span></h3>
+              <p className="text-xs font-medium leading-relaxed text-zinc-400">Реєстрація тренерів і бійців на спаринг-день. Вхід через Telegram, окремо від кабінетів клубу.</p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 transition-all group-hover:bg-[#C9A227] group-hover:text-black">
+              <LogIn size={18} />
+            </div>
+          </div>
+        </motion.a>
+
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}

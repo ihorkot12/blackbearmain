@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "node node_modules/typescript/bin/tsc --noEmit",
+    "test:shingi": "node --import ./tests/shingi/register.mjs --test --test-isolation=none tests/shingi/*.test.ts",
     "start": "tsx api/index.ts",
     "mobile:preflight": "node scripts/mobile-preflight.mjs",
     "mobile:sync": "npm run build && cap sync",
