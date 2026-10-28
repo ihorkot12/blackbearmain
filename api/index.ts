@@ -20,6 +20,7 @@ import {
   type HomeworkFocus,
   type HomeworkLibraryExercise,
 } from './_homeworkLibrary.js';
+import shingiHandler from './_shingi/handler.js';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -1022,6 +1023,12 @@ async function startServer() {
       return res.status(403).json({ error: 'Forbidden origin' });
     }
     next();
+  });
+
+  // SHIN GI живе в окремому модулі (api/_shingi), але в цій же serverless-функції:
+  // на Hobby-плані Vercel ліміт — 12 функцій, і всі 12 уже зайняті.
+  app.all('/api/shingi/*', (req, res) => {
+    void shingiHandler(req, res);
   });
 
   const ADMIN_TOKEN = crypto.createHash('sha256').update(SESSION_SECRET + 'admin-token-v1').digest('hex');
