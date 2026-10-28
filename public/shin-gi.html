@@ -53,6 +53,9 @@ a{color:inherit}
 .nav nav a:hover::after{transform:scaleX(1)}
 .nav .cta{font-family:var(--display);font-size:13px;letter-spacing:.12em;text-transform:uppercase;padding:10px 16px;border:1px solid var(--edge);text-decoration:none;transition:border-color .25s,background .25s,color .25s,box-shadow .25s;white-space:nowrap}
 .nav .cta:hover{border-color:var(--gold);color:var(--gold);background:#141413;box-shadow:0 0 0 1px rgba(201,162,39,.18),0 8px 24px -12px rgba(201,162,39,.45)}
+.nav-cta{display:flex;gap:10px;align-items:center}
+.nav .cta-reg{background:var(--gold);border-color:var(--gold);color:#0b0b0a;font-weight:700}
+.nav .cta-reg:hover{background:#d8b232;border-color:#d8b232;color:#0b0b0a}
 
 /* hero */
 .hero{position:relative;min-height:88vh;display:grid;align-items:end;overflow:hidden;padding-block:72px 64px}
@@ -317,6 +320,7 @@ footer a:hover{color:var(--gold)}
 @media (max-width:640px){
   body{font-size:17px}
   .nav nav{display:none}
+  .nav .cta-ghost{display:none}
   .hero{min-height:auto;padding-block:56px 56px}
   .hero .photo{width:70vw;opacity:.5;-webkit-mask-image:linear-gradient(90deg,transparent,#000 50%);mask-image:linear-gradient(90deg,transparent,#000 50%)}
   .hero .kanji{font-size:62vw;top:2vh;right:-6vw}
@@ -342,7 +346,10 @@ footer a:hover{color:var(--gold)}
       <a href="#systema">Система</a>
       <a href="#umovy">Умови</a>
     </nav>
-    <a class="cta" href="#zayavka">Заявка</a>
+    <div class="nav-cta">
+      <a class="cta cta-ghost" href="#zayavka">Заявка</a>
+      <a class="cta cta-reg" href="https://t.me/shingii_bot?start=team" target="_blank" rel="noopener">Реєстрація</a>
+    </div>
   </div>
 </header>
 
