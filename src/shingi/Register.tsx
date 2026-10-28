@@ -94,21 +94,32 @@ export default function RegisterPage() {
               <p className="text-[#b9b9b4]">Входимо через Telegram…</p>
             ) : (
               <>
-                <a
-                  className={`${btnCls()} !bg-[#229ED9] !border-[#229ED9] hover:!bg-[#1b8fc6] w-full sm:w-auto !px-7 !py-4 !text-[15px]`}
-                  href={`https://t.me/${BOT_USERNAME}?start=${solo ? 'solo' : 'team'}`}
-                >
-                  Відкрити в Telegram →
-                </a>
-                <p className="mt-3 max-w-md text-[13px] leading-relaxed text-[#85857f]">
-                  Бот відкриє заявку одним дотиком: без паролів і кодів. Натисніть «Start», потім кнопку під повідомленням.
-                </p>
-                <details className="mt-6 text-[13px] text-[#85857f]">
-                  <summary className="cursor-pointer select-none hover:text-[#C9A227]">Я за комп’ютером — увійти через віджет</summary>
-                  <div className="mt-3">
-                    <TelegramLogin onAuth={loginWithWidget} />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="border border-[#C9A227]/50 bg-[#C9A227]/[0.04] p-4 sm:p-5">
+                    <p className={`${display} text-[12px] text-[#C9A227]`}>Вхід на сайті · ПК і телефон</p>
+                    <p className="mt-2 text-[14px] leading-relaxed text-[#b9b9b4]">
+                      Натисніть кнопку Telegram нижче й підтвердіть вхід у застосунку. Паролі й коди не потрібні.
+                    </p>
+                    <div className="mt-4">
+                      <TelegramLogin onAuth={loginWithWidget} />
+                    </div>
                   </div>
-                </details>
+                  <div className="border border-[#242422] p-4 sm:p-5">
+                    <p className={`${display} text-[12px] text-[#8a8a86]`}>Через бота</p>
+                    <p className="mt-2 text-[14px] leading-relaxed text-[#b9b9b4]">
+                      Бот відкриє заявку одним дотиком. Натисніть «Start», потім кнопку під повідомленням.
+                    </p>
+                    <a
+                      className={`${btnCls()} !bg-[#229ED9] !border-[#229ED9] hover:!bg-[#1b8fc6] mt-4 w-full sm:w-auto`}
+                      href={`https://t.me/${BOT_USERNAME}?start=${solo ? 'solo' : 'team'}`}
+                    >
+                      Відкрити в Telegram →
+                    </a>
+                  </div>
+                </div>
+                <p className="mt-4 max-w-xl text-[13px] leading-relaxed text-[#85857f]">
+                  Обидва входи — це один акаунт Telegram, тож кабінет і заявка однакові на комп’ютері, у браузері телефона й у боті.
+                </p>
               </>
             )}
           </div>

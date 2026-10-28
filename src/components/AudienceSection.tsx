@@ -80,17 +80,13 @@ export const AudienceSection = () => {
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a
-                href="https://t.me/shingii_bot?start=team"
-                target="_blank"
-                rel="noopener"
+                href="/shin-gi/register?role=coach"
                 className="inline-flex items-center gap-2 rounded-full bg-red-700 px-6 py-3 text-[12px] font-black uppercase tracking-[0.15em] text-white transition-colors hover:bg-red-600"
               >
                 Зареєструвати команду <ArrowRight size={14} />
               </a>
               <a
-                href="https://t.me/shingii_bot?start=solo"
-                target="_blank"
-                rel="noopener"
+                href="/shin-gi/register?role=solo"
                 className="inline-flex items-center gap-2 rounded-full border border-[#C9A227]/60 px-6 py-3 text-[12px] font-black uppercase tracking-[0.15em] text-[#C9A227] transition-colors hover:bg-[#C9A227] hover:text-black"
               >
                 Я боєць
