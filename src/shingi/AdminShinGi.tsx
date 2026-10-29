@@ -993,6 +993,7 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
                 <p className="truncate text-[12px] text-zinc-500">{p.fighters || '—'}</p>
                 <p className="truncate text-[11px] text-zinc-600">
                   {p.reference}{p.marked_by ? ` · відмітив ${p.marked_by}` : ''}{p.note ? ` · ${p.note}` : ''}
+                  {p.offer_accepted_at ? ` · згода з офертою ${p.offer_version} від ${new Date(p.offer_accepted_at).toLocaleString('uk-UA')}` : ''}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">

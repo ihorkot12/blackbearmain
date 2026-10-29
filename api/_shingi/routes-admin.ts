@@ -514,6 +514,7 @@ export const adminRoutes: Route[] = [
       const event = await eventFromQuery(ctx);
       const payments = await query(
         `SELECT pay.id, pay.reference, pay.amount_uah, pay.base_uah, pay.fee_uah, pay.provider, pay.note, pay.marked_by,
+                pay.offer_version, pay.offer_accepted_at,
                 pay.status, pay.entries_ids, pay.created_at, pay.paid_at, p.club, p.coach_full_name,
                 (SELECT string_agg(f.full_name, ', ' ORDER BY f.full_name)
                  FROM shingi_entries e JOIN shingi_fighters f ON f.id = e.fighter_id

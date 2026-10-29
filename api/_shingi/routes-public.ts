@@ -23,6 +23,7 @@ import {
 } from './http.js';
 import { randomBytes } from 'crypto';
 import { parseFighters } from './parser.js';
+import { OFFER_VERSION } from './offer.js';
 import { refreshFromMono } from './pay-service.js';
 import { cardFeePercent, grossUp, invoiceBody, monoCall, monoToken } from './payments.js';
 import {
@@ -564,9 +565,9 @@ export const publicRoutes: Route[] = [
       const quote = grossUp(entries.length * event.fee_uah, cardFeePercent());
       const reference = `sg-${event.id}-${profile.id}-${randomBytes(4).toString('hex')}`;
       const [payment] = await query<{ id: number }>(
-        `INSERT INTO shingi_payments (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::int[], 'monobank', 'created') RETURNING id`,
-        [event.id, profile.id, reference, quote.total_uah, quote.base_uah, quote.fee_uah, entries.map((e) => e.id)],
+        `INSERT INTO shingi_payments (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status, offer_version, offer_accepted_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::int[], 'monobank', 'created', $8, now()) RETURNING id`,
+        [event.id, profile.id, reference, quote.total_uah, quote.base_uah, quote.fee_uah, entries.map((e) => e.id), OFFER_VERSION],
       );
 
       try {

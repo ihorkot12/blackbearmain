@@ -129,6 +129,9 @@ const SCHEMA_SQL = `
   ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS invoice_url TEXT;
   ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS note TEXT;
   ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS marked_by TEXT;
+  -- згода платника з офертою: версія редакції й момент акцепту
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS offer_version TEXT;
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS offer_accepted_at TIMESTAMPTZ;
   CREATE INDEX IF NOT EXISTS shingi_payments_invoice ON shingi_payments (invoice_id);
 
   CREATE TABLE IF NOT EXISTS shingi_messages (

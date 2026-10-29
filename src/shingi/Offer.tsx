@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { OFFER_EDITION_LABEL } from '../../api/_shingi/offer';
 import { fmtDate, fmtMoney, sg } from './api';
 import { Card, H2, Shell, display, usePageSetup } from './ui';
 
@@ -20,7 +21,7 @@ const ORGANIZER = {
   telegram: '@ihorkot',
 };
 
-const EDITION = '29.10.2026';
+const EDITION = OFFER_EDITION_LABEL;
 
 const P = ({ children }: { children: React.ReactNode }) => <p className="mt-3 text-[15px] leading-relaxed text-[#cfcfca]">{children}</p>;
 

@@ -633,8 +633,8 @@ export default function CabinetPage() {
             <label className="flex cursor-pointer items-start gap-2 text-[13px] leading-relaxed text-[#b9b9b4]">
               <input type="checkbox" className="mt-1" checked={acceptOffer} onChange={(e) => setAcceptOffer(e.target.checked)} />
               <span>
-                Погоджуюсь з <a className="text-[#C9A227] underline" href="/shin-gi/offer" target="_blank" rel="noopener">умовами публічної оферти</a>,
-                зокрема з тим, що комісію банку за онлайн-оплату сплачує платник.
+                Я ознайомився(-лась) і погоджуюсь з <a className="text-[#C9A227] underline" href="/shin-gi/offer" target="_blank" rel="noopener">договором публічної оферти</a>,
+                зокрема з тим, що комісію банку за онлайн-оплату сплачує платник. Оплата є акцептом договору.
               </span>
             </label>
             <button className={btnCls()} disabled={busy || !cab.payments_open || totals.unpaid === 0 || !acceptOffer} onClick={payByCard}>
