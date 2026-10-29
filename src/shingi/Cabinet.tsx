@@ -551,7 +551,7 @@ export default function CabinetPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <b>{f.full_name}</b>
-                      {entry && <Badge tone={ENTRY_TONE[entry.status]}>{ENTRY_LABEL[entry.status]}</Badge>}
+                      {entry && <Badge tone={ENTRY_TONE[entry.status]}>{fee?.free && entry.status === 'submitted' ? 'Прийнято' : ENTRY_LABEL[entry.status]}</Badge>}
                     </div>
                     <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-[#9a9a95]">
                       <BeltDot belt={f.belt} label={beltLabel(f.belt)} />
@@ -698,6 +698,18 @@ export default function CabinetPage() {
         <H2>Питання організаторам</H2>
         <textarea className={inputCls} rows={3} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Напишіть питання — відповімо в Telegram" />
         <div className="mt-3"><button className={btnCls('ghost')} disabled={!question.trim()} onClick={sendQuestion}>Надіслати</button></div>
+        {cab.messages?.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {cab.messages.map((m: any) => (
+              <div key={m.id} className={`border p-3 text-[14px] ${m.direction === 'in' ? 'border-[#242422]' : 'border-[#C9A227]/40 bg-[#C9A227]/5'}`}>
+                <p className="mb-1 text-[11px] uppercase tracking-wider text-[#85857f]">
+                  {m.direction === 'in' ? 'Ви' : 'Організатори'} · {new Date(m.created_at).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p className="whitespace-pre-wrap">{m.text}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {selected.size > 0 && event && (

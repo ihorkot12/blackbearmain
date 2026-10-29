@@ -24,6 +24,8 @@ import {
 import { randomBytes } from 'crypto';
 import { parseFighters } from './parser.js';
 import { feeInfo } from './fee.js';
+import { answerQuestion, forwardQuestion, isStaffTelegram } from './notify.js';
+import { parseQuestionTag } from './reminders.js';
 import { OFFER_VERSION } from './offer.js';
 import { refreshFromMono } from './pay-service.js';
 import { cardFeePercent, grossUp, invoiceBody, monoCall, monoToken } from './payments.js';
@@ -494,6 +496,10 @@ export const publicRoutes: Route[] = [
       const byCategory = { A: 0, B: 0, C: 0 };
       for (const e of active) byCategory[beltCategory(e.belt as BeltCode)] += 1;
       const quote = grossUp(unpaid * event.fee_uah, cardFeePercent());
+      const messages = await query(
+        `SELECT id, direction, text, created_at FROM shingi_messages WHERE profile_id = $1 ORDER BY created_at DESC, id DESC LIMIT 20`,
+        [profile.id],
+      );
 
       return {
         profile: profileView(profile),
@@ -513,6 +519,7 @@ export const publicRoutes: Route[] = [
           card_fee_percent: quote.percent,
         },
         payments_open: paymentsOpen(event) && event.fee_uah > 0 && Boolean(monoToken()),
+        messages,
         history,
         club_stats: { ...clubStats, by_category: byCategory },
       };
@@ -529,6 +536,27 @@ export const publicRoutes: Route[] = [
       if (!secretMatches(ctx.req.headers?.['x-telegram-bot-api-secret-token'], token)) throw new HttpError(401, 'Unauthorized');
       const message = ctx.body?.message;
       const chatId = message?.chat?.id;
+
+      // реплай організатора на повідомлення з питанням (мітка #Q) → відповідь тренеру
+      const questionId = message?.reply_to_message ? parseQuestionTag(message.reply_to_message.text) : null;
+      if (questionId && chatId && typeof message.text === 'string') {
+        try {
+          if (await isStaffTelegram(message.from?.id)) {
+            const result = await answerQuestion(questionId, message.text, `tg:${message.from.id}`);
+            const notice =
+              result.ok === false
+                ? result.reason === 'no_telegram'
+                  ? 'Тренер не підключений до Telegram, відповідь збережено не буде.'
+                  : 'Не вдалося надіслати відповідь тренеру. Спробуйте ще раз в адмінці.'
+                : '✅ Відповідь надіслано тренеру.';
+            await sendMessage(chatId, notice);
+          }
+        } catch (error) {
+          console.error('shingi staff reply failed:', (error as Error).message);
+        }
+        return { ok: true };
+      }
+
       if (message?.chat?.type === 'private' && typeof message.text === 'string' && chatId) {
         const event = await resolveEvent(null).catch(() => null);
         const reply = startReply(message.text, publicBaseUrl(), event ? feeInfo(event) : undefined);
@@ -632,8 +660,10 @@ export const publicRoutes: Route[] = [
         `INSERT INTO shingi_messages (profile_id, direction, text) VALUES ($1, 'in', $2) RETURNING id`,
         [ctx.profile!.id, text],
       );
-      // пересилання в штабний чат — етап 4
-      return new Reply(201, { ok: true, id: rows[0].id });
+      // штабу (SHINGI_ADMIN_TG_IDS) питання пересилає бот; відповісти можна реплаєм у Telegram або в адмінці
+      const profile = ctx.profile!;
+      const delivered = await forwardQuestion(rows[0].id, profile, text).catch(() => 0);
+      return new Reply(201, { ok: true, id: rows[0].id, delivered });
     },
   },
 ];

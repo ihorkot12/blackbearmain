@@ -1,6 +1,7 @@
 import ExcelJS from 'exceljs';
 import { randomBytes } from 'crypto';
 import { isFeeKind } from './fee.js';
+import { answerQuestion, isAudience, notifyGroupsPublished, recipientsFor, runReminders, sendBroadcast } from './notify.js';
 import { emptyRevenue, summarizeRevenue, type PaidRow, type PendingRow } from './payments.js';
 import { BELT_LABELS, beltCategory, isBeltCode, type BeltCode } from './belts.js';
 import { ENTRY_STATUSES, EVENT_STATUSES, ensureSchema, logAction, query, withTx } from './db.js';
@@ -22,6 +23,7 @@ import {
   capped,
   clean,
   isIsoDate,
+  kyivToday,
   normalizePhone,
   toInt,
   validateFighter,
@@ -511,9 +513,10 @@ export const adminRoutes: Route[] = [
       );
       if (missing > 0) throw new HttpError(409, `У ${missing} заявок немає групи — спершу натисніть «Сформувати групи»`, 'groups_missing');
       await query(`UPDATE shingi_events SET status = 'groups_published' WHERE id = $1`, [event.id]);
-      // сповіщення тренерам ботом — етап 4
       await logAction(actor(ctx), 'groups.publish', 'event', event.id);
-      return { ok: true, status: 'groups_published' };
+      // тренерам з заявками ботом іде повідомлення, що групи опубліковано (помилка розсилки не скасовує публікацію)
+      const notified = getBotToken() ? await notifyGroupsPublished(event, actor(ctx)).catch(() => null) : null;
+      return { ok: true, status: 'groups_published', notified };
     },
   },
 
@@ -756,9 +759,107 @@ export const adminRoutes: Route[] = [
 
   // --- наступні етапи ---
   { method: 'GET', path: 'admin/certificates', auth: 'admin', handler: notReady(5, 'Грамоти PDF') },
-  { method: 'POST', path: 'admin/broadcast', auth: 'admin', handler: notReady(4, 'Розсилки') },
-  { method: 'GET', path: 'admin/questions', auth: 'admin', handler: notReady(4, 'Питання тренерів') },
-  { method: 'POST', path: 'admin/questions/:id/answer', auth: 'admin', handler: notReady(4, 'Відповіді на питання') },
+
+  // --- розсилки, питання тренерів, нагадування ---
+  {
+    method: 'GET',
+    path: 'admin/broadcast/preview',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx);
+      const audience = ctx.query.audience;
+      if (!isAudience(audience)) throw new HttpError(400, 'Невідома аудиторія');
+      const list = await recipientsFor(event.id, audience);
+      return { audience, recipients: list.length };
+    },
+  },
+  {
+    method: 'POST',
+    path: 'admin/broadcast',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx, 'body');
+      const audience = ctx.body?.audience;
+      if (!isAudience(audience)) throw new HttpError(400, 'Невідома аудиторія');
+      const text = capped(ctx.body?.text, 3000);
+      if (!text) throw new HttpError(400, 'Напишіть текст розсилки');
+      if (!getBotToken()) throw new HttpError(503, 'SHINGI_BOT_TOKEN не задано для цього середовища', 'bot_not_configured');
+      const result = await sendBroadcast({ event, audience, text, urgent: ctx.body?.urgent === true, actor: actor(ctx) });
+      return new Reply(201, result);
+    },
+  },
+  {
+    method: 'GET',
+    path: 'admin/broadcasts',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx);
+      const broadcasts = await query(
+        `SELECT id, audience, text, urgent, sent_count, failed_count, created_by, created_at
+         FROM shingi_broadcasts WHERE event_id = $1 ORDER BY created_at DESC LIMIT 30`,
+        [event.id],
+      );
+      return { broadcasts };
+    },
+  },
+  {
+    method: 'GET',
+    path: 'admin/questions',
+    auth: 'admin',
+    handler: async () => {
+      const messages = await query(
+        `SELECT m.id, m.profile_id, m.direction, m.text, m.answered, m.created_at,
+                p.club, p.coach_full_name, p.tg_username
+         FROM shingi_messages m JOIN shingi_profiles p ON p.id = m.profile_id
+         ORDER BY m.created_at DESC, m.id DESC LIMIT 300`,
+      );
+      return { messages };
+    },
+  },
+  {
+    method: 'POST',
+    path: 'admin/questions/:id/answer',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const text = capped(ctx.body?.text, 2000);
+      if (!text) throw new HttpError(400, 'Напишіть відповідь');
+      if (!getBotToken()) throw new HttpError(503, 'SHINGI_BOT_TOKEN не задано для цього середовища', 'bot_not_configured');
+      const result = await answerQuestion(id, text, actor(ctx));
+      if (result.ok === false) {
+        if (result.reason === 'not_found') throw new HttpError(404, 'Питання не знайдено');
+        if (result.reason === 'no_telegram') throw new HttpError(409, 'Тренер не підключений до Telegram, відповісти ботом не можна', 'no_telegram');
+        throw new HttpError(502, 'Telegram не прийняв повідомлення. Спробуйте ще раз', 'send_failed');
+      }
+      return { ok: true };
+    },
+  },
+  {
+    // «Нагадати зараз»: за замовчуванням лише показує, що буде надіслано (dry_run); справжня відправка — dry_run: false
+    method: 'POST',
+    path: 'admin/reminders/run',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx, 'body');
+      const dryRun = ctx.body?.dry_run !== false;
+      if (!dryRun && !getBotToken()) throw new HttpError(503, 'SHINGI_BOT_TOKEN не задано для цього середовища', 'bot_not_configured');
+      return runReminders({ today: kyivToday(), actor: actor(ctx), dryRun, event });
+    },
+  },
+  {
+    // Для зовнішнього планувальника (cron): Authorization: Bearer <CRON_SECRET>. Без змінної CRON_SECRET вимкнено.
+    method: 'GET',
+    path: 'cron/reminders',
+    auth: 'public',
+    handler: async (ctx) => {
+      const secret = (process.env.CRON_SECRET || '').trim();
+      if (!secret) throw new HttpError(503, 'CRON_SECRET не задано', 'cron_not_configured');
+      if (ctx.req.headers?.authorization !== `Bearer ${secret}`) throw new HttpError(401, 'Unauthorized');
+      if (!getBotToken()) throw new HttpError(503, 'SHINGI_BOT_TOKEN не задано для цього середовища', 'bot_not_configured');
+      return runReminders({ today: kyivToday(), actor: 'cron', dryRun: false });
+    },
+  },
   {
     // Одна кнопка в адмінці: вебхук, команда /start і кнопка меню «Кабінет» (Mini App).
     // `base` — домен, на якому працює кабінет (https). Запускати з головного домену, не з preview.

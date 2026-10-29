@@ -650,7 +650,7 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
 
       <p className="px-1 text-[12px] text-zinc-500">
         Показано {shown.length} з {rows.length}
-        {Object.entries(counts).map(([s, n]) => ` · ${ENTRY_STATUS_LABELS[s]}: ${n}`)}
+        {Object.entries(counts).map(([s, n]) => ` · ${event.fee_uah === 0 && s === 'submitted' ? 'Прийнято' : ENTRY_STATUS_LABELS[s]}: ${n}`)}
       </p>
 
       {shown.length === 0 && <div className={`${card} text-center text-zinc-500`}>Заявок поки немає</div>}
@@ -665,7 +665,7 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
                 <p className="truncate text-[12px] text-zinc-400">{r.club} · {r.coach_full_name}</p>
                 <p className="text-[12px] text-zinc-500">{r.sex === 'm' ? 'Ч' : 'Ж'} · {r.age ?? '?'} р. · кат. {r.belt_cat ?? '?'}</p>
               </div>
-              <Badge tone={ENTRY_STATUS_TONE[r.status]}>{ENTRY_STATUS_LABELS[r.status]}</Badge>
+              <Badge tone={ENTRY_STATUS_TONE[r.status]}>{event.fee_uah === 0 && r.status === 'submitted' ? 'Прийнято' : ENTRY_STATUS_LABELS[r.status]}</Badge>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <StatusSelect r={r} patch={patch} />
@@ -1200,6 +1200,249 @@ const ExportTab = ({ event }: { event: EventRow }) => {
   );
 };
 
+/* ───────────── Питання тренерів ───────────── */
+
+const fmtDateTime = (iso?: string | null) => (iso ? new Date(iso).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '');
+
+const QuestionsTab = () => {
+  const [rows, setRows] = useState<any[] | null>(null);
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setRows((await api<{ messages: any[] }>('admin/questions')).messages);
+    } catch (e) {
+      fail(e);
+      setRows([]);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const threads = useMemo(() => {
+    const map = new Map<number, { profile_id: number; club: string; coach: string; tg: string | null; msgs: any[]; open: number; last: number }>();
+    for (const m of [...(rows || [])].reverse()) {
+      const t = map.get(m.profile_id) || { profile_id: m.profile_id, club: m.club, coach: m.coach_full_name, tg: m.tg_username, msgs: [], open: 0, last: 0 };
+      t.msgs.push(m);
+      t.last = m.id;
+      if (m.direction === 'in' && !m.answered) t.open += 1;
+      map.set(m.profile_id, t);
+    }
+    return [...map.values()].sort((a, b) => b.open - a.open || b.last - a.last);
+  }, [rows]);
+
+  const answer = async (id: number) => {
+    const text = (drafts[id] || '').trim();
+    if (!text) return;
+    setBusy(id);
+    try {
+      await api(`admin/questions/${id}/answer`, { method: 'POST', body: { text } });
+      toast.success('Відповідь надіслано тренеру в Telegram');
+      setDrafts((d) => ({ ...d, [id]: '' }));
+      await load();
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(null);
+  };
+
+  if (!rows) return <Loading />;
+  if (threads.length === 0) return <div className={`${card} text-center text-zinc-500`}>Питань від тренерів ще немає</div>;
+
+  return (
+    <div className="space-y-4">
+      <p className="px-1 text-[12px] text-zinc-500">
+        Нові питання приходять у Telegram тим, хто вказаний у SHINGI_ADMIN_TG_IDS. Відповісти можна реплаєм на повідомлення бота або тут.
+      </p>
+      {threads.map((t) => (
+        <div key={t.profile_id} className={card}>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate font-black">{t.club || '—'}</p>
+              <p className="truncate text-[12px] text-zinc-500">{t.coach}{t.tg ? ` · @${t.tg}` : ''}</p>
+            </div>
+            {t.open > 0 ? <Badge tone={ENTRY_STATUS_TONE.submitted}>Без відповіді: {t.open}</Badge> : <Badge tone={ENTRY_STATUS_TONE.paid}>Усе відповідено</Badge>}
+          </div>
+          <div className="space-y-2">
+            {t.msgs.map((m) => (
+              <div key={m.id} className={`rounded-xl border p-3 text-sm ${m.direction === 'in' ? 'border-white/5 bg-white/[0.03]' : 'border-emerald-500/20 bg-emerald-500/5'}`}>
+                <p className="mb-1 text-[11px] uppercase tracking-widest text-zinc-500">
+                  {m.direction === 'in' ? 'Тренер' : 'Організатори'} · {fmtDateTime(m.created_at)}
+                </p>
+                <p className="whitespace-pre-wrap">{m.text}</p>
+                {m.direction === 'in' && !m.answered && (
+                  <div className="mt-3 space-y-2">
+                    <textarea
+                      rows={2}
+                      className={input}
+                      value={drafts[m.id] || ''}
+                      maxLength={2000}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: e.target.value }))}
+                      placeholder="Відповідь піде тренеру в Telegram"
+                    />
+                    <button className={btnPrimary} disabled={busy === m.id || !(drafts[m.id] || '').trim()} onClick={() => answer(m.id)}>
+                      {busy === m.id ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Відповісти
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+/* ───────────── Розсилки і нагадування ───────────── */
+
+const AUDIENCE_LABELS: Record<string, string> = {
+  event: 'Усі з заявкою на цей захід',
+  unpaid: 'Ті, хто ще не сплатив внесок',
+  paid: 'Ті, хто сплатив',
+  all: 'Усі в системі (є Telegram)',
+};
+
+const REMINDER_LABELS = (key: string) => {
+  const [kind, d] = key.split(':d');
+  const when = d === '0' ? 'у останній день' : d === '1' ? 'за 1 день' : `за ${d} дні`;
+  return `${kind === 'pay' ? 'Внесок' : 'Заявки'} · ${when}`;
+};
+
+const BroadcastsTab = ({ event }: { event: EventRow }) => {
+  const [audience, setAudience] = useState('event');
+  const [text, setText] = useState('');
+  const [urgent, setUrgent] = useState(false);
+  const [count, setCount] = useState<number | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [history, setHistory] = useState<any[] | null>(null);
+  const [reminders, setReminders] = useState<{ due: Array<{ key: string; recipients: number; sent: number; failed: number; skipped?: string }> } | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    try {
+      setHistory((await api<{ broadcasts: any[] }>(`admin/broadcasts?event_id=${event.id}`)).broadcasts);
+    } catch (e) {
+      fail(e);
+      setHistory([]);
+    }
+  }, [event.id]);
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  useEffect(() => {
+    setCount(null);
+    setConfirm(false);
+    api<{ recipients: number }>(`admin/broadcast/preview?event_id=${event.id}&audience=${audience}`)
+      .then((r) => setCount(r.recipients))
+      .catch(() => setCount(null));
+  }, [event.id, audience]);
+
+  const send = async () => {
+    setBusy(true);
+    try {
+      const r = await api<{ recipients: number; sent: number; failed: number }>('admin/broadcast', {
+        method: 'POST',
+        body: { event_id: event.id, audience, text, urgent },
+      });
+      toast.success(`Надіслано: ${r.sent} з ${r.recipients}${r.failed ? `, не доставлено: ${r.failed}` : ''}`);
+      setText('');
+      setConfirm(false);
+      loadHistory();
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+
+  const checkReminders = async (dry: boolean) => {
+    try {
+      const res = await api<any>('admin/reminders/run', { method: 'POST', body: { event_id: event.id, dry_run: dry } });
+      setReminders(res);
+      if (!dry) {
+        toast.success('Нагадування надіслано');
+        loadHistory();
+      }
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={`${card} space-y-4`}>
+        <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-500">Розсилка тренерам у Telegram</h4>
+        <Field label="Кому">
+          <select className={input} value={audience} onChange={(e) => setAudience(e.target.value)}>
+            {Object.entries(AUDIENCE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        <Field label="Текст" hint="Текст надсилається як є, переноси рядків зберігаються">
+          <textarea rows={5} className={input} value={text} maxLength={3000} onChange={(e) => { setText(e.target.value); setConfirm(false); }} />
+        </Field>
+        <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-300">
+          <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} /> Терміново (з позначкою ❗)
+        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          {!confirm ? (
+            <button className={btnPrimary} disabled={!text.trim() || !count} onClick={() => setConfirm(true)}>Надіслати</button>
+          ) : (
+            <>
+              <button className={btnPrimary} disabled={busy} onClick={send}>
+                {busy ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Так, надіслати {count}
+              </button>
+              <button className={btnSecondary} disabled={busy} onClick={() => setConfirm(false)}>Скасувати</button>
+            </>
+          )}
+          <span className="text-sm text-zinc-500">{count === null ? 'Рахуємо отримувачів…' : `Отримувачів: ${count}`}</span>
+        </div>
+      </div>
+
+      <div className={`${card} space-y-3`}>
+        <h4 className="text-[11px] font-black uppercase tracking-widest text-zinc-500">Нагадування за дедлайнами</h4>
+        <p className="text-sm text-zinc-400">
+          За 3 дні, за 1 день і в останній день: про заявки (дедлайн {fmtDate(event.deadline_apps)}) та про внесок (дедлайн {fmtDate(event.deadline_pay)}, лише неоплаченим).
+          Кожне нагадування по події надсилається один раз. Автоматично його запускає зовнішній планувальник через /api/shingi/cron/reminders з CRON_SECRET.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <button className={btnSecondary} onClick={() => checkReminders(true)}>Що піде сьогодні</button>
+          <button className={btnPrimary} onClick={() => checkReminders(false)}>Надіслати зараз</button>
+        </div>
+        {reminders && (
+          <div className="space-y-2 text-sm">
+            {reminders.due.length === 0 && <p className="text-zinc-500">Сьогодні нагадувань немає: дні не збігаються з дедлайнами або реєстрація не відкрита.</p>}
+            {reminders.due.map((r) => (
+              <p key={r.key} className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                {REMINDER_LABELS(r.key)} · отримувачів: {r.recipients}
+                {r.skipped ? ' · уже надсилали' : r.sent || r.failed ? ` · надіслано ${r.sent}, помилок ${r.failed}` : ''}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className={card}>
+        <h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Історія</h4>
+        {!history && <Loading />}
+        {history && history.length === 0 && <p className="text-zinc-500">Розсилок ще не було</p>}
+        <div className="space-y-2">
+          {(history || []).map((h) => (
+            <div key={h.id} className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm">
+              <p className="mb-1 text-[11px] uppercase tracking-widest text-zinc-500">
+                {fmtDateTime(h.created_at)} · {String(h.audience).startsWith('auto:') ? `авто ${h.audience.slice(5)}` : AUDIENCE_LABELS[h.audience] || h.audience} · {h.sent_count} надіслано{h.failed_count ? `, ${h.failed_count} помилок` : ''}
+              </p>
+              <p className="whitespace-pre-wrap">{h.urgent ? '❗ ' : ''}{h.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ───────────── Оболонка ───────────── */
 
 const SUBTABS: Array<{ id: string; label: string; disabled?: string }> = [
@@ -1209,8 +1452,8 @@ const SUBTABS: Array<{ id: string; label: string; disabled?: string }> = [
   { id: 'payments', label: 'Оплати' },
   { id: 'stats', label: 'Статистика' },
   { id: 'export', label: 'Експорт' },
-  { id: 'questions', label: 'Питання', disabled: 'Буде на етапі 4' },
-  { id: 'broadcasts', label: 'Розсилки', disabled: 'Буде на етапі 4' },
+  { id: 'questions', label: 'Питання' },
+  { id: 'broadcasts', label: 'Розсилки' },
 ];
 
 export const AdminShinGi = () => {
@@ -1281,6 +1524,8 @@ export const AdminShinGi = () => {
           {tab === 'payments' && <PaymentsTab event={event} />}
           {tab === 'stats' && <StatsTab event={event} />}
           {tab === 'export' && <ExportTab event={event} />}
+          {tab === 'questions' && <QuestionsTab />}
+          {tab === 'broadcasts' && <BroadcastsTab event={event} />}
         </>
       )}
     </div>

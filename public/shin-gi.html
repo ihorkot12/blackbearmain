@@ -338,7 +338,7 @@ footer a:hover{color:var(--gold)}
 <body>
 <header class="nav" id="nav">
   <div class="wrap">
-    <a class="mark" href="#top"><span class="bm" aria-hidden="true">B</span><span>Black Bear <b>Dojo</b></span></a>
+    <a class="mark" href="/"><span class="bm" aria-hidden="true">B</span><span>Black Bear <b>Dojo</b></span></a>
     <nav>
       <a href="#chomu">Чому зараз</a>
       <a href="#format">Формат</a>
@@ -364,7 +364,7 @@ footer a:hover{color:var(--gold)}
       <p class="lead h-in d3">Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.</p>
       <div class="hero-cta h-in d4">
         <a class="btn" href="/shin-gi/register?role=coach">Зареєструвати команду <span class="arr">→</span></a>
-        <div class="facts"><span class="hi" id="fee-chip"><b>400 грн</b> · внесок за бійця</span><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
+        <div class="facts"><span class="hi" id="fee-chip"><b>400 грн</b> · внесок за бійця</span><span id="date-chip"><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
       </div>
     </div>
   </section>
@@ -627,7 +627,17 @@ footer a:hover{color:var(--gold)}
   var $=function(id){return document.getElementById(id)};
   var put=function(el,strong,rest){if(!el)return;var keep=el.querySelector('i');el.textContent='';if(keep)el.appendChild(keep);var b=document.createElement('b');b.textContent=strong;el.appendChild(b);el.appendChild(document.createTextNode(rest))};
   fetch('/api/shingi/event/current').then(function(r){return r.ok?r.json():null}).then(function(j){
-    var f=j&&j.event&&j.event.fee_info;if(!f)return;
+    var ev=j&&j.event;var f=ev&&ev.fee_info;if(!f)return;
+    var dc=$('date-chip');
+    if(dc&&ev.event_date){
+      var d=new Date(String(ev.event_date).slice(0,10)+'T12:00:00');
+      if(!isNaN(d)){
+        var s=ev.schedule_json||{};
+        var when=s.kids?'Kids '+s.kids+(s.open?' · Open '+s.open:''):'час — у Telegram';
+        dc.textContent='';var db=document.createElement('b');db.textContent=d.toLocaleDateString('uk-UA',{day:'numeric',month:'long'});
+        dc.appendChild(db);dc.appendChild(document.createTextNode(' · '+when));
+      }
+    }
     put($('fee-chip'),f.strong,f.free?' · участь у заході':' · '+f.per);
     put($('fee-pill'),f.sentence,' · медаль і грамота кожному');
     var price=$('price');
