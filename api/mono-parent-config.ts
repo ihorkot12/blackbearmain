@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import fetch from 'node-fetch';
 import pkg from 'pg';
+import { parseFeePercent } from './_shared/card-fee.js';
 
 const { Pool } = pkg;
 
@@ -1830,5 +1831,8 @@ export default async function handler(req: any, res: any) {
     success: true,
     enabled,
     monobankPaymentsEnabled: enabled,
+    // комісію банку сплачує платник: скрипт кабінету показує «внесок + комісія = до сплати»
+    feePercent: parseFeePercent(process.env.PARENT_CARD_FEE_PERCENT ?? process.env.SHINGI_CARD_FEE_PERCENT),
+    monthlyFeeUah: await getDefaultCashPaymentAmount(),
   });
 }

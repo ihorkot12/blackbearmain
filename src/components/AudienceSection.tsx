@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useReducedMotion } from 'motion/react';
 import { ArrowRight, ShieldCheck, Trophy, UserPlus, Users } from 'lucide-react';
@@ -15,6 +15,15 @@ const CLUB_SECTIONS = [
 
 export const AudienceSection = () => {
   const reduce = useReducedMotion();
+  // умови внеску беремо з активної події: змінив адмін — змінилось і тут
+  const [feeSentence, setFeeSentence] = useState('');
+
+  useEffect(() => {
+    fetch('/api/shingi/event/current')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => setFeeSentence(j?.event?.fee_info?.sentence || ''))
+      .catch(() => undefined);
+  }, []);
 
   return (
     <section id="sections" className="relative bg-black py-16 md:py-24">
@@ -76,7 +85,7 @@ export const AudienceSection = () => {
             </h3>
             <p className="mt-4 max-w-2xl text-base text-zinc-300 md:text-lg">
               Спаринг-день у залі-сховищі на Шулявці для тренерів і бійців із будь-яких клубів. Діти до 18 і дорослі 14+/18+, групи за статтю,
-              віком, вагою і поясом. Внесок 400 грн за бійця, медаль і грамота кожному.
+              віком, вагою і поясом. {feeSentence ? `${feeSentence}, м` : 'М'}едаль і грамота кожному.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
               <a

@@ -1,35 +1,16 @@
+import { grossUp, parseFeePercent, type Quote } from '../_shared/card-fee.js';
 import type { PAYMENT_STATUSES } from './db.js';
+
+export { grossUp, type Quote };
 
 type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
 
 export const MONO_API = 'https://api.monobank.ua';
 
 /** Комісія еквайрингу, яку закладаємо платнику. Фактичну ставку беремо з договору — змінна SHINGI_CARD_FEE_PERCENT. */
-export const DEFAULT_CARD_FEE_PERCENT = 1.3;
-export const MAX_CARD_FEE_PERCENT = 10;
-
 export const monoToken = () => (process.env.SHINGI_MONO_TOKEN || '').trim();
 
-export function cardFeePercent(raw: string | undefined = process.env.SHINGI_CARD_FEE_PERCENT): number {
-  if (raw === undefined || raw.trim() === '') return DEFAULT_CARD_FEE_PERCENT;
-  const value = Number(raw.replace(',', '.'));
-  if (!Number.isFinite(value) || value < 0) return DEFAULT_CARD_FEE_PERCENT;
-  return Math.min(value, MAX_CARD_FEE_PERCENT);
-}
-
-export type Quote = { base_uah: number; fee_uah: number; total_uah: number; percent: number };
-
-/**
- * Сума до оплати карткою так, щоб після комісії банку організатор отримав не менше за внесок.
- * total = base / (1 − p), угору до цілої гривні.
- */
-export function grossUp(baseUah: number, percent: number): Quote {
-  const base = Math.max(0, Math.round(baseUah));
-  if (base === 0 || percent <= 0) return { base_uah: base, fee_uah: 0, total_uah: base, percent: Math.max(0, percent) };
-  // 1e-9 гасить похибку float: результат, що ділиться націло, не має давати зайву гривню
-  const total = Math.ceil(base / (1 - percent / 100) - 1e-9);
-  return { base_uah: base, fee_uah: total - base, total_uah: total, percent };
-}
+export const cardFeePercent = (raw: string | undefined = process.env.SHINGI_CARD_FEE_PERCENT): number => parseFeePercent(raw);
 
 export const toKopecks = (uah: number) => Math.round(uah * 100);
 

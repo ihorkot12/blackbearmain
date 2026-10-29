@@ -364,7 +364,7 @@ footer a:hover{color:var(--gold)}
       <p class="lead h-in d3">Татамі в укритті. Бої для дітей і дорослих, пара годин замість цілого дня. Відкрито для всіх клубів.</p>
       <div class="hero-cta h-in d4">
         <a class="btn" href="/shin-gi/register?role=coach">Зареєструвати команду <span class="arr">→</span></a>
-        <div class="facts"><span class="hi"><b>400 грн</b> · внесок за бійця</span><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
+        <div class="facts"><span class="hi" id="fee-chip"><b>400 грн</b> · внесок за бійця</span><span><b>Дата</b> · анонс у Telegram</span><span><b>Шулявка</b> · зал-сховище 200 м²</span><span><b>Медаль і грамота</b> кожному</span></div>
       </div>
     </div>
   </section>
@@ -378,7 +378,7 @@ footer a:hover{color:var(--gold)}
       <div>
         <p class="sub rv d2">Сітка зупиняється, діти чекають годинами, день втрачено. У залі-сховищі тривога бою не зупиняє: учасники вже в укритті, поєдинки йдуть за розкладом.</p>
         <div class="pill rv d3"><i></i>Зал у безпечному приміщенні — спаринги не зупиняються</div>
-        <div class="pill gold rv d3"><i></i><b>Внесок 400 грн</b> за бійця · медаль і грамота кожному</div>
+        <div class="pill gold rv d3" id="fee-pill"><i></i><b>Внесок 400 грн</b> за бійця · медаль і грамота кожному</div>
       </div>
     </div>
   </section>
@@ -578,9 +578,9 @@ footer a:hover{color:var(--gold)}
         <h2 class="t rv d1" id="u-h">Разовий внесок</h2>
         <div class="price rv d2" id="price">400<small>грн / боєць</small></div>
         <ul class="rv d3">
-          <li>Платить тренер за команду одним платежем у кабінеті або в боті; одиночні бійці — самі. Статус оплати видно тренеру й організатору.</li>
+          <li id="fee-li-pay">Платить тренер за команду одним платежем у кабінеті або в боті; одиночні бійці — самі. Статус оплати видно тренеру й організатору.</li>
           <li>У внесок входять бої, медаль і грамота.</li>
-          <li>Місце підтверджується внеском. Дедлайн заявок — за 10 днів до події, внеску — за 7.</li>
+          <li id="fee-li-deadline">Місце підтверджується внеском. Дедлайн заявок — за 10 днів до події, внеску — за 7.</li>
           <li>Повернення — при скасуванні організатором. При неявці внесок не повертається.</li>
           <li>Кількість місць обмежена площею залу; ліміт по кожному блоку.</li>
         </ul>
@@ -621,6 +621,22 @@ footer a:hover{color:var(--gold)}
   </footer>
 </main>
 
+<script>
+/* Умови внеску беремо з активної події: змінив адмін (ціна, 0 = безкоштовно, благодійний) — змінилось і тут. Текст ставимо через textContent. */
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var put=function(el,strong,rest){if(!el)return;var keep=el.querySelector('i');el.textContent='';if(keep)el.appendChild(keep);var b=document.createElement('b');b.textContent=strong;el.appendChild(b);el.appendChild(document.createTextNode(rest))};
+  fetch('/api/shingi/event/current').then(function(r){return r.ok?r.json():null}).then(function(j){
+    var f=j&&j.event&&j.event.fee_info;if(!f)return;
+    put($('fee-chip'),f.strong,f.free?' · участь у заході':' · '+f.per);
+    put($('fee-pill'),f.sentence,' · медаль і грамота кожному');
+    var price=$('price');
+    if(price){price.textContent=f.price_main;if(f.price_small){var s=document.createElement('small');s.textContent=f.price_small;price.appendChild(s)}}
+    var h=$('u-h');if(h)h.textContent=f.free?'Участь безкоштовна':f.noun.charAt(0).toUpperCase()+f.noun.slice(1);
+    if(f.free){var a=$('fee-li-pay'),d=$('fee-li-deadline');if(a)a.hidden=true;if(d)d.hidden=true}
+  }).catch(function(){});
+})();
+</script>
 <script>
 (function(){
   document.documentElement.classList.add('js');

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import type { FeeInfo } from '../../api/_shingi/fee';
 import { errorText, sg } from './api';
 import { BOT_USERNAME, Card, Chip, H2, Label, Shell, Spinner, Stepper, TelegramLogin, btnCls, display, inputCls, usePageSetup, useSession } from './ui';
 
@@ -23,6 +24,14 @@ export default function RegisterPage() {
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  // умови внеску беремо з події: змінив адмін — змінилось і тут
+  const [fee, setFee] = useState<FeeInfo | null>(null);
+
+  useEffect(() => {
+    sg<{ event: { fee_info?: FeeInfo } | null }>('event/current')
+      .then((r) => setFee(r.event?.fee_info ?? null))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!me?.authenticated) return;
@@ -85,7 +94,7 @@ export default function RegisterPage() {
             Далі коротка анкета, і список бійців можна вставити одним повідомленням.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
-            <Chip strong="400 грн">за бійця</Chip>
+            {fee && <Chip strong={fee.strong}>{fee.per}</Chip>}
             <Chip strong="Kids + Open" />
             <Chip strong="Медаль і грамота">кожному</Chip>
           </div>

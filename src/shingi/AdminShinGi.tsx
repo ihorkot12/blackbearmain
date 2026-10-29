@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Download, Plus, RefreshCw, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { BELT_CODES, BELT_LABELS, beltCategory, type BeltCode } from '../../api/_shingi/belts';
+import { FEE_KINDS, FEE_KIND_LABELS, feeInfo } from '../../api/_shingi/fee';
 
 /* ───────────── API ───────────── */
 
@@ -153,6 +154,8 @@ type EventRow = {
   event_date: string;
   status: string;
   fee_uah: number;
+  fee_kind?: string | null;
+  fee_label?: string | null;
   limit_kids: number | null;
   limit_open: number | null;
   deadline_apps: string | null;
@@ -214,6 +217,8 @@ const eventToForm = (e: EventRow) => ({
   event_date: e.event_date || '',
   status: e.status,
   fee_uah: String(e.fee_uah ?? 400),
+  fee_kind: (e.fee_kind || 'fee') as string,
+  fee_label: e.fee_label || '',
   limit_kids: e.limit_kids === null ? '' : String(e.limit_kids),
   limit_open: e.limit_open === null ? '' : String(e.limit_open),
   deadline_apps: e.deadline_apps || '',
@@ -247,6 +252,8 @@ const EventTab = ({ event, onSaved, onCreated }: { event: EventRow; onSaved: () 
           event_date: form.event_date,
           status: form.status,
           fee_uah: form.fee_uah,
+          fee_kind: form.fee_kind,
+          fee_label: form.fee_label,
           limit_kids: form.limit_kids,
           limit_open: form.limit_open,
           deadline_apps: form.deadline_apps,
@@ -306,9 +313,24 @@ const EventTab = ({ event, onSaved, onCreated }: { event: EventRow; onSaved: () 
           <Field label="Дата події">
             <input type="date" className={input} value={form.event_date} onChange={(e) => set('event_date', e.target.value)} />
           </Field>
-          <Field label="Внесок, грн за бійця">
+          <Field label="Внесок, грн за бійця" hint="0 — участь безкоштовна: на сайті, в боті й оферті все зміниться саме">
             <input type="number" min={0} className={input} value={form.fee_uah} onChange={(e) => set('fee_uah', e.target.value)} />
           </Field>
+          <Field label="Вид внеску" hint="Благодійний або власна назва показується скрізь замість «внесок»">
+            <select className={input} value={form.fee_kind} onChange={(e) => set('fee_kind', e.target.value)}>
+              {FEE_KINDS.map((k) => (
+                <option key={k} value={k}>{FEE_KIND_LABELS[k]}</option>
+              ))}
+            </select>
+          </Field>
+          {form.fee_kind === 'custom' && (
+            <Field label="Власна назва" hint="Напр.: підтримка залу, збір на нагороди">
+              <input className={input} value={form.fee_label} maxLength={80} onChange={(e) => set('fee_label', e.target.value)} />
+            </Field>
+          )}
+          <p className="self-end rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm text-zinc-300 sm:col-span-2">
+            На сайті буде: <b>{feeInfo({ fee_uah: Number(form.fee_uah), fee_kind: form.fee_kind, fee_label: form.fee_label }).sentence}</b>
+          </p>
           <Field label="Дедлайн заявок" hint="За брифом: D−10">
             <input type="date" className={input} value={form.deadline_apps} onChange={(e) => set('deadline_apps', e.target.value)} />
           </Field>
@@ -971,7 +993,7 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
               <div className="flex flex-wrap items-center gap-2">
                 {c.pending > 0 && <Badge tone={ENTRY_STATUS_TONE.submitted}>Очікує: {c.pending} · {fmtMoney(c.pending * event.fee_uah)}</Badge>}
                 {c.paid > 0 && <Badge tone={ENTRY_STATUS_TONE.paid}>Оплачено: {c.paid}</Badge>}
-                {c.pending > 0 && (
+                {c.pending > 0 && event.fee_uah > 0 && (
                   <button className={btnSecondary} onClick={() => setCash({ club: c.club, fighters: c.pendingFighters })}>
                     Готівка
                   </button>

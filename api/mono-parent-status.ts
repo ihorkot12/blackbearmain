@@ -713,6 +713,8 @@ async function markSuccessfulPayment(invoice: any, amountUah: number) {
   if (!pool) return false;
   const referenceId = `monobank:${invoice.invoice_id}`;
   const now = new Date();
+  // у книгу клубу йде внесок без комісії банку, яку сплатив платник (monobank_payments.fee_uah)
+  const creditedUah = Math.round((amountUah - Number(invoice.fee_uah || 0)) * 100) / 100;
 
   const insertResult = await pool.query(
     `INSERT INTO payments (participant_id, amount, date, month, year, type, method, notes, reference_id)
@@ -721,7 +723,7 @@ async function markSuccessfulPayment(invoice: any, amountUah: number) {
      RETURNING id`,
     [
       invoice.participant_id,
-      amountUah,
+      creditedUah,
       now.getMonth() + 1,
       now.getFullYear(),
       `Оплата monobank, рахунок ${invoice.invoice_id}`,
@@ -733,7 +735,7 @@ async function markSuccessfulPayment(invoice: any, amountUah: number) {
 
   const inserted = (insertResult.rowCount || 0) > 0;
   if (inserted) {
-    await notifySuccessfulPayment(invoice, amountUah);
+    await notifySuccessfulPayment(invoice, creditedUah);
   }
 
   return inserted;

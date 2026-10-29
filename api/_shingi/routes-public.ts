@@ -23,6 +23,7 @@ import {
 } from './http.js';
 import { randomBytes } from 'crypto';
 import { parseFighters } from './parser.js';
+import { feeInfo } from './fee.js';
 import { OFFER_VERSION } from './offer.js';
 import { refreshFromMono } from './pay-service.js';
 import { cardFeePercent, grossUp, invoiceBody, monoCall, monoToken } from './payments.js';
@@ -96,9 +97,12 @@ export const publicRoutes: Route[] = [
     method: 'GET',
     path: 'event/current',
     auth: 'public',
-    handler: async () => {
-      const event = await resolveEvent(null);
-      if (!event || !['announced', 'registration', 'groups_published'].includes(event.status)) return { event: null };
+    // ?event_id= — конкретна подія (для оферти на кожен івент, у тому числі завершений); без нього — активна
+    handler: async (ctx) => {
+      const requested = toInt(ctx.query.event_id);
+      const event = requested && requested > 0 ? await getEventById(requested) : await resolveEvent(null);
+      const visible = requested ? ['announced', 'registration', 'groups_published', 'done'] : ['announced', 'registration', 'groups_published'];
+      if (!event || !visible.includes(event.status)) return { event: null };
       return { event: publicEvent(event), counters: await eventCounters(event) };
     },
   },
@@ -508,7 +512,7 @@ export const publicRoutes: Route[] = [
           card_total_uah: quote.total_uah,
           card_fee_percent: quote.percent,
         },
-        payments_open: paymentsOpen(event) && Boolean(monoToken()),
+        payments_open: paymentsOpen(event) && event.fee_uah > 0 && Boolean(monoToken()),
         history,
         club_stats: { ...clubStats, by_category: byCategory },
       };
@@ -526,7 +530,8 @@ export const publicRoutes: Route[] = [
       const message = ctx.body?.message;
       const chatId = message?.chat?.id;
       if (message?.chat?.type === 'private' && typeof message.text === 'string' && chatId) {
-        const reply = startReply(message.text, publicBaseUrl());
+        const event = await resolveEvent(null).catch(() => null);
+        const reply = startReply(message.text, publicBaseUrl(), event ? feeInfo(event) : undefined);
         if (reply) {
           try {
             await sendMessage(chatId, reply.text, {
@@ -554,6 +559,7 @@ export const publicRoutes: Route[] = [
       const profile = ctx.profile!;
       const event = await resolveEvent(ctx.body?.event_id ?? null);
       if (!event) throw new HttpError(404, 'Подію не знайдено');
+      if (event.fee_uah === 0) throw new HttpError(409, 'Участь у цьому заході безкоштовна, оплата не потрібна', 'free_event');
       if (!paymentsOpen(event)) throw new HttpError(409, 'Оплата для цієї події зараз закрита', 'payments_closed');
 
       const entries = await query<{ id: number }>(
@@ -567,7 +573,7 @@ export const publicRoutes: Route[] = [
       const [payment] = await query<{ id: number }>(
         `INSERT INTO shingi_payments (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status, offer_version, offer_accepted_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7::int[], 'monobank', 'created', $8, now()) RETURNING id`,
-        [event.id, profile.id, reference, quote.total_uah, quote.base_uah, quote.fee_uah, entries.map((e) => e.id), OFFER_VERSION],
+        [event.id, profile.id, reference, quote.total_uah, quote.base_uah, quote.fee_uah, entries.map((e) => e.id), `${OFFER_VERSION}:e${event.id}`],
       );
 
       try {

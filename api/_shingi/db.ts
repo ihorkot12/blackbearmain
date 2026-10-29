@@ -133,6 +133,9 @@ const SCHEMA_SQL = `
   ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS offer_version TEXT;
   ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS offer_accepted_at TIMESTAMPTZ;
   CREATE INDEX IF NOT EXISTS shingi_payments_invoice ON shingi_payments (invoice_id);
+  -- вид внеску події: fee | charity | custom (підпис у fee_label); сума 0 = безкоштовно
+  ALTER TABLE shingi_events ADD COLUMN IF NOT EXISTS fee_kind TEXT NOT NULL DEFAULT 'fee';
+  ALTER TABLE shingi_events ADD COLUMN IF NOT EXISTS fee_label TEXT;
 
   CREATE TABLE IF NOT EXISTS shingi_messages (
     id SERIAL PRIMARY KEY,

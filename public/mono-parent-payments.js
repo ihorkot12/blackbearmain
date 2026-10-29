@@ -8,6 +8,16 @@
   let configLoaded = false;
   let paymentsEnabled = true;
   let configPromise = null;
+  // комісію банку сплачує платник; ставку і ціну місяця віддає сервер (monobank-config)
+  let feePercent = 1.3;
+  let monthlyFee = 2500;
+
+  function quote(base) {
+    const b = Math.round(Number(base));
+    if (!(b > 0) || feePercent <= 0) return { base: b > 0 ? b : 0, fee: 0, total: b > 0 ? b : 0 };
+    const total = Math.ceil(b / (1 - feePercent / 100) - 1e-9);
+    return { base: b, fee: total - b, total };
+  }
 
   const normalize = (value) => String(value || '').trim().toLowerCase();
 
@@ -36,6 +46,8 @@
       .then((response) => response.ok ? response.json() : {})
       .then((data) => {
         paymentsEnabled = data.enabled !== false && data.monobankPaymentsEnabled !== false;
+        if (Number.isFinite(Number(data.feePercent)) && Number(data.feePercent) >= 0) feePercent = Number(data.feePercent);
+        if (Number(data.monthlyFeeUah) > 0) monthlyFee = Number(data.monthlyFeeUah);
         configLoaded = true;
         return paymentsEnabled;
       })
@@ -370,8 +382,22 @@
     amountInput.max = '100000';
     amountInput.step = '10';
     amountInput.inputMode = 'decimal';
-    amountInput.value = window.localStorage.getItem('bb_mono_last_amount') || '1000';
+    amountInput.value = window.localStorage.getItem('bb_mono_last_amount') || String(monthlyFee);
     amountInput.setAttribute('aria-label', 'Сума оплати в гривнях');
+
+    const breakdown = document.createElement('div');
+    breakdown.className = 'bb-mono-caption';
+    breakdown.style.cssText = 'text-transform:none;letter-spacing:0;font-size:12px;line-height:1.5;font-weight:700;';
+    const renderBreakdown = () => {
+      const q = quote(String(amountInput.value || '').replace(',', '.'));
+      breakdown.textContent = q.base > 0
+        ? (q.fee > 0
+          ? `Внесок ${q.base} грн + комісія банку ${feePercent}% (${q.fee} грн) = до сплати ${q.total} грн`
+          : `До сплати ${q.total} грн`)
+        : '';
+    };
+    amountInput.addEventListener('input', renderBreakdown);
+    renderBreakdown();
 
     const status = document.createElement('div');
     status.className = 'bb-mono-status';
@@ -383,6 +409,7 @@
     row.appendChild(button);
     panel.appendChild(caption);
     panel.appendChild(row);
+    panel.appendChild(breakdown);
     panel.appendChild(status);
     parent.appendChild(panel);
 

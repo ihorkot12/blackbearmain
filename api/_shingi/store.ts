@@ -1,6 +1,7 @@
 import { beltCategory, type BeltCode } from './belts.js';
 import { resolveAge } from './grouping.js';
 import { query } from './db.js';
+import { feeInfo } from './fee.js';
 import { daysBetween, kyivToday, type Profile } from './http.js';
 
 export type EventRow = {
@@ -10,6 +11,8 @@ export type EventRow = {
   event_date: string;
   status: 'draft' | 'announced' | 'registration' | 'groups_published' | 'done' | 'cancelled';
   fee_uah: number;
+  fee_kind: string;
+  fee_label: string | null;
   limit_kids: number | null;
   limit_open: number | null;
   deadline_apps: string | null;
@@ -53,9 +56,10 @@ export async function resolveEvent(eventId: unknown): Promise<EventRow | null> {
   return (await getCurrentEvent()) || (await getLatestEvent());
 }
 
+/** Подія для публічного API: без нотаток адмінів, з готовими текстами внеску (`fee_info`) для сайту, бота й оферти. */
 export const publicEvent = (event: EventRow) => {
   const { notes: _notes, ...rest } = event;
-  return rest;
+  return { ...rest, fee_info: feeInfo(event) };
 };
 
 export async function eventCounters(event: EventRow) {

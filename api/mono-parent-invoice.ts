@@ -1,8 +1,12 @@
 import crypto from 'crypto';
 import fetch from 'node-fetch';
 import pkg from 'pg';
+import { grossUp, parseFeePercent } from './_shared/card-fee.js';
 
 const { Pool } = pkg;
+
+/** Комісію еквайрингу сплачує платник. Ставка: PARENT_CARD_FEE_PERCENT, інакше SHINGI_CARD_FEE_PERCENT, інакше 1,3 %. */
+const parentCardFeePercent = () => parseFeePercent(process.env.PARENT_CARD_FEE_PERCENT ?? process.env.SHINGI_CARD_FEE_PERCENT);
 
 const pool = process.env.DATABASE_URL
   ? new Pool({
@@ -160,6 +164,8 @@ async function ensureSchema() {
     );
 
     ALTER TABLE monobank_payments ADD COLUMN IF NOT EXISTS payment_type TEXT DEFAULT 'debit';
+    -- комісія банку, яку сплатив платник: amount_uah — списано, amount_uah − fee_uah — внесок клубу
+    ALTER TABLE monobank_payments ADD COLUMN IF NOT EXISTS fee_uah NUMERIC(10,2) DEFAULT 0;
   `);
 }
 
@@ -224,10 +230,13 @@ export default async function handler(req: any, res: any) {
     return res.status(404).json({ error: 'Учасника не знайдено' });
   }
 
-  const amountKop = Math.round(amountUah * 100);
+  // amountUah — внесок клубу; до рахунку додаємо комісію банку, щоб клуб отримав саме внесок
+  const quote = grossUp(amountUah, parentCardFeePercent());
+  const amountKop = quote.total_uah * 100;
   const reference = `bbd_${participantId}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   const baseUrl = getBaseUrl(req);
-  const purpose = clean(body.purpose) || `Оплата тренувань BLACK BEAR DOJO: ${participant.name}`;
+  const basePurpose = clean(body.purpose) || `Оплата тренувань BLACK BEAR DOJO: ${participant.name}`;
+  const purpose = quote.fee_uah > 0 ? `${basePurpose} (внесок ${quote.base_uah} грн + комісія банку ${quote.fee_uah} грн)` : basePurpose;
   const email = clean(participant.email);
   const paymentType = body.paymentType === 'hold' ? 'hold' : 'debit';
 
@@ -275,8 +284,8 @@ export default async function handler(req: any, res: any) {
   }
 
   await pool.query(
-    `INSERT INTO monobank_payments (participant_id, invoice_id, reference, amount, amount_uah, status, page_url, purpose, payment_type, raw_payload)
-     VALUES ($1, $2, $3, $4, $5, 'created', $6, $7, $8, $9::jsonb)
+    `INSERT INTO monobank_payments (participant_id, invoice_id, reference, amount, amount_uah, fee_uah, status, page_url, purpose, payment_type, raw_payload)
+     VALUES ($1, $2, $3, $4, $5, $6, 'created', $7, $8, $9, $10::jsonb)
      ON CONFLICT (invoice_id) DO UPDATE SET
        page_url = EXCLUDED.page_url,
        updated_at = CURRENT_TIMESTAMP`,
@@ -285,11 +294,12 @@ export default async function handler(req: any, res: any) {
       monoData.invoiceId,
       reference,
       amountKop,
-      amountUah,
+      quote.total_uah,
+      quote.fee_uah,
       monoData.pageUrl,
       purpose,
       paymentType,
-      JSON.stringify({ request: { amount: amountKop, ccy: 980, reference, paymentType }, response: monoData }),
+      JSON.stringify({ request: { amount: amountKop, ccy: 980, reference, paymentType }, quote, response: monoData }),
     ]
   );
 
@@ -297,5 +307,8 @@ export default async function handler(req: any, res: any) {
     success: true,
     invoiceId: monoData.invoiceId,
     pageUrl: monoData.pageUrl,
+    baseUah: quote.base_uah,
+    feeUah: quote.fee_uah,
+    totalUah: quote.total_uah,
   });
 }

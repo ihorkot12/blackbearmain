@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import { randomBytes } from 'crypto';
+import { isFeeKind } from './fee.js';
 import { emptyRevenue, summarizeRevenue, type PaidRow, type PendingRow } from './payments.js';
 import { BELT_LABELS, beltCategory, isBeltCode, type BeltCode } from './belts.js';
 import { ENTRY_STATUSES, EVENT_STATUSES, ensureSchema, logAction, query, withTx } from './db.js';
@@ -212,8 +213,8 @@ export const adminRoutes: Route[] = [
       const d = b.event_date;
       try {
         const rows = await query<EventRow>(
-          `INSERT INTO shingi_events (slug, title, event_date, status, fee_uah, limit_kids, limit_open, deadline_apps, deadline_pay, groups_publish_date, address, schedule_json, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, 'Київ, вул. Сім''ї Бродських, 31/33, зал Black Bear Dojo'), COALESCE($12::jsonb, '{"kids":"10:00","open":"13:00"}'::jsonb), $13)
+          `INSERT INTO shingi_events (slug, title, event_date, status, fee_uah, fee_kind, fee_label, limit_kids, limit_open, deadline_apps, deadline_pay, groups_publish_date, address, schedule_json, notes)
+           VALUES ($1, $2, $3, $4, $5, $14, $15, $6, $7, $8, $9, $10, COALESCE($11, 'Київ, вул. Сім''ї Бродських, 31/33, зал Black Bear Dojo'), COALESCE($12::jsonb, '{"kids":"10:00","open":"13:00"}'::jsonb), $13)
            RETURNING *`,
           [
             slug, title, d, status,
@@ -226,6 +227,8 @@ export const adminRoutes: Route[] = [
             capped(b.address, 300),
             parseSchedule(b.schedule_json) ?? null,
             capped(b.notes, 2000),
+            isFeeKind(b.fee_kind) ? b.fee_kind : 'fee',
+            capped(b.fee_label, 80) || null,
           ],
         );
         await logAction(actor(ctx), 'event.create', 'event', rows[0].id, { slug });
@@ -263,7 +266,16 @@ export const adminRoutes: Route[] = [
         if (!(EVENT_STATUSES as readonly string[]).includes(b.status)) throw new HttpError(400, 'Невідомий статус події');
         set('status', b.status);
       }
-      if (b.fee_uah !== undefined) set('fee_uah', optionalInt(b.fee_uah, 'Внесок', 0) ?? 400);
+      if (b.fee_uah !== undefined) {
+        const fee = optionalInt(b.fee_uah, 'Внесок', 0);
+        if (fee === null) throw new HttpError(400, 'Вкажіть внесок у гривнях (0 — безкоштовно)');
+        set('fee_uah', fee);
+      }
+      if (b.fee_kind !== undefined) {
+        if (!isFeeKind(b.fee_kind)) throw new HttpError(400, 'Невідомий вид внеску');
+        set('fee_kind', b.fee_kind);
+      }
+      if (b.fee_label !== undefined) set('fee_label', capped(b.fee_label, 80) || null);
       if (b.limit_kids !== undefined) set('limit_kids', optionalInt(b.limit_kids, 'Ліміт Kids', 1));
       if (b.limit_open !== undefined) set('limit_open', optionalInt(b.limit_open, 'Ліміт Open', 1));
       if (b.deadline_apps !== undefined) set('deadline_apps', optionalDate(b.deadline_apps, 'Дедлайн заявок'));

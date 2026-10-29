@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BELT_CODES, BELT_LABELS, beltCategory, type BeltCode } from '../../api/_shingi/belts';
+import { feeInfo } from '../../api/_shingi/fee';
 import { beltCat, blockRule, groupKeyOf, groupLabel, plausibilityWarnings, resolveBlock } from '../../api/_shingi/rules';
 import { ApiError, ageOnDate, errorText, fmtDate, fmtMoney, kyivToday, sg } from './api';
 import { Badge, BeltDot, Card, Chip, H2, Label, Shell, Spinner, Stepper, btnCls, display, inputCls, usePageSetup, useSession } from './ui';
 
 const beltLabel = (belt?: string | null) => (belt && belt in BELT_LABELS ? BELT_LABELS[belt as BeltCode] : belt || '—');
 
+
+const capitalize = (text: string) => (text ? text[0].toUpperCase() + text.slice(1) : text);
 
 const PAY_STATUS_LABEL: Record<string, string> = {
   created: 'очікує оплати',
@@ -302,6 +305,7 @@ export default function CabinetPage() {
   }, [me, load]);
 
   const event = cab?.event;
+  const fee = event ? feeInfo(event) : null;
   const entryOf = useMemo(() => new Map<number, any>((cab?.entries || []).map((e: any) => [e.fighter_id, e])), [cab]);
   const registrationOpen = Boolean(event && event.status === 'registration' && (!event.deadline_apps || kyivToday() <= event.deadline_apps));
 
@@ -336,7 +340,12 @@ export default function CabinetPage() {
       });
       setSelected(new Set());
       await load();
-      setNotice({ kind: 'ok', text: `Заявку подано: ${ids.length} бійців. До дедлайну внеску потрібно сплатити ${fmtMoney(res.sum_due_uah)}.` });
+      setNotice({
+        kind: 'ok',
+        text: fee?.free
+          ? `Заявку подано: ${ids.length} бійців. Участь безкоштовна, оплата не потрібна.`
+          : `Заявку подано: ${ids.length} бійців. До дедлайну внеску потрібно сплатити ${fmtMoney(res.sum_due_uah)}.`,
+      });
     } catch (e) {
       setNotice({ kind: 'err', text: errorText(e) });
     }
@@ -612,14 +621,21 @@ export default function CabinetPage() {
 
       {event && (
         <Card>
-          <H2 n="03">Внесок</H2>
-          <p className="text-[15px]">
-            У заявці: <b>{totals.fighters}</b> · оплачено: <b>{totals.paid}</b> · очікує оплати: <b>{totals.unpaid}</b>
-          </p>
+          <H2 n="03">{fee?.free ? 'Участь' : capitalize(fee?.noun || 'внесок')}</H2>
+          {fee?.free ? (
+            <p className="text-[15px]">
+              У заявці: <b>{totals.fighters}</b> · участь у цьому заході безкоштовна, оплата не потрібна.
+            </p>
+          ) : (
+            <p className="text-[15px]">
+              У заявці: <b>{totals.fighters}</b> · оплачено: <b>{totals.paid}</b> · очікує оплати: <b>{totals.unpaid}</b>
+            </p>
+          )}
+          {!fee?.free && (
           <div className="mt-3 space-y-3">
             {totals.unpaid > 0 && (
               <div className="border border-[#242422] p-3 text-[14px]">
-                <p className="flex justify-between gap-3"><span>Внесок за {totals.unpaid} бійц.</span><b>{fmtMoney(totals.sum_due_uah)}</b></p>
+                <p className="flex justify-between gap-3"><span>{capitalize(fee?.noun || 'внесок')} за {totals.unpaid} бійц.</span><b>{fmtMoney(totals.sum_due_uah)}</b></p>
                 {totals.card_fee_uah > 0 && (
                   <p className="flex justify-between gap-3 text-[#b9b9b4]">
                     <span>Комісія банку за оплату карткою ({totals.card_fee_percent}%)</span><span>{fmtMoney(totals.card_fee_uah)}</span>
@@ -633,7 +649,7 @@ export default function CabinetPage() {
             <label className="flex cursor-pointer items-start gap-2 text-[13px] leading-relaxed text-[#b9b9b4]">
               <input type="checkbox" className="mt-1" checked={acceptOffer} onChange={(e) => setAcceptOffer(e.target.checked)} />
               <span>
-                Я ознайомився(-лась) і погоджуюсь з <a className="text-[#C9A227] underline" href="/shin-gi/offer" target="_blank" rel="noopener">договором публічної оферти</a>,
+                Я ознайомився(-лась) і погоджуюсь з <a className="text-[#C9A227] underline" href={`/shin-gi/offer?event=${event.id}`} target="_blank" rel="noopener">договором публічної оферти</a>,
                 зокрема з тим, що комісію банку за онлайн-оплату сплачує платник. Оплата є акцептом договору.
               </span>
             </label>
@@ -646,6 +662,7 @@ export default function CabinetPage() {
                 : 'Онлайн-оплата зараз недоступна. Внесок можна передати готівкою організатору, він відмітить оплату в системі.'}
             </p>
           </div>
+          )}
           {cab.payments?.length > 0 && (
             <div className="mt-4 space-y-1 text-[14px]">
               {cab.payments.map((p: any) => (

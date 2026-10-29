@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { secretMatches, startReply, webhookSecret } from '../../api/_shingi/bot.js';
+import { feeInfo } from '../../api/_shingi/fee.js';
 
 const TOKEN = '123456:TEST-TOKEN-NOT-REAL';
 const BASE = 'https://shin-karate.kyiv.ua';
@@ -36,6 +37,13 @@ describe('бот: відповідь на /start', () => {
   it('невідомий параметр і /start@bot працюють як звичайний старт', () => {
     assert.equal(startReply('/start event', BASE)!.url, `${BASE}/shin-gi/cabinet`);
     assert.equal(startReply('/start@shingii_bot team', BASE)!.url, `${BASE}/shin-gi/register?role=coach`);
+  });
+
+  it('умови внеску у вітанні беруться з події', () => {
+    assert.match(startReply('/start', BASE, feeInfo({ fee_uah: 400 }))!.text, /Внесок 400 грн за бійця, медаль і грамота/);
+    assert.match(startReply('/start', BASE, feeInfo({ fee_uah: 0 }))!.text, /Участь безкоштовна, медаль і грамота/);
+    assert.match(startReply('/start', BASE, feeInfo({ fee_uah: 250, fee_kind: 'charity' }))!.text, /Благодійний внесок 250 грн за бійця/);
+    assert.doesNotMatch(startReply('/start', BASE)!.text, /грн/);
   });
 
   it('зайвий слеш у base не дублюється, інші повідомлення ігноруються', () => {
