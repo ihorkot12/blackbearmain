@@ -21,7 +21,10 @@ import {
   type Profile,
   type Route,
 } from './http.js';
+import { randomBytes } from 'crypto';
 import { parseFighters } from './parser.js';
+import { refreshFromMono } from './pay-service.js';
+import { cardFeePercent, grossUp, invoiceBody, monoCall, monoToken } from './payments.js';
 import {
   ACTIVE_ENTRY_STATUSES,
   decorateEntry,
@@ -31,6 +34,7 @@ import {
   profileView,
   publicEvent,
   resolveEvent,
+  type EventRow,
 } from './store.js';
 import { originAllowed } from './admin-auth.js';
 import { publicBaseUrl, secretMatches, startReply } from './bot.js';
@@ -78,6 +82,10 @@ const idParam = (ctx: Ctx, name = 'id') => {
 function ensureDeadline(deadline: string | null, message: string) {
   if (deadline && kyivToday() > deadline) throw new HttpError(409, message, 'deadline_passed');
 }
+
+/** Оплата доступна, поки відкрита реєстрація (або групи вже опубліковані) і не минув дедлайн внеску. */
+const paymentsOpen = (event: EventRow) =>
+  ['registration', 'groups_published'].includes(event.status) && (!event.deadline_pay || kyivToday() <= event.deadline_pay);
 
 const FIGHTER_COLUMNS = `x.full_name, x.sex, x.birth_date, x.age_years, x.weight_kg, x.belt, x.guardian_name, x.guardian_phone, x.notes`;
 const FIGHTER_RECORD = `full_name text, sex text, birth_date date, age_years int, weight_kg numeric, belt text, guardian_name text, guardian_phone text, notes text`;
@@ -456,7 +464,7 @@ export const publicRoutes: Route[] = [
       });
 
       const payments = await query(
-        `SELECT id, reference, amount_uah, status, entries_ids, created_at, paid_at FROM shingi_payments
+        `SELECT id, reference, amount_uah, base_uah, fee_uah, provider, status, entries_ids, created_at, paid_at FROM shingi_payments
          WHERE profile_id = $1 AND event_id = $2 ORDER BY created_at DESC`,
         [profile.id, event.id],
       );
@@ -480,6 +488,7 @@ export const publicRoutes: Route[] = [
       const unpaid = active.filter((e) => e.status === 'submitted').length;
       const byCategory = { A: 0, B: 0, C: 0 };
       for (const e of active) byCategory[beltCategory(e.belt as BeltCode)] += 1;
+      const quote = grossUp(unpaid * event.fee_uah, cardFeePercent());
 
       return {
         profile: profileView(profile),
@@ -493,8 +502,12 @@ export const publicRoutes: Route[] = [
           unpaid,
           sum_due_uah: unpaid * event.fee_uah,
           fee_uah: event.fee_uah,
+          // комісію еквайрингу сплачує платник: до оплати карткою = внесок + комісія банку
+          card_fee_uah: quote.fee_uah,
+          card_total_uah: quote.total_uah,
+          card_fee_percent: quote.percent,
         },
-        payments_open: false,
+        payments_open: paymentsOpen(event) && Boolean(monoToken()),
         history,
         club_stats: { ...clubStats, by_category: byCategory },
       };
@@ -530,11 +543,75 @@ export const publicRoutes: Route[] = [
 
   // --- оплата (етап 5) і питання ---
   {
+    // Рахунок на всіх бійців клубу, що чекають оплати. Комісію банку сплачує платник: сума = внесок + комісія.
     method: 'POST',
     path: 'pay/invoice',
     auth: 'member',
-    handler: async () => {
-      throw new HttpError(501, 'Оплата відкриється з анонсом дати', 'payments_not_ready');
+    handler: async (ctx) => {
+      if (!monoToken()) throw new HttpError(503, 'Онлайн-оплата ще не налаштована. Напишіть організатору або сплатіть готівкою.', 'payments_not_configured');
+      if (ctx.body?.accept_offer !== true) throw new HttpError(400, 'Підтвердіть згоду з умовами оферти', 'offer_not_accepted');
+      const profile = ctx.profile!;
+      const event = await resolveEvent(ctx.body?.event_id ?? null);
+      if (!event) throw new HttpError(404, 'Подію не знайдено');
+      if (!paymentsOpen(event)) throw new HttpError(409, 'Оплата для цієї події зараз закрита', 'payments_closed');
+
+      const entries = await query<{ id: number }>(
+        `SELECT id FROM shingi_entries WHERE profile_id = $1 AND event_id = $2 AND status = 'submitted' ORDER BY id`,
+        [profile.id, event.id],
+      );
+      if (entries.length === 0) throw new HttpError(409, 'Немає бійців, що чекають на оплату', 'nothing_to_pay');
+
+      const quote = grossUp(entries.length * event.fee_uah, cardFeePercent());
+      const reference = `sg-${event.id}-${profile.id}-${randomBytes(4).toString('hex')}`;
+      const [payment] = await query<{ id: number }>(
+        `INSERT INTO shingi_payments (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::int[], 'monobank', 'created') RETURNING id`,
+        [event.id, profile.id, reference, quote.total_uah, quote.base_uah, quote.fee_uah, entries.map((e) => e.id)],
+      );
+
+      try {
+        const invoice = await monoCall<{ invoiceId: string; pageUrl: string }>('/api/merchant/invoice/create', {
+          method: 'POST',
+          body: invoiceBody({ reference, quote, fighters: entries.length, eventTitle: event.title, baseUrl: publicBaseUrl() }),
+        });
+        await query('UPDATE shingi_payments SET invoice_id = $2, invoice_url = $3 WHERE id = $1', [payment.id, invoice.invoiceId, invoice.pageUrl]);
+        await logAction(`tg:${profile.tg_id ?? profile.id}`, 'payment.invoice', 'payment', payment.id, { reference, fighters: entries.length, total_uah: quote.total_uah });
+        return { page_url: invoice.pageUrl, reference, base_uah: quote.base_uah, fee_uah: quote.fee_uah, total_uah: quote.total_uah };
+      } catch (error) {
+        await query(`UPDATE shingi_payments SET status = 'failure' WHERE id = $1`, [payment.id]);
+        console.error('shingi invoice failed:', (error as Error).message);
+        throw new HttpError(502, 'Не вдалося створити рахунок. Спробуйте ще раз за хвилину.', 'invoice_failed');
+      }
+    },
+  },
+  {
+    // Монобанк стукає сюди після оплати. Тілу не довіряємо — лише питаємо банк про статус рахунку.
+    method: 'POST',
+    path: 'pay/webhook',
+    auth: 'public',
+    handler: async (ctx) => {
+      const invoiceId = typeof ctx.body?.invoiceId === 'string' ? ctx.body.invoiceId : '';
+      if (invoiceId && monoToken()) {
+        const [payment] = await query<{ id: number }>('SELECT id FROM shingi_payments WHERE invoice_id = $1', [invoiceId]);
+        if (payment) await refreshFromMono(payment.id);
+      }
+      return { ok: true };
+    },
+  },
+  {
+    // Повернення з банку в кабінет: ?pay=<reference> — перевіряємо стан рахунку, не чекаючи вебхука.
+    method: 'GET',
+    path: 'pay/status',
+    auth: 'member',
+    handler: async (ctx) => {
+      const reference = String(ctx.query.reference || '');
+      const [payment] = await query<{ id: number; status: string }>('SELECT id, status FROM shingi_payments WHERE reference = $1 AND profile_id = $2', [
+        reference,
+        ctx.profile!.id,
+      ]);
+      if (!payment) throw new HttpError(404, 'Платіж не знайдено');
+      const status = monoToken() ? await refreshFromMono(payment.id).catch(() => payment.status) : payment.status;
+      return { reference, status };
     },
   },
   {

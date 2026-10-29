@@ -123,6 +123,13 @@ const SCHEMA_SQL = `
     paid_at TIMESTAMPTZ
   );
   CREATE INDEX IF NOT EXISTS shingi_payments_reference ON shingi_payments (reference);
+  -- amount_uah — те, що списано з платника; base_uah — внесок за бійців; fee_uah — комісія банку, яку сплатив платник
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS base_uah INTEGER;
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS fee_uah INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS invoice_url TEXT;
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS note TEXT;
+  ALTER TABLE shingi_payments ADD COLUMN IF NOT EXISTS marked_by TEXT;
+  CREATE INDEX IF NOT EXISTS shingi_payments_invoice ON shingi_payments (invoice_id);
 
   CREATE TABLE IF NOT EXISTS shingi_messages (
     id SERIAL PRIMARY KEY,

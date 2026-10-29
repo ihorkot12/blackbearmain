@@ -125,7 +125,7 @@ export default function RegisterPage() {
           </div>
           {error && <p className="mt-4 border border-[#A3101A]/60 bg-[#A3101A]/10 p-3 text-[14px] text-[#ff9a9a]">{error}</p>}
           <p className="mt-6 text-[13px] text-[#85857f]">
-            Немає Telegram? Напишіть організатору{' '}
+            Увійшовши, ви погоджуєтесь з <a className="text-[#C9A227] underline" href="/shin-gi/offer">умовами публічної оферти</a>. Немає Telegram? Напишіть організатору{' '}
             <a className="text-[#C9A227] underline" href="https://t.me/ihorkot">@ihorkot</a> — створимо команду вручну.
           </p>
         </Card>

@@ -830,30 +830,122 @@ const GroupsTab = ({ event, onChanged }: { event: EventRow; onChanged: () => voi
 
 /* ───────────── Оплати ───────────── */
 
+const METHOD_LABELS: Record<string, string> = { monobank: 'Картка', cash: 'Готівка' };
+
+/** Адмін відмічає, що бійці сплатили готівкою: створюється платіж, заявки стають «Оплачено». */
+const CashModal = ({
+  event,
+  club,
+  fighters,
+  onClose,
+  onDone,
+}: {
+  event: EventRow;
+  club: string;
+  fighters: Array<{ id: number; full_name: string; block: string }>;
+  onClose: () => void;
+  onDone: () => void;
+}) => {
+  const [picked, setPicked] = useState<Set<number>>(() => new Set(fighters.map((f) => f.id)));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const sum = picked.size * event.fee_uah;
+
+  const toggle = (id: number) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const submit = async () => {
+    setBusy(true);
+    try {
+      await api('admin/payments/cash', { method: 'POST', body: { event_id: event.id, entry_ids: [...picked], note } });
+      toast.success(`Готівку відмічено: ${picked.size} · ${fmtMoney(sum)}`);
+      onDone();
+    } catch (e) {
+      fail(e);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className={`${card} max-h-[90vh] w-full max-w-lg overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-lg font-black">Готівка · {club}</h4>
+            <p className="text-[12px] text-zinc-500">Внесок {fmtMoney(event.fee_uah)} за бійця, комісії немає</p>
+          </div>
+          <button className="text-zinc-500 hover:text-white" onClick={onClose} aria-label="Закрити"><X size={18} /></button>
+        </div>
+        <div className="space-y-2">
+          {fighters.map((f) => (
+            <label key={f.id} className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm">
+              <input type="checkbox" checked={picked.has(f.id)} onChange={() => toggle(f.id)} />
+              <span className="flex-1 font-bold">{f.full_name}</span>
+              <span className="text-[11px] uppercase text-zinc-500">{f.block === 'kids' ? 'Kids' : 'Open'}</span>
+            </label>
+          ))}
+        </div>
+        <Field label="Примітка (необов'язково)">
+          <input className={input} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Хто передав, коли" maxLength={300} />
+        </Field>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <b>{picked.size} бійц. · {fmtMoney(sum)}</b>
+          <button className={btnPrimary} disabled={busy || picked.size === 0} onClick={submit}>
+            <CheckCircle2 size={14} /> Підтвердити готівку
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PaymentsTab = ({ event }: { event: EventRow }) => {
   const [payments, setPayments] = useState<any[] | null>(null);
   const [entries, setEntries] = useState<any[]>([]);
+  const [cash, setCash] = useState<{ club: string; fighters: any[] } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const [p, e] = await Promise.all([api<any>(`admin/payments?event_id=${event.id}`), api<any>(`admin/entries?event_id=${event.id}`)]);
+      setPayments(p.payments);
+      setEntries(e.entries);
+    } catch (e) {
+      fail(e);
+      setPayments([]);
+    }
+  }, [event.id]);
 
   useEffect(() => {
     setPayments(null);
-    Promise.all([api<any>(`admin/payments?event_id=${event.id}`), api<any>(`admin/entries?event_id=${event.id}`)])
-      .then(([p, e]) => {
-        setPayments(p.payments);
-        setEntries(e.entries);
-      })
-      .catch((e) => {
-        fail(e);
-        setPayments([]);
-      });
-  }, [event.id]);
+    load();
+  }, [load]);
+
+  const reverse = async (p: any) => {
+    const reason = window.prompt(`Скасувати готівку ${fmtMoney(p.amount_uah)} (${p.club})? Вкажіть причину:`, '');
+    if (reason === null) return;
+    try {
+      await api(`admin/payments/${p.id}/reverse`, { method: 'POST', body: { reason } });
+      toast.success('Готівку скасовано, бійці знову чекають оплати');
+      load();
+    } catch (e) {
+      fail(e);
+    }
+  };
 
   const byClub = useMemo(() => {
-    const map = new Map<number, { club: string; coach: string; paid: number; pending: number }>();
+    const map = new Map<number, { club: string; coach: string; paid: number; pending: number; pendingFighters: any[] }>();
     for (const r of entries) {
       if (r.status !== 'paid' && r.status !== 'submitted' && r.status !== 'fought') continue;
-      const row = map.get(r.profile_id) || { club: r.club, coach: r.coach_full_name, paid: 0, pending: 0 };
-      if (r.status === 'submitted') row.pending += 1;
-      else row.paid += 1;
+      const row = map.get(r.profile_id) || { club: r.club, coach: r.coach_full_name, paid: 0, pending: 0, pendingFighters: [] };
+      if (r.status === 'submitted') {
+        row.pending += 1;
+        row.pendingFighters.push({ id: r.id, full_name: r.full_name, block: r.block });
+      } else row.paid += 1;
       map.set(r.profile_id, row);
     }
     return [...map.values()].sort((a, b) => b.pending - a.pending);
@@ -863,8 +955,10 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200">
-        Онлайн-оплата Monobank підключається на етапі 5. Поки що тут видно, скільки бійців чекає на оплату; статус «Оплачено» можна виставити вручну у вкладці «Заявки».
+      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-300">
+        Картка: тренер платить у кабінеті через Monobank, комісію банку сплачує платник, статус «Оплачено» ставиться сам.
+        Готівка: натисніть «Готівка» біля клубу — створиться платіж, і гроші потраплять у статистику.
+        Статус «Оплачено» у вкладці «Заявки» грошей в обліку не веде.
       </div>
 
       <div className={card}>
@@ -874,9 +968,14 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
           {byClub.map((c) => (
             <div key={c.club + c.coach} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm">
               <div className="min-w-0"><p className="truncate font-bold">{c.club}</p><p className="truncate text-[12px] text-zinc-500">{c.coach}</p></div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {c.pending > 0 && <Badge tone={ENTRY_STATUS_TONE.submitted}>Очікує: {c.pending} · {fmtMoney(c.pending * event.fee_uah)}</Badge>}
                 {c.paid > 0 && <Badge tone={ENTRY_STATUS_TONE.paid}>Оплачено: {c.paid}</Badge>}
+                {c.pending > 0 && (
+                  <button className={btnSecondary} onClick={() => setCash({ club: c.club, fighters: c.pendingFighters })}>
+                    Готівка
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -884,17 +983,45 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
       </div>
 
       <div className={card}>
-        <h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Платежі Monobank</h4>
+        <h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Платежі · картка і готівка</h4>
         {payments.length === 0 && <p className="text-zinc-500">Платежів ще немає</p>}
         <div className="space-y-2">
           {payments.map((p) => (
             <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.03] p-3 text-sm">
-              <div className="min-w-0"><p className="truncate font-bold">{p.club}</p><p className="truncate text-[12px] text-zinc-500">{p.reference}</p></div>
-              <div className="flex items-center gap-2"><b>{fmtMoney(p.amount_uah)}</b><Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABELS[p.status]}</Badge></div>
+              <div className="min-w-0">
+                <p className="truncate font-bold">{p.club} <span className="text-[11px] font-normal text-zinc-500">· {METHOD_LABELS[p.provider] || p.provider}</span></p>
+                <p className="truncate text-[12px] text-zinc-500">{p.fighters || '—'}</p>
+                <p className="truncate text-[11px] text-zinc-600">
+                  {p.reference}{p.marked_by ? ` · відмітив ${p.marked_by}` : ''}{p.note ? ` · ${p.note}` : ''}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-right">
+                  <b>{fmtMoney(p.amount_uah)}</b>
+                  {p.fee_uah > 0 && <p className="text-[11px] text-zinc-500">внесок {fmtMoney(p.base_uah)} + комісія {fmtMoney(p.fee_uah)}</p>}
+                </div>
+                <Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABELS[p.status]}</Badge>
+                {p.provider === 'cash' && p.status === 'success' && (
+                  <button className={btnSecondary} onClick={() => reverse(p)}>Скасувати</button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       </div>
+
+      {cash && (
+        <CashModal
+          event={event}
+          club={cash.club}
+          fighters={cash.fighters}
+          onClose={() => setCash(null)}
+          onDone={() => {
+            setCash(null);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };
@@ -919,6 +1046,51 @@ const Bars = ({ data, order }: { data: Record<string, number>; order?: string[] 
   );
 };
 
+const BLOCK_ROWS: Array<{ key: 'kids' | 'open' | 'total'; label: string }> = [
+  { key: 'kids', label: 'Kids · діти' },
+  { key: 'open', label: 'Open · дорослі' },
+  { key: 'total', label: 'Разом' },
+];
+
+/** Платежі й заробіток події: Kids і Open окремо, картка й готівка окремо, комісія банку окремим рядком. */
+const RevenuePanel = ({ revenue, unaccounted }: { revenue: any; unaccounted: number }) => (
+  <div className={`${card} overflow-x-auto`}>
+    <h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Платежі й заробіток · ця подія</h4>
+    <table className="w-full min-w-[620px] text-left text-sm">
+      <thead>
+        <tr className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+          <th className="pb-2">Блок</th><th className="pb-2">Оплатили</th><th className="pb-2">Внесок</th><th className="pb-2">Карткою</th>
+          <th className="pb-2">Готівкою</th><th className="pb-2">Комісія платників</th><th className="pb-2">Очікує</th>
+        </tr>
+      </thead>
+      <tbody>
+        {BLOCK_ROWS.map(({ key, label }) => {
+          const b = revenue[key];
+          return (
+            <tr key={key} className={`border-t border-white/5 ${key === 'total' ? 'font-black text-white' : 'text-zinc-300'}`}>
+              <td className="py-2">{label}</td>
+              <td className="py-2">{b.fighters_paid}</td>
+              <td className="py-2">{fmtMoney(b.paid_uah)}</td>
+              <td className="py-2">{fmtMoney(b.by_method.monobank.paid_uah)}</td>
+              <td className="py-2">{fmtMoney(b.by_method.cash.paid_uah)}</td>
+              <td className="py-2">{fmtMoney(b.fee_uah)}</td>
+              <td className="py-2">{b.fighters_pending} · {fmtMoney(b.pending_uah)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+    <p className="mt-3 text-[12px] text-zinc-500">
+      «Внесок» — гроші організатора без комісії. Комісію банку платник сплачує понад внесок, вона лише покриває еквайринг.
+    </p>
+    {unaccounted > 0 && (
+      <p className="mt-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-200">
+        {unaccounted} бійц. мають статус «Оплачено» без платежу, тому в заробітку не враховані. Поверніть їм «Очікує оплати» і відмітьте оплату у вкладці «Оплати».
+      </p>
+    )}
+  </div>
+);
+
 const StatsTab = ({ event }: { event: EventRow }) => {
   const [stats, setStats] = useState<any | null>(null);
   useEffect(() => {
@@ -939,29 +1111,37 @@ const StatsTab = ({ event }: { event: EventRow }) => {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Клубів" value={stats.clubs} />
         <Stat label="Бійців" value={stats.fighters} sub={`Kids ${stats.by_block.kids || 0} · Open ${stats.by_block.open || 0}`} />
-        <Stat label="Оплачено" value={fmtMoney(stats.money.paid_uah)} />
+        <Stat label="Оплачено" value={fmtMoney(stats.money.paid_uah)} sub={stats.money.fee_collected_uah ? `+ комісія ${fmtMoney(stats.money.fee_collected_uah)}` : undefined} />
         <Stat label="Очікується" value={fmtMoney(stats.money.pending_uah)} />
       </div>
+      <RevenuePanel revenue={stats.revenue} unaccounted={stats.unaccounted_paid || 0} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className={card}><h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Категорії поясів</h4><Bars data={stats.by_category} order={['A', 'B', 'C']} /></div>
         <div className={card}><h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Федерації</h4><Bars data={stats.by_federation} /></div>
       </div>
       <div className={`${card} overflow-x-auto`}>
         <h4 className="mb-3 text-[11px] font-black uppercase tracking-widest text-zinc-500">Порівняння подій</h4>
-        <table className="w-full min-w-[420px] text-left text-sm">
+        <table className="w-full min-w-[720px] text-left text-sm">
           <thead>
             <tr className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
               <th className="pb-2">Подія</th><th className="pb-2">Дата</th><th className="pb-2">Клубів</th><th className="pb-2">Бійців</th>
+              <th className="pb-2">Kids</th><th className="pb-2">Open</th><th className="pb-2">Разом</th><th className="pb-2">Комісія</th><th className="pb-2">Очікує</th>
             </tr>
           </thead>
           <tbody>
             {stats.events.map((e: any) => (
               <tr key={e.event_id} className={`border-t border-white/5 ${e.event_id === event.id ? 'text-white' : 'text-zinc-400'}`}>
                 <td className="py-2">{e.title}</td><td className="py-2">{fmtDate(e.event_date)}</td><td className="py-2">{e.clubs}</td><td className="py-2">{e.fighters}</td>
+                <td className="py-2">{fmtMoney(e.revenue?.kids.paid_uah)}</td>
+                <td className="py-2">{fmtMoney(e.revenue?.open.paid_uah)}</td>
+                <td className="py-2 font-bold">{fmtMoney(e.revenue?.total.paid_uah)}</td>
+                <td className="py-2">{fmtMoney(e.revenue?.total.fee_uah)}</td>
+                <td className="py-2">{fmtMoney(e.revenue?.total.pending_uah)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="mt-2 text-[11px] text-zinc-600">Kids, Open і Разом — оплачений внесок без комісії банку.</p>
       </div>
     </div>
   );

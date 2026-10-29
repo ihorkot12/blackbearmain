@@ -20,6 +20,7 @@ const Encyclopedia = lazy(() => import('./Encyclopedia'));
 const Portal = lazy(() => import('./Portal').then(m => ({ default: m.Portal })));
 const ShinGiRegister = lazy(() => import('./shingi/Register'));
 const ShinGiCabinet = lazy(() => import('./shingi/Cabinet'));
+const ShinGiOffer = lazy(() => import('./shingi/Offer'));
 
 import { MainLanding } from './MainLanding';
 
@@ -171,6 +172,7 @@ export default function App() {
           <Route path="/encyclopedia" element={<Encyclopedia />} />
           <Route path="/shin-gi/register" element={<ShinGiRegister />} />
           <Route path="/shin-gi/cabinet" element={<ShinGiCabinet />} />
+          <Route path="/shin-gi/offer" element={<ShinGiOffer />} />
         </Routes>
       </Suspense>
     </>

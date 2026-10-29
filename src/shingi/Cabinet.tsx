@@ -8,6 +8,15 @@ import { Badge, BeltDot, Card, Chip, H2, Label, Shell, Spinner, Stepper, btnCls,
 const beltLabel = (belt?: string | null) => (belt && belt in BELT_LABELS ? BELT_LABELS[belt as BeltCode] : belt || '—');
 
 
+const PAY_STATUS_LABEL: Record<string, string> = {
+  created: 'очікує оплати',
+  processing: 'в обробці',
+  success: 'сплачено',
+  failure: 'не пройшла',
+  expired: 'прострочено',
+  reversed: 'повернуто',
+};
+
 const ENTRY_LABEL: Record<string, string> = {
   draft: 'Чернетка',
   submitted: 'Очікує оплати',
@@ -251,6 +260,7 @@ export default function CabinetPage() {
   const [fCat, setFCat] = useState('');
   const [fStatus, setFStatus] = useState('');
   const [fQuery, setFQuery] = useState('');
+  const [acceptOffer, setAcceptOffer] = useState(false);
 
   useEffect(() => {
     if (!me) return;
@@ -270,6 +280,25 @@ export default function CabinetPage() {
 
   useEffect(() => {
     if (me?.authenticated && !me.needs_profile) load();
+  }, [me, load]);
+
+  // повернення з банку: ?pay=<reference> — одразу питаємо статус, не чекаючи вебхука
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('pay');
+    if (!reference || !me?.authenticated || me.needs_profile) return;
+    sg<{ status: string }>(`pay/status?reference=${encodeURIComponent(reference)}`)
+      .then(async (r) => {
+        await load();
+        setNotice(
+          r.status === 'success'
+            ? { kind: 'ok', text: 'Оплату отримано, дякуємо! Бійців позначено як оплачених.' }
+            : r.status === 'processing' || r.status === 'created'
+              ? { kind: 'ok', text: 'Оплата ще обробляється. Оновіть сторінку за хвилину.' }
+              : { kind: 'err', text: 'Оплата не пройшла. Спробуйте ще раз або сплатіть готівкою організатору.' },
+        );
+        window.history.replaceState(null, '', window.location.pathname);
+      })
+      .catch(() => undefined);
   }, [me, load]);
 
   const event = cab?.event;
@@ -323,6 +352,21 @@ export default function CabinetPage() {
     } catch (e) {
       setNotice({ kind: 'err', text: errorText(e) });
     }
+  };
+
+  const payByCard = async () => {
+    if (!event) return;
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await sg<{ page_url: string }>('pay/invoice', { method: 'POST', body: { event_id: event.id, accept_offer: true } });
+      const tg = window.Telegram?.WebApp;
+      if (tg?.openLink) tg.openLink(res.page_url);
+      else window.location.href = res.page_url;
+    } catch (e) {
+      setNotice({ kind: 'err', text: errorText(e) });
+    }
+    setBusy(false);
   };
 
   const withdraw = (entry: any) => run(() => sg(`entries/${entry.id}`, { method: 'DELETE' }), 'Бійця знято із заявки');
@@ -572,18 +616,43 @@ export default function CabinetPage() {
           <p className="text-[15px]">
             У заявці: <b>{totals.fighters}</b> · оплачено: <b>{totals.paid}</b> · очікує оплати: <b>{totals.unpaid}</b>
           </p>
-          <div className="mt-3">
-            <button className={btnCls()} disabled>
-              {totals.unpaid > 0 ? `Сплатити за ${totals.unpaid} — ${fmtMoney(totals.sum_due_uah)}` : 'Сплатити'}
+          <div className="mt-3 space-y-3">
+            {totals.unpaid > 0 && (
+              <div className="border border-[#242422] p-3 text-[14px]">
+                <p className="flex justify-between gap-3"><span>Внесок за {totals.unpaid} бійц.</span><b>{fmtMoney(totals.sum_due_uah)}</b></p>
+                {totals.card_fee_uah > 0 && (
+                  <p className="flex justify-between gap-3 text-[#b9b9b4]">
+                    <span>Комісія банку за оплату карткою ({totals.card_fee_percent}%)</span><span>{fmtMoney(totals.card_fee_uah)}</span>
+                  </p>
+                )}
+                <p className="mt-1 flex justify-between gap-3 border-t border-[#242422] pt-1 text-[16px]">
+                  <span>До сплати карткою</span><b>{fmtMoney(totals.card_total_uah)}</b>
+                </p>
+              </div>
+            )}
+            <label className="flex cursor-pointer items-start gap-2 text-[13px] leading-relaxed text-[#b9b9b4]">
+              <input type="checkbox" className="mt-1" checked={acceptOffer} onChange={(e) => setAcceptOffer(e.target.checked)} />
+              <span>
+                Погоджуюсь з <a className="text-[#C9A227] underline" href="/shin-gi/offer" target="_blank" rel="noopener">умовами публічної оферти</a>,
+                зокрема з тим, що комісію банку за онлайн-оплату сплачує платник.
+              </span>
+            </label>
+            <button className={btnCls()} disabled={busy || !cab.payments_open || totals.unpaid === 0 || !acceptOffer} onClick={payByCard}>
+              {totals.unpaid > 0 ? `Сплатити карткою — ${fmtMoney(totals.card_total_uah)}` : 'Немає що сплачувати'}
             </button>
-            <p className="mt-2 text-[13px] text-[#85857f]">
-              {cab.payments_open ? '' : 'Оплата відкриється з анонсом дати. До дедлайну внеску вам надійде нагадування.'}
+            <p className="text-[13px] text-[#85857f]">
+              {cab.payments_open
+                ? 'Готівкою — без комісії: передайте внесок організатору, він відмітить оплату в системі.'
+                : 'Онлайн-оплата зараз недоступна. Внесок можна передати готівкою організатору, він відмітить оплату в системі.'}
             </p>
           </div>
           {cab.payments?.length > 0 && (
             <div className="mt-4 space-y-1 text-[14px]">
               {cab.payments.map((p: any) => (
-                <p key={p.id}>{fmtMoney(p.amount_uah)} — <span className="text-[#9a9a95]">{p.status}</span></p>
+                <p key={p.id}>
+                  {fmtMoney(p.amount_uah)} · {p.provider === 'cash' ? 'готівка' : 'картка'} —{' '}
+                  <span className="text-[#9a9a95]">{PAY_STATUS_LABEL[p.status] || p.status}</span>
+                </p>
               ))}
             </div>
           )}

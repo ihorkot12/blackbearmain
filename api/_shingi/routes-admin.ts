@@ -1,4 +1,6 @@
 import ExcelJS from 'exceljs';
+import { randomBytes } from 'crypto';
+import { emptyRevenue, summarizeRevenue, type PaidRow, type PendingRow } from './payments.js';
 import { BELT_LABELS, beltCategory, isBeltCode, type BeltCode } from './belts.js';
 import { ENTRY_STATUSES, EVENT_STATUSES, ensureSchema, logAction, query, withTx } from './db.js';
 import {
@@ -511,13 +513,84 @@ export const adminRoutes: Route[] = [
     handler: async (ctx) => {
       const event = await eventFromQuery(ctx);
       const payments = await query(
-        `SELECT pay.id, pay.reference, pay.amount_uah, pay.status, pay.entries_ids, pay.created_at, pay.paid_at,
-                p.club, p.coach_full_name
+        `SELECT pay.id, pay.reference, pay.amount_uah, pay.base_uah, pay.fee_uah, pay.provider, pay.note, pay.marked_by,
+                pay.status, pay.entries_ids, pay.created_at, pay.paid_at, p.club, p.coach_full_name,
+                (SELECT string_agg(f.full_name, ', ' ORDER BY f.full_name)
+                 FROM shingi_entries e JOIN shingi_fighters f ON f.id = e.fighter_id
+                 WHERE e.id = ANY(pay.entries_ids)) AS fighters
          FROM shingi_payments pay JOIN shingi_profiles p ON p.id = pay.profile_id
          WHERE pay.event_id = $1 ORDER BY pay.created_at DESC`,
         [event.id],
       );
       return { payments };
+    },
+  },
+  {
+    // Готівка: адмін вручну відмічає, що бійці сплатили. Створюється платіж (по одному на клуб), заявки стають «Оплачено».
+    method: 'POST',
+    path: 'admin/payments/cash',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const event = await eventFromQuery(ctx, 'body');
+      const rawIds: unknown[] = Array.isArray(ctx.body?.entry_ids) ? ctx.body.entry_ids : [];
+      const ids = [...new Set(rawIds.map((v) => toInt(v)).filter((n): n is number => n !== null && n > 0))];
+      if (ids.length === 0) throw new HttpError(400, 'Оберіть бійців, які сплатили');
+      if (ids.length > 300) throw new HttpError(400, 'Забагато бійців за раз');
+      const note = capped(ctx.body?.note, 300) || null;
+
+      const created = await withTx(async (run) => {
+        const rows = await run(
+          `SELECT id, profile_id, status FROM shingi_entries WHERE id = ANY($1::int[]) AND event_id = $2 FOR UPDATE`,
+          [ids, event.id],
+        );
+        if (rows.length !== ids.length) throw new HttpError(404, 'Частину заявок не знайдено в цій події');
+        const notPayable = rows.filter((r) => r.status !== 'submitted');
+        if (notPayable.length > 0) {
+          throw new HttpError(409, `Відмітити готівку можна лише для статусу «Очікує оплати» (не підходять: ${notPayable.length})`, 'not_payable');
+        }
+        const byProfile = new Map<number, number[]>();
+        for (const r of rows) byProfile.set(r.profile_id, [...(byProfile.get(r.profile_id) ?? []), r.id]);
+
+        const payments: Array<{ id: number; reference: string; amount_uah: number; fighters: number }> = [];
+        for (const [profileId, entryIds] of byProfile) {
+          const amount = entryIds.length * event.fee_uah;
+          const [pay] = await run(
+            `INSERT INTO shingi_payments
+               (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status, paid_at, note, marked_by)
+             VALUES ($1, $2, $3, $4, $4, 0, $5::int[], 'cash', 'success', now(), $6, $7)
+             RETURNING id, reference, amount_uah`,
+            [event.id, profileId, `cash-${event.id}-${randomBytes(4).toString('hex')}`, amount, entryIds, note, actor(ctx)],
+          );
+          await run(`UPDATE shingi_entries SET status = 'paid', updated_at = now() WHERE id = ANY($1::int[])`, [entryIds]);
+          payments.push({ ...pay, fighters: entryIds.length });
+        }
+        return payments;
+      });
+      for (const p of created) await logAction(actor(ctx), 'payment.cash', 'payment', p.id, { fighters: p.fighters, amount_uah: p.amount_uah });
+      return new Reply(201, { payments: created, paid_fighters: ids.length });
+    },
+  },
+  {
+    // Помилкову відмітку готівки можна скасувати: платіж стає «Повернуто», заявки знову «Очікує оплати».
+    method: 'POST',
+    path: 'admin/payments/:id/reverse',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const reason = capped(ctx.body?.reason, 300) || 'без причини';
+      await withTx(async (run) => {
+        const [pay] = await run('SELECT id, provider, status, entries_ids FROM shingi_payments WHERE id = $1 FOR UPDATE', [id]);
+        if (!pay) throw new HttpError(404, 'Платіж не знайдено');
+        if (pay.provider !== 'cash') {
+          throw new HttpError(409, 'Скасувати можна лише готівковий платіж. Повернення за картку робиться в кабінеті Monobank.', 'not_cash');
+        }
+        if (pay.status !== 'success') throw new HttpError(409, 'Цей платіж уже скасовано', 'already_reversed');
+        await run(`UPDATE shingi_payments SET status = 'reversed', note = trim(coalesce(note, '') || ' | скасовано: ' || $2) WHERE id = $1`, [id, reason]);
+        await run(`UPDATE shingi_entries SET status = 'submitted', updated_at = now() WHERE id = ANY($1::int[]) AND status = 'paid'`, [pay.entries_ids]);
+      });
+      await logAction(actor(ctx), 'payment.cash_reverse', 'payment', id, { reason });
+      return { ok: true };
     },
   },
   {
@@ -540,8 +613,29 @@ export const adminRoutes: Route[] = [
         }
         return out;
       };
-      const [money] = await query<{ paid_uah: number }>(
-        `SELECT COALESCE(SUM(amount_uah) FILTER (WHERE status = 'success'), 0)::int AS paid_uah FROM shingi_payments WHERE event_id = $1`,
+      // Виручка по подіях, блоках (Kids/Open) і способах оплати. Внесок і комісію банку рахуємо окремо:
+      // платіж розкладається порівну на бійців, яких оплачує.
+      const paidRows = await query<PaidRow>(
+        `SELECT pay.event_id, e.block, pay.provider AS method, COUNT(*)::int AS fighters,
+                ROUND(SUM(COALESCE(pay.base_uah, pay.amount_uah)::numeric / cardinality(pay.entries_ids)))::int AS base_uah,
+                ROUND(SUM(pay.fee_uah::numeric / cardinality(pay.entries_ids)))::int AS fee_uah
+         FROM shingi_payments pay
+         CROSS JOIN LATERAL unnest(pay.entries_ids) AS x(entry_id)
+         JOIN shingi_entries e ON e.id = x.entry_id
+         WHERE pay.status = 'success' AND cardinality(pay.entries_ids) > 0
+         GROUP BY pay.event_id, e.block, pay.provider`,
+      );
+      const pendingRows = await query<PendingRow>(
+        `SELECT event_id, block, COUNT(*)::int AS fighters FROM shingi_entries WHERE status = 'submitted' GROUP BY event_id, block`,
+      );
+      const feeRows = await query<{ id: number; fee_uah: number }>('SELECT id, fee_uah FROM shingi_events');
+      const revenueByEvent = summarizeRevenue(paidRows, pendingRows, Object.fromEntries(feeRows.map((r) => [r.id, r.fee_uah])));
+      const revenue = revenueByEvent.find((r) => r.event_id === event.id) ?? emptyRevenue(event.id);
+      // «Оплачено» виставлено вручну в заявках, а платежу немає — гроші в обліку не видно
+      const [unaccounted] = await query<{ n: number }>(
+        `SELECT COUNT(*)::int AS n FROM shingi_entries e
+         WHERE e.event_id = $1 AND e.status IN ('paid', 'fought')
+           AND NOT EXISTS (SELECT 1 FROM shingi_payments pay WHERE pay.status = 'success' AND e.id = ANY(pay.entries_ids))`,
         [event.id],
       );
       const unpaid = rows.filter((r) => r.status === 'submitted').length;
@@ -561,8 +655,15 @@ export const adminRoutes: Route[] = [
         by_block: count((r) => r.block),
         by_category: count((r) => (isBeltCode(r.belt) ? beltCategory(r.belt) : '?')),
         by_federation: count((r) => r.federation || '—'),
-        money: { paid_uah: money?.paid_uah ?? 0, pending_uah: unpaid * event.fee_uah, fee_uah: event.fee_uah },
-        events: history,
+        money: {
+          paid_uah: revenue.total.paid_uah,
+          fee_collected_uah: revenue.total.fee_uah,
+          pending_uah: unpaid * event.fee_uah,
+          fee_uah: event.fee_uah,
+        },
+        revenue,
+        unaccounted_paid: unaccounted?.n ?? 0,
+        events: history.map((h: any) => ({ ...h, revenue: revenueByEvent.find((r) => r.event_id === h.event_id) ?? emptyRevenue(h.event_id) })),
       };
     },
   },
@@ -617,13 +718,15 @@ export const adminRoutes: Route[] = [
       groupsSheet.columns.forEach((column) => { column.width = 18; });
 
       const payments = await query(
-        `SELECT pay.reference, pay.amount_uah, pay.status, pay.created_at, pay.paid_at, p.club
+        `SELECT pay.reference, pay.provider, pay.amount_uah, pay.base_uah, pay.fee_uah, pay.status, pay.created_at, pay.paid_at, p.club
          FROM shingi_payments pay JOIN shingi_profiles p ON p.id = pay.profile_id WHERE pay.event_id = $1 ORDER BY pay.created_at`,
         [event.id],
       );
       const paySheet = workbook.addWorksheet('Оплати');
-      paySheet.addRow(['Клуб', 'Сума, грн', 'Статус', 'Створено', 'Оплачено', 'Референс']).font = { bold: true };
-      payments.forEach((p) => paySheet.addRow([safeCell(p.club), p.amount_uah, p.status, p.created_at, p.paid_at, p.reference]));
+      paySheet.addRow(['Клуб', 'Спосіб', 'Внесок, грн', 'Комісія банку, грн', 'Сплачено, грн', 'Статус', 'Створено', 'Оплачено', 'Референс']).font = { bold: true };
+      payments.forEach((p) =>
+        paySheet.addRow([safeCell(p.club), p.provider === 'cash' ? 'готівка' : 'картка', p.base_uah ?? p.amount_uah, p.fee_uah ?? 0, p.amount_uah, p.status, p.created_at, p.paid_at, p.reference]),
+      );
       paySheet.columns.forEach((column) => { column.width = 20; });
 
       const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
