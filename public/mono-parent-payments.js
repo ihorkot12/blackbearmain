@@ -11,6 +11,9 @@
   // комісію банку сплачує платник; ставку і ціну місяця віддає сервер (monobank-config)
   let feePercent = 1.3;
   let monthlyFee = 2500;
+  let monthlyPrice = 2500;
+  let discountPercent = 0;
+  let discountLabel = '';
 
   function quote(base) {
     const b = Math.round(Number(base));
@@ -34,7 +37,16 @@
     );
   }
 
+  const currentToken = () => window.localStorage.getItem('parent_token') || '';
+  let configToken = null;
+
   async function loadPaymentConfig() {
+    // ціна місяця залежить від того, хто увійшов: після зміни токена конфіг читаємо заново
+    if (configToken !== null && configToken !== currentToken()) {
+      configLoaded = false;
+      configPromise = null;
+    }
+    configToken = currentToken();
     if (configLoaded) return paymentsEnabled;
     if (configPromise) return configPromise;
 
@@ -42,12 +54,18 @@
       method: 'GET',
       cache: 'no-store',
       credentials: 'include',
+      headers: getAuthHeaders(),
     })
       .then((response) => response.ok ? response.json() : {})
       .then((data) => {
         paymentsEnabled = data.enabled !== false && data.monobankPaymentsEnabled !== false;
         if (Number.isFinite(Number(data.feePercent)) && Number(data.feePercent) >= 0) feePercent = Number(data.feePercent);
         if (Number(data.monthlyFeeUah) > 0) monthlyFee = Number(data.monthlyFeeUah);
+        // ціна місяця для цього батька: знижка УБД або 2+ дітей (не складаються), рахує сервер
+        if (Number(data.monthlyPriceUah) > 0) monthlyPrice = Number(data.monthlyPriceUah);
+        else monthlyPrice = monthlyFee;
+        discountPercent = Number(data.discountPercent) > 0 ? Number(data.discountPercent) : 0;
+        discountLabel = data.discountLabel ? String(data.discountLabel) : '';
         configLoaded = true;
         return paymentsEnabled;
       })
@@ -382,8 +400,20 @@
     amountInput.max = '100000';
     amountInput.step = '10';
     amountInput.inputMode = 'decimal';
-    amountInput.value = window.localStorage.getItem('bb_mono_last_amount') || String(monthlyFee);
+    amountInput.value = window.localStorage.getItem('bb_mono_last_amount') || String(monthlyPrice);
     amountInput.setAttribute('aria-label', 'Сума оплати в гривнях');
+
+    const month = document.createElement('button');
+    month.type = 'button';
+    month.className = 'bb-mono-caption';
+    month.style.cssText = 'cursor:pointer;background:none;border:0;padding:0;text-transform:none;letter-spacing:0;font-size:12px;font-weight:800;text-decoration:underline;color:#f87171;';
+    month.textContent = discountPercent > 0
+      ? `Місяць ${monthlyFee} грн − ${discountPercent}% (${discountLabel}) = ${monthlyPrice} грн · підставити`
+      : `Місяць ${monthlyPrice} грн · підставити`;
+    month.addEventListener('click', () => {
+      amountInput.value = String(monthlyPrice);
+      amountInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
 
     const breakdown = document.createElement('div');
     breakdown.className = 'bb-mono-caption';
@@ -408,6 +438,7 @@
     row.appendChild(amountInput);
     row.appendChild(button);
     panel.appendChild(caption);
+    panel.appendChild(month);
     panel.appendChild(row);
     panel.appendChild(breakdown);
     panel.appendChild(status);
@@ -459,7 +490,7 @@
 
   function scan() {
     if (!isParentPage()) return;
-    if (!configLoaded) {
+    if (!configLoaded || configToken !== currentToken()) {
       loadPaymentConfig().then(scan);
       return;
     }

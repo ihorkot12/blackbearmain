@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import fetch from 'node-fetch';
 import pkg from 'pg';
 import { parseFeePercent } from './_shared/card-fee.js';
+import { DISCOUNT_REASON_LABELS, discountedMonthly, parentDiscount, parseDiscountPercent } from './_shared/parent-pricing.js';
 
 const { Pool } = pkg;
 
@@ -1810,6 +1811,52 @@ async function handleTelegramWebhookStatus(req: any, res: any) {
   });
 }
 
+let discountColumnReady = false;
+
+/**
+ * Ціна місяця для залогіненого батька: базова ціна мінус знижка (УБД або 2+ дітей у родині, не складаються).
+ * Родину визначають за спільним «телефоном акаунта» або логіном серед активних дітей. Для гостя знижки немає.
+ */
+async function getParentPricing(req: any, baseUah: number) {
+  const none = { monthlyBaseUah: baseUah, monthlyPriceUah: baseUah, discountPercent: 0, discountReason: null as string | null, discountLabel: null as string | null };
+  const payload = getBearerPayload(req);
+  if (!pool || payload?.role !== 'parent') return none;
+  try {
+    if (!discountColumnReady) {
+      await pool.query('ALTER TABLE participants ADD COLUMN IF NOT EXISTS discount_ubd BOOLEAN DEFAULT FALSE');
+      discountColumnReady = true;
+    }
+    const percent = parseDiscountPercent(await getSettingsValue(['parent_discount_percent']));
+    const result = await pool.query(
+      `SELECT me.discount_ubd,
+              (SELECT COUNT(*)::int FROM participants p
+                WHERE (p.status IS NULL OR p.status = 'active')
+                  AND COALESCE(p.member_type, 'child') = 'child'
+                  AND (
+                    (regexp_replace(COALESCE(me.parent_phone, ''), '[^0-9]', '', 'g') <> ''
+                       AND regexp_replace(COALESCE(p.parent_phone, ''), '[^0-9]', '', 'g') = regexp_replace(COALESCE(me.parent_phone, ''), '[^0-9]', '', 'g'))
+                    OR (TRIM(COALESCE(me.parent_login, '')) <> ''
+                       AND LOWER(TRIM(COALESCE(p.parent_login, ''))) = LOWER(TRIM(me.parent_login)))
+                  )) AS siblings
+       FROM participants me WHERE me.id = $1`,
+      [Number(payload.sub)]
+    );
+    const row = result.rows[0];
+    if (!row) return none;
+    const discount = parentDiscount({ ubd: Boolean(row.discount_ubd), siblings: Number(row.siblings || 0), percent });
+    return {
+      monthlyBaseUah: baseUah,
+      monthlyPriceUah: discountedMonthly(baseUah, discount.percent),
+      discountPercent: discount.percent,
+      discountReason: discount.reason,
+      discountLabel: discount.reason ? DISCOUNT_REASON_LABELS[discount.reason] : null,
+    };
+  } catch (error) {
+    console.warn('Parent pricing lookup failed', error);
+    return none;
+  }
+}
+
 export default async function handler(req: any, res: any) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -1827,12 +1874,14 @@ export default async function handler(req: any, res: any) {
   }
 
   const enabled = await readPaymentVisibility();
+  const monthlyBase = await getDefaultCashPaymentAmount();
   return res.status(200).json({
     success: true,
     enabled,
     monobankPaymentsEnabled: enabled,
     // комісію банку сплачує платник: скрипт кабінету показує «внесок + комісія = до сплати»
     feePercent: parseFeePercent(process.env.PARENT_CARD_FEE_PERCENT ?? process.env.SHINGI_CARD_FEE_PERCENT),
-    monthlyFeeUah: await getDefaultCashPaymentAmount(),
+    monthlyFeeUah: monthlyBase,
+    ...(await getParentPricing(req, monthlyBase)),
   });
 }

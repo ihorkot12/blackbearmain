@@ -372,6 +372,7 @@ async function initDb() {
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen BOOLEAN DEFAULT FALSE;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_frozen_until DATE;
       ALTER TABLE participants ADD COLUMN IF NOT EXISTS attendance_freeze_note TEXT;
+      ALTER TABLE participants ADD COLUMN IF NOT EXISTS discount_ubd BOOLEAN DEFAULT FALSE;
 
       CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
@@ -6070,7 +6071,7 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
         'name', 'age', 'birthday', 'group_id', 'parent_login', 'parent_password',
         'belt', 'rank_points', 'payment_status', 'status', 'parent_name', 'phone',
         'parent_phone', 'email', 'member_type', 'telegram_chat_id', 'exam_readiness', 'skill_checklist', 'streak', 'last_attendance_date',
-        'achievements_text', 'attendance_frozen', 'attendance_frozen_until', 'attendance_freeze_note'
+        'achievements_text', 'attendance_frozen', 'attendance_frozen_until', 'attendance_freeze_note', 'discount_ubd'
       ];
 
       const updateData: any = {};
@@ -6103,6 +6104,10 @@ ${isHashed ? '\n<i>Примітка: Ваш пароль зашифровано.
           updateData.attendance_frozen_until = null;
           updateData.attendance_freeze_note = '';
         }
+      }
+
+      if (updateData.discount_ubd !== undefined) {
+        updateData.discount_ubd = updateData.discount_ubd === true || updateData.discount_ubd === 'true' || updateData.discount_ubd === 'on';
       }
 
       if (updateData.attendance_frozen_until === '') {

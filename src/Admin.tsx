@@ -4102,6 +4102,20 @@ const ParticipantsEditor = ({ initialAction, onActionComplete, role, coachId }: 
                   </select>
                 </div>
               </div>
+              <div className="rounded-3xl border border-emerald-500/15 bg-emerald-500/5 p-4 lg:p-5">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(editingParticipant.discount_ubd)}
+                    onChange={e => setEditingParticipant({ ...editingParticipant, discount_ubd: e.target.checked })}
+                    className="mt-1 h-4 w-4 accent-emerald-400"
+                  />
+                  <span>
+                    <span className="block text-xs font-black uppercase tracking-widest text-emerald-300">УБД · знижка на оплату</span>
+                    <span className="mt-1 block text-xs leading-5 text-zinc-400">Батько отримує знижку 15% у кабінеті оплати. Та сама знижка діє для родин, де займаються 2 і більше дітей (визначається за спільним «Телефоном акаунта»). Знижки не складаються. До SHIN GI це не стосується.</span>
+                  </span>
+                </label>
+              </div>
               <div className="rounded-3xl border border-amber-500/15 bg-amber-500/5 p-4 lg:p-5">
                 <label className="flex cursor-pointer items-start gap-3">
                   <input
