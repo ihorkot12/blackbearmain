@@ -37,6 +37,10 @@ import { GROUPABLE_ENTRY_STATUSES, getEventById, eventCounters, type EventRow } 
 
 const actor = (ctx: Ctx) => ctx.admin || 'admin';
 
+/** Успішний платіж, що покриває заявку (гроші по ній уже в обліку). */
+const coveringPayment = async (entryId: number) =>
+  (await query<{ id: number }>(`SELECT id FROM shingi_payments WHERE status = 'success' AND $1 = ANY(entries_ids) LIMIT 1`, [entryId]))[0] ?? null;
+
 const eventFromQuery = async (ctx: Ctx, source: 'query' | 'body' = 'query'): Promise<EventRow> => {
   const raw = source === 'query' ? ctx.query.event_id : ctx.body?.event_id;
   const id = toInt(raw);
@@ -295,6 +299,205 @@ export const adminRoutes: Route[] = [
     },
   },
 
+  {
+    // Видалення події разом із її заявками й платежами (каскад у БД). Захист: підтвердження slug у ?confirm_slug=
+    // і заборона, якщо вже є успішні оплати — щоб не втратити облік грошей (такі події краще скасувати статусом).
+    method: 'DELETE',
+    path: 'admin/events/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const event = await getEventById(id);
+      if (!event) throw new HttpError(404, 'Подію не знайдено');
+      if (String(ctx.query.confirm_slug || '') !== event.slug) {
+        throw new HttpError(400, 'Для видалення підтвердьте slug події', 'confirm_required');
+      }
+      const [paid] = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM shingi_payments WHERE event_id = $1 AND status = 'success'`, [id]);
+      if ((paid?.n ?? 0) > 0) {
+        throw new HttpError(409, `У події є оплати (${paid.n}). Видаляти її не можна, щоб не втратити облік грошей. Поставте статус «Скасовано».`, 'has_payments');
+      }
+      const [counts] = await query<{ entries: number }>('SELECT COUNT(*)::int AS entries FROM shingi_entries WHERE event_id = $1', [id]);
+      await query('DELETE FROM shingi_events WHERE id = $1', [id]);
+      await logAction(actor(ctx), 'event.delete', 'event', id, { slug: event.slug, title: event.title, entries: counts?.entries ?? 0 });
+      return { ok: true, deleted_entries: counts?.entries ?? 0 };
+    },
+  },
+
+  // --- клуби й бійці: перегляд, пошук, редагування, видалення ---
+  {
+    method: 'GET',
+    path: 'admin/clubs',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const eventId = toInt(ctx.query.event_id) ?? 0;
+      const clubs = await query(
+        `SELECT p.id, p.role, p.club, p.branch, p.coach_full_name, p.federation, p.city, p.phone, p.tg_id, p.tg_username, p.is_admin, p.created_at,
+                (SELECT COUNT(*)::int FROM shingi_fighters f WHERE f.profile_id = p.id) AS fighters,
+                (SELECT COUNT(*)::int FROM shingi_entries e WHERE e.profile_id = p.id AND e.event_id = $1 AND e.status IN ('submitted', 'paid', 'fought')) AS entries,
+                (SELECT COUNT(*)::int FROM shingi_entries e WHERE e.profile_id = p.id AND e.event_id = $1 AND e.status = 'paid') AS paid_entries,
+                COALESCE((SELECT SUM(COALESCE(pay.base_uah, pay.amount_uah)) FROM shingi_payments pay WHERE pay.profile_id = p.id AND pay.status = 'success'), 0)::int AS paid_uah
+         FROM shingi_profiles p
+         WHERE p.club IS NOT NULL OR p.coach_full_name IS NOT NULL
+         ORDER BY lower(COALESCE(p.club, '')), p.id
+         LIMIT 500`,
+        [eventId],
+      );
+      return { clubs };
+    },
+  },
+  {
+    method: 'PUT',
+    path: 'admin/clubs/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const b = ctx.body || {};
+      const sets: string[] = [];
+      const values: unknown[] = [id];
+      const set = (column: string, value: unknown) => {
+        values.push(value);
+        sets.push(`${column} = $${values.length}`);
+      };
+      if (b.club !== undefined) {
+        const club = capped(b.club, 120);
+        if (!club) throw new HttpError(400, 'Назва клубу не може бути порожньою');
+        set('club', club);
+      }
+      if (b.coach_full_name !== undefined) {
+        const coach = capped(b.coach_full_name, 120);
+        if (!coach) throw new HttpError(400, "Вкажіть прізвище та ім'я тренера");
+        set('coach_full_name', coach);
+      }
+      if (b.role !== undefined) {
+        if (b.role !== 'coach' && b.role !== 'solo') throw new HttpError(400, 'Роль: тренер або одиночний боєць');
+        set('role', b.role);
+      }
+      if (b.federation !== undefined) set('federation', capped(b.federation, 80) || null);
+      if (b.branch !== undefined) set('branch', capped(b.branch, 80) || null);
+      if (b.city !== undefined) set('city', capped(b.city, 80) || 'Київ');
+      if (b.phone !== undefined) set('phone', normalizePhone(b.phone));
+      if (sets.length === 0) throw new HttpError(400, 'Нічого оновлювати');
+      const rows = await query(`UPDATE shingi_profiles SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 RETURNING id`, values);
+      if (!rows[0]) throw new HttpError(404, 'Клуб не знайдено');
+      await logAction(actor(ctx), 'club.update', 'profile', id, Object.keys(b));
+      return { ok: true };
+    },
+  },
+  {
+    // Видалення клубу (профілю тренера) разом із його бійцями, заявками й платежами. Підтвердження — назва клубу в ?confirm_club=.
+    // Заборона, якщо є успішні оплати (облік грошей) або це профіль адміна.
+    method: 'DELETE',
+    path: 'admin/clubs/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const [profile] = await query<{ id: number; club: string | null; coach_full_name: string | null; is_admin: boolean }>(
+        'SELECT id, club, coach_full_name, is_admin FROM shingi_profiles WHERE id = $1',
+        [id],
+      );
+      if (!profile) throw new HttpError(404, 'Клуб не знайдено');
+      if (profile.is_admin) throw new HttpError(409, 'Це профіль адміністратора, його видаляти не можна', 'is_admin');
+      const expected = (profile.club || profile.coach_full_name || String(id)).trim().toLowerCase();
+      if (String(ctx.query.confirm_club || '').trim().toLowerCase() !== expected) {
+        throw new HttpError(400, 'Для видалення підтвердьте назву клубу', 'confirm_required');
+      }
+      const [paid] = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM shingi_payments WHERE profile_id = $1 AND status = 'success'`, [id]);
+      if ((paid?.n ?? 0) > 0) {
+        throw new HttpError(409, `У клубу є оплати (${paid.n}). Видаляти його не можна, щоб не втратити облік грошей. Скасуйте оплату у вкладці «Оплати» або залиште клуб.`, 'has_payments');
+      }
+      const [counts] = await query<{ fighters: number; entries: number }>(
+        `SELECT (SELECT COUNT(*)::int FROM shingi_fighters WHERE profile_id = $1) AS fighters,
+                (SELECT COUNT(*)::int FROM shingi_entries WHERE profile_id = $1) AS entries`,
+        [id],
+      );
+      await query('DELETE FROM shingi_profiles WHERE id = $1', [id]);
+      await logAction(actor(ctx), 'club.delete', 'profile', id, { club: profile.club, ...counts });
+      return { ok: true, deleted_fighters: counts?.fighters ?? 0, deleted_entries: counts?.entries ?? 0 };
+    },
+  },
+  {
+    method: 'GET',
+    path: 'admin/fighters',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const eventId = toInt(ctx.query.event_id) ?? 0;
+      const fighters = await query(
+        `SELECT f.id, f.profile_id, f.full_name, f.sex, f.birth_date, f.age_years, f.weight_kg, f.belt, f.guardian_name, f.guardian_phone, f.notes,
+                p.club, p.branch, p.coach_full_name, p.federation, p.city,
+                en.id AS entry_id, en.status AS entry_status, en.block, en.group_key
+         FROM shingi_fighters f
+         JOIN shingi_profiles p ON p.id = f.profile_id
+         LEFT JOIN shingi_entries en ON en.fighter_id = f.id AND en.event_id = $1
+         ORDER BY lower(COALESCE(p.club, '')), lower(f.full_name)
+         LIMIT 3000`,
+        [eventId],
+      );
+      return { fighters };
+    },
+  },
+  {
+    method: 'PUT',
+    path: 'admin/fighters/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const [current] = await query('SELECT * FROM shingi_fighters WHERE id = $1', [id]);
+      if (!current) throw new HttpError(404, 'Бійця не знайдено');
+      const f = validateFighter({ ...current, ...ctx.body });
+      try {
+        await query(
+          `UPDATE shingi_fighters SET full_name = $2, sex = $3, birth_date = $4, age_years = $5, weight_kg = $6, belt = $7,
+                  guardian_name = $8, guardian_phone = $9, notes = $10, updated_at = now()
+           WHERE id = $1`,
+          [id, f.full_name, f.sex, f.birth_date, f.age_years, f.weight_kg, f.belt, f.guardian_name, f.guardian_phone, f.notes],
+        );
+        // знімок ваги, поясу й блоку оновлюємо лише в неоплачених заявках, як і в кабінеті тренера
+        const open = await query(
+          `SELECT e.id, e.block_override, ev.event_date FROM shingi_entries e JOIN shingi_events ev ON ev.id = e.event_id
+           WHERE e.fighter_id = $1 AND e.status IN ('draft', 'submitted')`,
+          [id],
+        );
+        for (const entry of open) {
+          const age = resolveAge(f, entry.event_date);
+          await query(`UPDATE shingi_entries SET weight_kg = $2, belt = $3, block = $4, updated_at = now() WHERE id = $1`, [
+            entry.id,
+            f.weight_kg,
+            f.belt,
+            age === null ? 'kids' : resolveBlock(age, entry.block_override),
+          ]);
+        }
+      } catch (error: any) {
+        if (error?.code === '23505') throw new HttpError(409, 'Такий боєць уже є в цьому клубі', 'duplicate');
+        throw error;
+      }
+      await logAction(actor(ctx), 'fighter.update', 'fighter', id);
+      return { ok: true };
+    },
+  },
+  {
+    // Видалення бійця разом із його заявками. Якщо є оплачена заявка — спершу скасуйте оплату, інакше облік грошей розійдеться.
+    method: 'DELETE',
+    path: 'admin/fighters/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const [fighter] = await query<{ id: number; full_name: string }>('SELECT id, full_name FROM shingi_fighters WHERE id = $1', [id]);
+      if (!fighter) throw new HttpError(404, 'Бійця не знайдено');
+      const [paid] = await query<{ n: number }>(`SELECT COUNT(*)::int AS n FROM shingi_entries WHERE fighter_id = $1 AND status IN ('paid', 'fought')`, [id]);
+      if ((paid?.n ?? 0) > 0) {
+        throw new HttpError(409, 'У бійця є оплачена заявка. Спершу скасуйте оплату (вкладка «Оплати») або поставте статус «Знято» у заявках.', 'has_paid_entry');
+      }
+      await query('DELETE FROM shingi_fighters WHERE id = $1', [id]);
+      await logAction(actor(ctx), 'fighter.delete', 'fighter', id, { full_name: fighter.full_name });
+      return { ok: true };
+    },
+  },
+
   // --- заявки ---
   {
     method: 'GET',
@@ -405,8 +608,23 @@ export const adminRoutes: Route[] = [
         values.push(value);
         sets.push(`${column} = $${values.length}`);
       };
+      const [current] = await query<{ id: number; status: string; profile_id: number; event_id: number; fee_uah: number }>(
+        `SELECT e.id, e.status, e.profile_id, e.event_id, ev.fee_uah FROM shingi_entries e JOIN shingi_events ev ON ev.id = e.event_id WHERE e.id = $1`,
+        [id],
+      );
+      if (!current) throw new HttpError(404, 'Заявку не знайдено');
+      let needCashPayment = false;
       if (b.status !== undefined) {
         if (!(ENTRY_STATUSES as readonly string[]).includes(b.status)) throw new HttpError(400, 'Невідомий статус заявки');
+        if (b.status !== current.status) {
+          const covered = await coveringPayment(id);
+          // оплачену заявку не можна «розоплатити» зміною статусу — гроші вже в обліку; спершу скасовують оплату
+          if (current.status === 'paid' && covered && ['submitted', 'draft', 'withdrawn'].includes(b.status)) {
+            throw new HttpError(409, `Заявка оплачена (платіж №${covered.id}). Спершу скасуйте оплату у вкладці «Оплати».`, 'paid_entry');
+          }
+          // «Оплачено» вручну = готівка: створюємо платіж, щоб гроші потрапили в статистику
+          if (b.status === 'paid' && !covered && current.fee_uah > 0) needCashPayment = true;
+        }
         set('status', b.status);
       }
       if (b.weight_kg !== undefined) {
@@ -435,10 +653,38 @@ export const adminRoutes: Route[] = [
         set('group_manual', Boolean(key));
       }
       if (sets.length === 0) throw new HttpError(400, 'Нічого оновлювати');
+      if (needCashPayment) {
+        await query(
+          `INSERT INTO shingi_payments (event_id, profile_id, reference, amount_uah, base_uah, fee_uah, entries_ids, provider, status, paid_at, note, marked_by)
+           VALUES ($1, $2, $3, $4, $4, 0, ARRAY[$5]::int[], 'cash', 'success', now(), 'відмічено в заявках', $6)`,
+          [current.event_id, current.profile_id, `cash-${current.event_id}-${randomBytes(4).toString('hex')}`, current.fee_uah, id, actor(ctx)],
+        );
+      }
       const rows = await query(`UPDATE shingi_entries SET ${sets.join(', ')}, updated_at = now() WHERE id = $1 RETURNING *`, values);
       if (!rows[0]) throw new HttpError(404, 'Заявку не знайдено');
       await logAction(actor(ctx), 'entry.update', 'entry', id, Object.keys(b));
-      return { entry: rows[0] };
+      return { entry: rows[0], cash_payment_created: needCashPayment };
+    },
+  },
+  {
+    // Видалення заявки. Оплачену не видаляємо: спершу скасовують оплату, інакше облік грошей розійдеться.
+    method: 'DELETE',
+    path: 'admin/entries/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const [entry] = await query<{ id: number; status: string; full_name: string }>(
+        `SELECT e.id, e.status, f.full_name FROM shingi_entries e JOIN shingi_fighters f ON f.id = e.fighter_id WHERE e.id = $1`,
+        [id],
+      );
+      if (!entry) throw new HttpError(404, 'Заявку не знайдено');
+      if (['paid', 'fought'].includes(entry.status) || (await coveringPayment(id))) {
+        throw new HttpError(409, 'Заявка оплачена або вже була на змаганнях. Спершу скасуйте оплату у вкладці «Оплати».', 'paid_entry');
+      }
+      await query('DELETE FROM shingi_entries WHERE id = $1', [id]);
+      await logAction(actor(ctx), 'entry.delete', 'entry', id, { full_name: entry.full_name });
+      return { ok: true };
     },
   },
 
@@ -606,6 +852,91 @@ export const adminRoutes: Route[] = [
         await run(`UPDATE shingi_entries SET status = 'submitted', updated_at = now() WHERE id = ANY($1::int[]) AND status = 'paid'`, [pay.entries_ids]);
       });
       await logAction(actor(ctx), 'payment.cash_reverse', 'payment', id, { reason });
+      return { ok: true };
+    },
+  },
+  {
+    // Редагування платежу. action:
+    //  to_cash — неоплачений картковий рахунок (створено, прострочено, помилка) перетворюємо на готівкову оплату;
+    //  edit    — змінити суму й примітку готівкового платежу;
+    //  restore — повернути скасований готівковий платіж.
+    // Картковий платіж, що вже сплачено через банк, не змінюємо: гроші прийшли через Monobank.
+    method: 'PUT',
+    path: 'admin/payments/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const action = String(ctx.body?.action || '');
+      const note = capped(ctx.body?.note, 300);
+      if (!['to_cash', 'edit', 'restore'].includes(action)) throw new HttpError(400, 'Невідома дія з платежем');
+
+      await withTx(async (run) => {
+        const [pay] = await run(
+          `SELECT p.id, p.provider, p.status, p.entries_ids, p.amount_uah, ev.fee_uah AS event_fee
+           FROM shingi_payments p JOIN shingi_events ev ON ev.id = p.event_id WHERE p.id = $1 FOR UPDATE OF p`,
+          [id],
+        );
+        if (!pay) throw new HttpError(404, 'Платіж не знайдено');
+
+        if (action === 'to_cash') {
+          if (pay.provider !== 'monobank') throw new HttpError(409, 'Це вже готівковий платіж', 'already_cash');
+          if (pay.status === 'success') throw new HttpError(409, 'Картковий платіж уже сплачено через банк, спосіб змінювати не можна', 'card_paid');
+          if (pay.status === 'processing') throw new HttpError(409, 'Банк ще обробляє платіж. Зачекайте або перевірте його в кабінеті Monobank.', 'processing');
+          const open = await run(`SELECT id FROM shingi_entries WHERE id = ANY($1::int[]) AND status = 'submitted' FOR UPDATE`, [pay.entries_ids]);
+          if (open.length === 0) throw new HttpError(409, 'У платежі немає бійців, що чекають на оплату', 'nothing_to_pay');
+          const amount = open.length * pay.event_fee;
+          await run(
+            `UPDATE shingi_payments
+             SET provider = 'cash', status = 'success', amount_uah = $2, base_uah = $2, fee_uah = 0, paid_at = now(), marked_by = $3,
+                 note = trim(coalesce(note, '') || ' | замінено на готівку' || CASE WHEN $4::text IS NULL THEN '' ELSE ': ' || $4 END)
+             WHERE id = $1`,
+            [id, amount, actor(ctx), note],
+          );
+          await run(`UPDATE shingi_entries SET status = 'paid', updated_at = now() WHERE id = ANY($1::int[]) AND status = 'submitted'`, [pay.entries_ids]);
+          return;
+        }
+
+        if (pay.provider !== 'cash') throw new HttpError(409, 'Редагувати можна лише готівкові платежі', 'not_cash');
+
+        if (action === 'edit') {
+          if (pay.status !== 'success') throw new HttpError(409, 'Редагувати можна лише чинний платіж', 'not_active');
+          const amount = ctx.body?.amount_uah === undefined ? null : optionalInt(ctx.body.amount_uah, 'Сума', 0);
+          if (amount === null && note === null && ctx.body?.note === undefined) throw new HttpError(400, 'Вкажіть суму або примітку');
+          if (amount !== null && amount > 1_000_000) throw new HttpError(400, 'Сума завелика');
+          await run(
+            `UPDATE shingi_payments
+             SET amount_uah = COALESCE($2, amount_uah), base_uah = COALESCE($2, base_uah), fee_uah = 0,
+                 note = CASE WHEN $3::boolean THEN $4 ELSE note END, marked_by = $5
+             WHERE id = $1`,
+            [id, amount, ctx.body?.note !== undefined, note, actor(ctx)],
+          );
+          return;
+        }
+
+        // restore
+        if (pay.status !== 'reversed') throw new HttpError(409, 'Відновити можна лише скасований платіж', 'not_reversed');
+        await run(`UPDATE shingi_payments SET status = 'success', paid_at = now(), marked_by = $2 WHERE id = $1`, [id, actor(ctx)]);
+        await run(`UPDATE shingi_entries SET status = 'paid', updated_at = now() WHERE id = ANY($1::int[]) AND status = 'submitted'`, [pay.entries_ids]);
+      });
+      await logAction(actor(ctx), `payment.${action}`, 'payment', id);
+      return { ok: true };
+    },
+  },
+  {
+    // Прибрати зайвий запис: лише платежі без грошей (створено, помилка, прострочено, скасовано). Заявки не чіпаємо.
+    method: 'DELETE',
+    path: 'admin/payments/:id',
+    auth: 'admin',
+    handler: async (ctx) => {
+      const id = toInt(ctx.params.id);
+      if (id === null) throw new HttpError(400, 'Некоректний id');
+      const [pay] = await query<{ id: number; status: string; provider: string }>('SELECT id, status, provider FROM shingi_payments WHERE id = $1', [id]);
+      if (!pay) throw new HttpError(404, 'Платіж не знайдено');
+      if (pay.status === 'success') throw new HttpError(409, 'Чинний платіж видаляти не можна: спершу скасуйте його', 'is_success');
+      if (pay.status === 'processing') throw new HttpError(409, 'Банк ще обробляє платіж', 'processing');
+      await query('DELETE FROM shingi_payments WHERE id = $1', [id]);
+      await logAction(actor(ctx), 'payment.delete', 'payment', id, { status: pay.status, provider: pay.provider });
       return { ok: true };
     },
   },

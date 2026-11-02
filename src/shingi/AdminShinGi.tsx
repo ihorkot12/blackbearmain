@@ -230,15 +230,34 @@ const eventToForm = (e: EventRow) => ({
   notes: e.notes || '',
 });
 
-const EventTab = ({ event, onSaved, onCreated }: { event: EventRow; onSaved: () => void; onCreated: (id: number) => void }) => {
+const EventTab = ({ event, onSaved, onCreated, onDeleted }: { event: EventRow; onSaved: () => void; onCreated: (id: number) => void; onDeleted: () => void }) => {
   const [form, setForm] = useState(() => eventToForm(event));
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState({ title: 'SHIN GI · Kyokushin Open', slug: '', event_date: '' });
+  const [delOpen, setDelOpen] = useState(false);
+  const [delSlug, setDelSlug] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setForm(eventToForm(event));
   }, [event]);
+  useEffect(() => {
+    setDelOpen(false);
+    setDelSlug('');
+  }, [event.id]);
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      const res = await api<{ deleted_entries: number }>(`admin/events/${event.id}?confirm_slug=${encodeURIComponent(delSlug)}`, { method: 'DELETE' });
+      toast.success(`Подію видалено${res.deleted_entries ? `, разом із заявками: ${res.deleted_entries}` : ''}`);
+      onDeleted();
+    } catch (e) {
+      fail(e);
+    }
+    setDeleting(false);
+  };
   const set = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }));
   const c = event.counters;
 
@@ -394,6 +413,35 @@ const EventTab = ({ event, onSaved, onCreated }: { event: EventRow; onSaved: () 
           </div>
         </div>
       )}
+
+      <div className="rounded-3xl border border-red-500/20 bg-red-500/5 p-4 sm:p-6">
+        <h4 className="mb-2 text-[11px] font-black uppercase tracking-widest text-red-300">Видалення події</h4>
+        <p className="text-sm text-zinc-400">
+          Подія видаляється разом із її заявками{c ? ` (${c.fighters.total} бійців)` : ''}. Профілі тренерів і списки бійців у клубах лишаються.
+          Якщо в події вже є оплати, видалити її не вийде, щоб не втратити облік грошей: поставте статус «Скасовано».
+        </p>
+        {!delOpen ? (
+          <div className="mt-4">
+            <button className={btnSecondary} onClick={() => setDelOpen(true)}>Видалити подію…</button>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-3">
+            <Field label={`Для підтвердження введіть slug події: ${event.slug}`}>
+              <input className={input} value={delSlug} onChange={(e) => setDelSlug(e.target.value)} placeholder={event.slug} autoComplete="off" />
+            </Field>
+            <div className="flex flex-wrap gap-3">
+              <button
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={deleting || delSlug !== event.slug}
+                onClick={remove}
+              >
+                {deleting ? <RefreshCw size={14} className="animate-spin" /> : <X size={14} />} Видалити назавжди
+              </button>
+              <button className={btnSecondary} disabled={deleting} onClick={() => { setDelOpen(false); setDelSlug(''); }}>Скасувати</button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <BotCard />
     </div>
@@ -596,7 +644,8 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
 
   const patch: Patch = async (id, body) => {
     try {
-      const res = await api<{ entry: any }>(`admin/entries/${id}`, { method: 'PUT', body });
+      const res = await api<{ entry: any; cash_payment_created?: boolean }>(`admin/entries/${id}`, { method: 'PUT', body });
+      if (res.cash_payment_created) toast.success('Статус «Оплачено»: створено готівковий платіж');
       setRows((list) =>
         (list || []).map((r) =>
           r.id === id ? { ...r, ...res.entry, belt_cat: res.entry.belt in BELT_LABELS ? beltCategory(res.entry.belt) : r.belt_cat } : r,
@@ -605,6 +654,17 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
     } catch (e) {
       fail(e);
       load();
+    }
+  };
+
+  const remove = async (r: any) => {
+    if (!window.confirm(`Видалити заявку «${r.full_name}» (${r.club})? Сам боєць у списку клубу лишиться.`)) return;
+    try {
+      await api(`admin/entries/${r.id}`, { method: 'DELETE' });
+      setRows((list) => (list || []).filter((x) => x.id !== r.id));
+      toast.success('Заявку видалено');
+    } catch (e) {
+      fail(e);
     }
   };
 
@@ -674,6 +734,7 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
               <BeltSelect r={r} patch={patch} />
             </div>
             {r.group_key && <p className="mt-2 text-[11px] text-zinc-500">Група: {groupLabel(r.group_key)}</p>}
+            <div className="mt-3"><button className={btnSecondary} onClick={() => remove(r)}>Видалити заявку</button></div>
           </div>
         ))}
       </div>
@@ -685,7 +746,7 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
             <tr className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
               <th className="pb-3 pr-3">Клуб / тренер</th><th className="pb-3 pr-3">Боєць</th><th className="pb-3 pr-3">Ст.</th>
               <th className="pb-3 pr-3">Вік</th><th className="pb-3 pr-3">Кат.</th><th className="pb-3 pr-3">Статус</th>
-              <th className="pb-3 pr-3">Блок</th><th className="pb-3 pr-3">Вага</th><th className="pb-3 pr-3">Пояс</th><th className="pb-3">Група</th>
+              <th className="pb-3 pr-3">Блок</th><th className="pb-3 pr-3">Вага</th><th className="pb-3 pr-3">Пояс</th><th className="pb-3 pr-3">Група</th><th className="pb-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -700,7 +761,8 @@ const EntriesTab = ({ event }: { event: EventRow }) => {
                 <td className="py-2 pr-3"><BlockSelect r={r} patch={patch} /></td>
                 <td className="py-2 pr-3"><WeightInput r={r} patch={patch} /></td>
                 <td className="py-2 pr-3"><BeltSelect r={r} patch={patch} /></td>
-                <td className="py-2 text-[12px] text-zinc-500">{r.group_key ? groupLabel(r.group_key) : '—'}</td>
+                <td className="py-2 pr-3 text-[12px] text-zinc-500">{r.group_key ? groupLabel(r.group_key) : '—'}</td>
+                <td className="py-2"><button className={btnSecondary} onClick={() => remove(r)}>Видалити</button></td>
               </tr>
             ))}
           </tbody>
@@ -959,6 +1021,44 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
     }
   };
 
+  const [editPay, setEditPay] = useState<any | null>(null);
+  const [payBusy, setPayBusy] = useState(false);
+
+  const payAction = async (p: any, body: Record<string, unknown>, okText: string) => {
+    try {
+      await api(`admin/payments/${p.id}`, { method: 'PUT', body });
+      toast.success(okText);
+      load();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  const savePay = async () => {
+    if (!editPay) return;
+    setPayBusy(true);
+    try {
+      await api(`admin/payments/${editPay.id}`, { method: 'PUT', body: { action: 'edit', amount_uah: editPay.amount, note: editPay.noteText } });
+      toast.success('Платіж змінено');
+      setEditPay(null);
+      load();
+    } catch (e) {
+      fail(e);
+    }
+    setPayBusy(false);
+  };
+
+  const removePay = async (p: any) => {
+    if (!window.confirm(`Видалити запис платежу «${p.club}» (${PAYMENT_STATUS_LABELS[p.status] || p.status})? Заявки не зміняться.`)) return;
+    try {
+      await api(`admin/payments/${p.id}`, { method: 'DELETE' });
+      toast.success('Запис видалено');
+      load();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
   const byClub = useMemo(() => {
     const map = new Map<number, { club: string; coach: string; paid: number; pending: number; pendingFighters: any[] }>();
     for (const r of entries) {
@@ -979,8 +1079,8 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
     <div className="space-y-4">
       <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm text-zinc-300">
         Картка: тренер платить у кабінеті через Monobank, комісію банку сплачує платник, статус «Оплачено» ставиться сам.
-        Готівка: натисніть «Готівка» біля клубу — створиться платіж, і гроші потраплять у статистику.
-        Статус «Оплачено» у вкладці «Заявки» грошей в обліку не веде.
+        Готівка: натисніть «Готівка» біля клубу — створиться платіж, і гроші потраплять у статистику. Помилково відмічену готівку можна змінити,
+        скасувати або відновити; непрооплачений картковий рахунок — перетворити на готівку. Статус «Оплачено» в «Заявках» теж створює готівковий платіж.
       </div>
 
       <div className={card}>
@@ -1025,13 +1125,47 @@ const PaymentsTab = ({ event }: { event: EventRow }) => {
                 </div>
                 <Badge tone={PAYMENT_STATUS_TONE[p.status]}>{PAYMENT_STATUS_LABELS[p.status]}</Badge>
                 {p.provider === 'cash' && p.status === 'success' && (
-                  <button className={btnSecondary} onClick={() => reverse(p)}>Скасувати</button>
+                  <>
+                    <button className={btnSecondary} onClick={() => setEditPay({ ...p, amount: String(p.amount_uah), noteText: p.note || '' })}>Змінити</button>
+                    <button className={btnSecondary} onClick={() => reverse(p)}>Скасувати</button>
+                  </>
+                )}
+                {p.provider === 'cash' && p.status === 'reversed' && (
+                  <button className={btnSecondary} onClick={() => payAction(p, { action: 'restore' }, 'Платіж відновлено')}>Відновити</button>
+                )}
+                {p.provider === 'monobank' && ['created', 'failure', 'expired'].includes(p.status) && (
+                  <button
+                    className={btnSecondary}
+                    onClick={() => window.confirm(`Позначити платіж «${p.club}» як сплачений готівкою? Заявки стануть «Оплачено».`) && payAction(p, { action: 'to_cash' }, 'Платіж змінено на готівку')}
+                  >
+                    На готівку
+                  </button>
+                )}
+                {p.status !== 'success' && p.status !== 'processing' && (
+                  <button className={btnSecondary} onClick={() => removePay(p)}>Видалити</button>
                 )}
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {editPay && (
+        <Modal title={`Платіж · ${editPay.club}`} onClose={() => setEditPay(null)}>
+          <div className="space-y-3">
+            <Field label="Сума, грн" hint="Готівка без комісії; внесок і сума збігаються">
+              <input type="number" min={0} className={input} value={editPay.amount} onChange={(e) => setEditPay({ ...editPay, amount: e.target.value })} />
+            </Field>
+            <Field label="Примітка">
+              <input className={input} value={editPay.noteText} maxLength={300} onChange={(e) => setEditPay({ ...editPay, noteText: e.target.value })} />
+            </Field>
+            <div className="flex gap-3">
+              <button className={btnPrimary} disabled={payBusy} onClick={savePay}><CheckCircle2 size={14} /> Зберегти</button>
+              <button className={btnSecondary} onClick={() => setEditPay(null)}>Скасувати</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {cash && (
         <CashModal
@@ -1196,6 +1330,371 @@ const ExportTab = ({ event }: { event: EventRow }) => {
           {busy === 'csv' ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />} CSV (лише заявки)
         </button>
       </div>
+    </div>
+  );
+};
+
+/* ───────────── Клуби й бійці ───────────── */
+
+const Modal = ({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) => (
+  <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" onClick={onClose}>
+    <div className={`${card} max-h-[90vh] w-full max-w-lg overflow-y-auto`} onClick={(e) => e.stopPropagation()}>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <h4 className="text-lg font-black">{title}</h4>
+        <button className="text-zinc-500 hover:text-white" onClick={onClose} aria-label="Закрити"><X size={18} /></button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+const lower = (v: unknown) => String(v ?? '').toLowerCase();
+const uniq = (list: Array<string | null | undefined>) => [...new Set(list.filter((v): v is string => Boolean(v && v.trim())))].sort((a, b) => a.localeCompare(b, 'uk'));
+const DANGER_BTN =
+  'inline-flex items-center justify-center gap-2 rounded-xl bg-red-700 px-4 py-2.5 text-[11px] font-black uppercase tracking-widest text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40';
+
+const ClubsTab = ({ event }: { event: EventRow }) => {
+  const [clubs, setClubs] = useState<any[] | null>(null);
+  const [fighters, setFighters] = useState<any[]>([]);
+  const [view, setView] = useState<'clubs' | 'fighters'>('clubs');
+  const [q, setQ] = useState('');
+  const [fClub, setFClub] = useState('');
+  const [fFed, setFFed] = useState('');
+  const [fCity, setFCity] = useState('');
+  const [fBranch, setFBranch] = useState('');
+  const [fStatus, setFStatus] = useState('');
+  const [editClub, setEditClub] = useState<any | null>(null);
+  const [editFighter, setEditFighter] = useState<any | null>(null);
+  const [delClub, setDelClub] = useState<{ club: any; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const [c, f] = await Promise.all([
+        api<{ clubs: any[] }>(`admin/clubs?event_id=${event.id}`),
+        api<{ fighters: any[] }>(`admin/fighters?event_id=${event.id}`),
+      ]);
+      setClubs(c.clubs);
+      setFighters(f.fighters);
+    } catch (e) {
+      fail(e);
+      setClubs([]);
+      setFighters([]);
+    }
+  }, [event.id]);
+  useEffect(() => {
+    setClubs(null);
+    load();
+  }, [load]);
+
+  const facets = useMemo(() => {
+    const src = clubs || [];
+    return {
+      clubs: uniq(src.map((c) => c.club)),
+      feds: uniq(src.map((c) => c.federation)),
+      cities: uniq(src.map((c) => c.city)),
+      branches: uniq(src.map((c) => c.branch)),
+    };
+  }, [clubs]);
+
+  const tokens = lower(q).split(/\s+/).filter(Boolean);
+  const matchesSearch = (haystack: string) => tokens.every((t) => haystack.includes(t));
+  const matchesFacets = (r: any) =>
+    (!fClub || r.club === fClub) && (!fFed || r.federation === fFed) && (!fCity || r.city === fCity) && (!fBranch || r.branch === fBranch);
+
+  const shownClubs = useMemo(
+    () => (clubs || []).filter((c) => matchesFacets(c) && matchesSearch(lower([c.club, c.branch, c.coach_full_name, c.federation, c.city, c.phone, c.tg_username].join(' ')))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [clubs, q, fClub, fFed, fCity, fBranch],
+  );
+  const shownFighters = useMemo(
+    () =>
+      fighters.filter((f) => {
+        if (!matchesFacets(f)) return false;
+        const st = f.entry_status;
+        if (fStatus === 'entered' && !['submitted', 'paid', 'fought'].includes(st)) return false;
+        if (fStatus === 'unpaid' && st !== 'submitted') return false;
+        if (fStatus === 'paid' && st !== 'paid') return false;
+        if (fStatus === 'none' && ['submitted', 'paid', 'fought'].includes(st)) return false;
+        return matchesSearch(lower([f.full_name, f.club, f.branch, f.coach_full_name, f.federation, f.city, beltLabel(f.belt)].join(' ')));
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [fighters, q, fClub, fFed, fCity, fBranch, fStatus],
+  );
+
+  const saveClub = async () => {
+    if (!editClub) return;
+    setBusy(true);
+    try {
+      const { id, club, branch, coach_full_name, federation, city, phone, role } = editClub;
+      await api(`admin/clubs/${id}`, { method: 'PUT', body: { club, branch, coach_full_name, federation, city, phone, role } });
+      toast.success('Клуб збережено');
+      setEditClub(null);
+      load();
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+
+  const removeClub = async () => {
+    if (!delClub) return;
+    setBusy(true);
+    try {
+      const res = await api<{ deleted_fighters: number; deleted_entries: number }>(
+        `admin/clubs/${delClub.club.id}?confirm_club=${encodeURIComponent(delClub.text)}`,
+        { method: 'DELETE' },
+      );
+      toast.success(`Клуб видалено (бійців: ${res.deleted_fighters}, заявок: ${res.deleted_entries})`);
+      setDelClub(null);
+      load();
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+
+  const saveFighter = async () => {
+    if (!editFighter) return;
+    setBusy(true);
+    try {
+      const f = editFighter;
+      await api(`admin/fighters/${f.id}`, {
+        method: 'PUT',
+        body: {
+          full_name: f.full_name,
+          sex: f.sex,
+          birth_date: f.birth_date ? String(f.birth_date).slice(0, 10) : null,
+          age_years: f.age_years === '' || f.age_years === null ? null : Number(f.age_years),
+          weight_kg: Number(f.weight_kg),
+          belt: f.belt,
+          guardian_name: f.guardian_name || null,
+          guardian_phone: f.guardian_phone || null,
+          notes: f.notes || null,
+        },
+      });
+      toast.success('Бійця збережено');
+      setEditFighter(null);
+      load();
+    } catch (e) {
+      fail(e);
+    }
+    setBusy(false);
+  };
+
+  const removeFighter = async (f: any) => {
+    if (!window.confirm(`Видалити бійця «${f.full_name}» (${f.club || 'клуб'}) разом із його заявками?`)) return;
+    try {
+      await api(`admin/fighters/${f.id}`, { method: 'DELETE' });
+      toast.success('Бійця видалено');
+      load();
+    } catch (e) {
+      fail(e);
+    }
+  };
+
+  if (!clubs) return <Loading />;
+
+  const reset = () => {
+    setQ('');
+    setFClub('');
+    setFFed('');
+    setFCity('');
+    setFBranch('');
+    setFStatus('');
+  };
+  const filtersOn = Boolean(q || fClub || fFed || fCity || fBranch || fStatus);
+
+  return (
+    <div className="space-y-4">
+      <div className={`${card} space-y-3`}>
+        <div className="flex flex-wrap items-center gap-2">
+          {(['clubs', 'fighters'] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={`rounded-xl px-4 py-2 text-[11px] font-black uppercase tracking-widest ${view === v ? 'bg-red-600 text-white' : 'bg-zinc-900/50 text-zinc-400 hover:text-white'}`}
+            >
+              {v === 'clubs' ? `Клуби (${clubs.length})` : `Бійці (${fighters.length})`}
+            </button>
+          ))}
+          <button className={`${btnSecondary} ml-auto`} onClick={load}><RefreshCw size={14} /> Оновити</button>
+        </div>
+        <input
+          className={input}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={view === 'clubs' ? 'Пошук: клуб, бранч, тренер, федерація, місто, телефон, @telegram' : 'Пошук бійця: прізвище, клуб, бранч, тренер, федерація, місто, пояс'}
+        />
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <select className={input} value={fClub} onChange={(e) => setFClub(e.target.value)} aria-label="Клуб">
+            <option value="">Усі клуби</option>
+            {facets.clubs.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <select className={input} value={fBranch} onChange={(e) => setFBranch(e.target.value)} aria-label="Бранч">
+            <option value="">Усі бранчі</option>
+            {facets.branches.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <select className={input} value={fFed} onChange={(e) => setFFed(e.target.value)} aria-label="Федерація">
+            <option value="">Усі федерації</option>
+            {facets.feds.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <select className={input} value={fCity} onChange={(e) => setFCity(e.target.value)} aria-label="Місто">
+            <option value="">Усі міста</option>
+            {facets.cities.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+          {view === 'fighters' && (
+            <select className={input} value={fStatus} onChange={(e) => setFStatus(e.target.value)} aria-label="Стан у заході">
+              <option value="">Будь-який стан</option>
+              <option value="entered">У заявці на захід</option>
+              <option value="unpaid">Очікує оплати</option>
+              <option value="paid">Оплачено</option>
+              <option value="none">Не подані на захід</option>
+            </select>
+          )}
+        </div>
+        <p className="text-[12px] text-zinc-500">
+          Показано {view === 'clubs' ? `${shownClubs.length} з ${clubs.length}` : `${shownFighters.length} з ${fighters.length}`}
+          {filtersOn && <button className="ml-3 underline hover:text-white" onClick={reset}>Скинути фільтри</button>}
+        </p>
+      </div>
+
+      {view === 'clubs' ? (
+        <div className="space-y-3">
+          {shownClubs.length === 0 && <div className={`${card} text-center text-zinc-500`}>Нічого не знайдено</div>}
+          {shownClubs.map((c) => (
+            <div key={c.id} className={card}>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-black">{c.club || '—'}{c.branch ? <span className="font-normal text-zinc-400"> · {c.branch}</span> : null}</p>
+                  <p className="truncate text-[12px] text-zinc-400">{c.coach_full_name || '—'}{c.tg_username ? ` · @${c.tg_username}` : ''}{c.phone ? ` · ${c.phone}` : ''}</p>
+                  <p className="text-[12px] text-zinc-500">{[c.federation, c.city, c.role === 'solo' ? 'одиночний боєць' : 'тренер'].filter(Boolean).join(' · ')}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                  <Badge tone={ENTRY_STATUS_TONE.draft}>Бійців: {c.fighters}</Badge>
+                  <Badge tone={ENTRY_STATUS_TONE.submitted}>У заявці: {c.entries}</Badge>
+                  {c.paid_uah > 0 && <Badge tone={ENTRY_STATUS_TONE.paid}>Сплачено: {fmtMoney(c.paid_uah)}</Badge>}
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button className={btnSecondary} onClick={() => { setView('fighters'); reset(); setFClub(c.club || ''); }}>Бійці клубу</button>
+                <button className={btnSecondary} onClick={() => setEditClub({ ...c })}>Редагувати</button>
+                {!c.is_admin && <button className={btnSecondary} onClick={() => setDelClub({ club: c, text: '' })}>Видалити…</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          {shownFighters.length === 0 && <div className={`${card} text-center text-zinc-500`}>Нічого не знайдено</div>}
+          <div className="space-y-2">
+            {shownFighters.map((f) => (
+              <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/5 bg-zinc-900/30 p-3 text-sm">
+                <div className="min-w-0">
+                  <p className="truncate font-bold">{f.full_name} <span className="font-normal text-zinc-500">· {f.sex === 'm' ? 'Ч' : 'Ж'} · {f.birth_date ? String(f.birth_date).slice(0, 4) + ' р.н.' : `${f.age_years} р.`} · {f.weight_kg} кг · {beltLabel(f.belt)}</span></p>
+                  <p className="truncate text-[12px] text-zinc-400">{f.club || '—'}{f.branch ? ` · ${f.branch}` : ''}{f.federation ? ` · ${f.federation}` : ''} · {f.coach_full_name || '—'}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {f.entry_status ? (
+                    <Badge tone={ENTRY_STATUS_TONE[f.entry_status]}>{event.fee_uah === 0 && f.entry_status === 'submitted' ? 'Прийнято' : ENTRY_STATUS_LABELS[f.entry_status]}{f.block ? ` · ${f.block === 'kids' ? 'Kids' : 'Open'}` : ''}</Badge>
+                  ) : (
+                    <span className="text-[11px] uppercase tracking-widest text-zinc-600">не подано</span>
+                  )}
+                  <button className={btnSecondary} onClick={() => setEditFighter({ ...f, birth_date: f.birth_date ? String(f.birth_date).slice(0, 10) : '', age_years: f.age_years ?? '' })}>Редагувати</button>
+                  <button className={btnSecondary} onClick={() => removeFighter(f)}>Видалити</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {editClub && (
+        <Modal title="Редагувати клуб" onClose={() => setEditClub(null)}>
+          <div className="space-y-3">
+            <Field label="Клуб"><input className={input} value={editClub.club || ''} onChange={(e) => setEditClub({ ...editClub, club: e.target.value })} /></Field>
+            <Field label="Бранч / філія" hint="Для пошуку й фільтрів"><input className={input} value={editClub.branch || ''} onChange={(e) => setEditClub({ ...editClub, branch: e.target.value })} /></Field>
+            <Field label="Тренер"><input className={input} value={editClub.coach_full_name || ''} onChange={(e) => setEditClub({ ...editClub, coach_full_name: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Федерація"><input className={input} value={editClub.federation || ''} onChange={(e) => setEditClub({ ...editClub, federation: e.target.value })} /></Field>
+              <Field label="Місто"><input className={input} value={editClub.city || ''} onChange={(e) => setEditClub({ ...editClub, city: e.target.value })} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Телефон"><input className={input} value={editClub.phone || ''} onChange={(e) => setEditClub({ ...editClub, phone: e.target.value })} /></Field>
+              <Field label="Роль">
+                <select className={input} value={editClub.role || 'coach'} onChange={(e) => setEditClub({ ...editClub, role: e.target.value })}>
+                  <option value="coach">Тренер</option>
+                  <option value="solo">Одиночний боєць</option>
+                </select>
+              </Field>
+            </div>
+            <div className="flex gap-3">
+              <button className={btnPrimary} disabled={busy} onClick={saveClub}><CheckCircle2 size={14} /> Зберегти</button>
+              <button className={btnSecondary} onClick={() => setEditClub(null)}>Скасувати</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {editFighter && (
+        <Modal title="Редагувати бійця" onClose={() => setEditFighter(null)}>
+          <div className="space-y-3">
+            <Field label="Прізвище та ім'я"><input className={input} value={editFighter.full_name || ''} onChange={(e) => setEditFighter({ ...editFighter, full_name: e.target.value })} /></Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Стать">
+                <select className={input} value={editFighter.sex} onChange={(e) => setEditFighter({ ...editFighter, sex: e.target.value })}>
+                  <option value="m">Чоловіча</option>
+                  <option value="f">Жіноча</option>
+                </select>
+              </Field>
+              <Field label="Вага, кг"><input type="number" step="0.1" className={input} value={editFighter.weight_kg ?? ''} onChange={(e) => setEditFighter({ ...editFighter, weight_kg: e.target.value })} /></Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Дата народження"><input type="date" className={input} value={editFighter.birth_date || ''} onChange={(e) => setEditFighter({ ...editFighter, birth_date: e.target.value })} /></Field>
+              <Field label="Вік (якщо немає дати)"><input type="number" className={input} value={editFighter.age_years ?? ''} onChange={(e) => setEditFighter({ ...editFighter, age_years: e.target.value })} /></Field>
+            </div>
+            <Field label="Пояс">
+              <select className={input} value={editFighter.belt} onChange={(e) => setEditFighter({ ...editFighter, belt: e.target.value })}>
+                {BELT_CODES.map((b) => <option key={b} value={b}>{BELT_LABELS[b as BeltCode]}</option>)}
+              </select>
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Опікун"><input className={input} value={editFighter.guardian_name || ''} onChange={(e) => setEditFighter({ ...editFighter, guardian_name: e.target.value })} /></Field>
+              <Field label="Телефон опікуна"><input className={input} value={editFighter.guardian_phone || ''} onChange={(e) => setEditFighter({ ...editFighter, guardian_phone: e.target.value })} /></Field>
+            </div>
+            <Field label="Нотатки"><input className={input} value={editFighter.notes || ''} onChange={(e) => setEditFighter({ ...editFighter, notes: e.target.value })} /></Field>
+            <p className="text-[12px] text-zinc-500">Вага, пояс і блок оновляться в неоплачених заявках; в оплачених лишаються як були.</p>
+            <div className="flex gap-3">
+              <button className={btnPrimary} disabled={busy} onClick={saveFighter}><CheckCircle2 size={14} /> Зберегти</button>
+              <button className={btnSecondary} onClick={() => setEditFighter(null)}>Скасувати</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {delClub && (
+        <Modal title="Видалити клуб" onClose={() => setDelClub(null)}>
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-400">
+              Буде видалено клуб <b className="text-white">{delClub.club.club || delClub.club.coach_full_name}</b> разом із його бійцями ({delClub.club.fighters}) і заявками.
+              Якщо в клубу є оплати, видалити не вийде, щоб не втратити облік грошей.
+            </p>
+            <Field label={`Для підтвердження введіть назву: ${delClub.club.club || delClub.club.coach_full_name}`}>
+              <input className={input} value={delClub.text} onChange={(e) => setDelClub({ ...delClub, text: e.target.value })} autoComplete="off" />
+            </Field>
+            <div className="flex gap-3">
+              <button
+                className={DANGER_BTN}
+                disabled={busy || lower(delClub.text).trim() !== lower(delClub.club.club || delClub.club.coach_full_name).trim()}
+                onClick={removeClub}
+              >
+                <X size={14} /> Видалити назавжди
+              </button>
+              <button className={btnSecondary} onClick={() => setDelClub(null)}>Скасувати</button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
@@ -1448,6 +1947,7 @@ const BroadcastsTab = ({ event }: { event: EventRow }) => {
 const SUBTABS: Array<{ id: string; label: string; disabled?: string }> = [
   { id: 'event', label: 'Подія' },
   { id: 'entries', label: 'Заявки' },
+  { id: 'clubs', label: 'Клуби й бійці' },
   { id: 'groups', label: 'Групи' },
   { id: 'payments', label: 'Оплати' },
   { id: 'stats', label: 'Статистика' },
@@ -1518,8 +2018,19 @@ export const AdminShinGi = () => {
         <div className={`${card} text-center text-zinc-500`}>Подій ще немає</div>
       ) : (
         <>
-          {tab === 'event' && <EventTab event={event} onSaved={() => load()} onCreated={(id) => load(id)} />}
+          {tab === 'event' && (
+            <EventTab
+              event={event}
+              onSaved={() => load()}
+              onCreated={(id) => load(id)}
+              onDeleted={() => {
+                setEventId(null);
+                load();
+              }}
+            />
+          )}
           {tab === 'entries' && <EntriesTab event={event} />}
+          {tab === 'clubs' && <ClubsTab event={event} />}
           {tab === 'groups' && <GroupsTab event={event} onChanged={() => load()} />}
           {tab === 'payments' && <PaymentsTab event={event} />}
           {tab === 'stats' && <StatsTab event={event} />}

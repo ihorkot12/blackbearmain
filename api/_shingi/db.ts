@@ -136,6 +136,8 @@ const SCHEMA_SQL = `
   -- вид внеску події: fee | charity | custom (підпис у fee_label); сума 0 = безкоштовно
   ALTER TABLE shingi_events ADD COLUMN IF NOT EXISTS fee_kind TEXT NOT NULL DEFAULT 'fee';
   ALTER TABLE shingi_events ADD COLUMN IF NOT EXISTS fee_label TEXT;
+  -- філія / бранч клубу (вказує адмін): для пошуку й фільтрів
+  ALTER TABLE shingi_profiles ADD COLUMN IF NOT EXISTS branch TEXT;
 
   CREATE TABLE IF NOT EXISTS shingi_messages (
     id SERIAL PRIMARY KEY,
