@@ -533,7 +533,6 @@
 
     document.documentElement.classList.remove(ROLE_CLASS);
     restoreCoachHidden();
-    if (isAdmin()) mountAdminInstagramWidget();
   };
 
   let scheduled = 0;

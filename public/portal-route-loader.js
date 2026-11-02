@@ -36,13 +36,6 @@
       loadScript('/admin-coach-telegram.js');
       loadScript('/admin-coach-contact.js');
       loadScript('/admin-dashboard-organizer.js');
-      loadScript('/admin-instagram-fix.js');
-      loadScript('/admin-instagram-account-picker.js');
-      loadScript('/admin-smm-repair-v2.js');
-      loadScript('/admin-smm-save-router.js');
-      loadScript('/admin-smm-controls-fix.js');
-      loadScript('/admin-smm-mobile-fix.js');
-      loadScript('/admin-smm-layout-fix.js');
     }
   };
 

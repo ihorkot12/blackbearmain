@@ -16,7 +16,6 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast, Toaster } from 'sonner';
-import { SMMModule } from './components/SMMModule';
 import { BELT_OPTIONS, getBeltColorClass, hasSilverStripe, normalizeBeltName } from './belts';
 import KarateManual from './KarateManual';
 import { HomeworkCoachModule } from './HomeworkModules';
@@ -954,7 +953,6 @@ export const AdminPage = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [botUsername, setBotUsername] = useState('karatekyivbot');
   const [coachData, setCoachData] = useState<any>(null);
-  const [isInstagramConnected, setIsInstagramConnected] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
   const [isBugReportOpen, setIsBugReportOpen] = useState(false);
   const [bugReportText, setBugReportText] = useState('');
@@ -969,70 +967,7 @@ export const AdminPage = () => {
       .then(r => r.json())
       .then(data => setBotUsername(data.botUsername))
       .catch(e => console.log(e));
-    
-    checkInstagramStatus();
   }, [authChecked]);
-
-  const checkInstagramStatus = async () => {
-    const token = localStorage.getItem('admin_token');
-    try {
-      const res = await fetch('/api/instagram/status', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-      if (data.connected) {
-        setIsInstagramConnected(true);
-      }
-    } catch (e) {
-      console.error('Failed to check IG status', e);
-    }
-  };
-
-  const connectInstagram = async () => {
-    const token = localStorage.getItem('admin_token');
-    try {
-      const res = await fetch('/api/auth/instagram/url?action=connect', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const { url } = await res.json();
-      
-      const width = 600;
-      const height = 700;
-      const left = window.screen.width / 2 - width / 2;
-      const top = window.screen.height / 2 - height / 2;
-      
-      const popup = window.open(
-        url,
-        'InstagramLogin',
-        `width=${width},height=${height},left=${left},top=${top}`
-      );
-
-      if (!popup) {
-        toast.error('Будь ласка, дозвольте спливаючі вікна');
-        return;
-      }
-
-      const checkPopup = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkPopup);
-          checkInstagramStatus();
-        }
-      }, 1000);
-    } catch (e) {
-      toast.error('Помилка отримання посилання для авторизації');
-    }
-  };
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data === 'instagram_connected') {
-        setIsInstagramConnected(true);
-        toast.success('Instagram акаунт успішно підключено!');
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
 
   useEffect(() => {
     if (coachId) {
@@ -1131,7 +1066,7 @@ export const AdminPage = () => {
   }, [navigate]);
 
   const handleQuickAction = (tab: string, action?: string) => {
-    if (role === 'coach' && ['leads', 'registrations', 'content', 'coaches', 'settings', 'admin_users', 'smm', 'notifications', 'audit_logs'].includes(tab)) {
+    if (role === 'coach' && ['leads', 'registrations', 'content', 'coaches', 'settings', 'admin_users', 'notifications', 'audit_logs'].includes(tab)) {
       setInitialAction(null);
       setActiveTab('today');
       setIsMobileMenuOpen(false);
@@ -1219,7 +1154,6 @@ export const AdminPage = () => {
       items: [
         { id: 'leads', label: 'Заявки', icon: MessageSquare, roles: ['admin'] },
         { id: 'crm', label: 'CRM & Фінанси', icon: BarChart3, roles: ['admin', 'coach'] },
-        { id: 'smm', label: 'SMM Agency', icon: Sparkles, roles: ['admin'] },
         { id: 'shingi', label: 'SHIN GI', icon: Trophy, roles: ['admin'] },
         { id: 'content', label: 'Конструктор', icon: Settings, roles: ['admin'] },
         { id: 'coaches', label: 'Тренери', icon: Users, roles: ['admin'] },
@@ -1486,23 +1420,6 @@ export const AdminPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-3">
-              {isInstagramConnected ? (
-                <div className="flex items-center gap-2 text-pink-500 text-[10px] font-black uppercase tracking-widest bg-pink-500/10 px-4 py-2 rounded-xl border border-pink-500/20">
-                  <ImageIcon size={14} />
-                  <span>Instagram OK</span>
-                </div>
-              ) : (
-                <button 
-                  onClick={connectInstagram}
-                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all shadow-lg shadow-pink-600/20"
-                >
-                  <ImageIcon size={14} />
-                  <span>Підключити Instagram</span>
-                </button>
-              )}
-            </div>
-
             {role === 'coach' && coachId && (
               <div className="hidden md:flex items-center gap-3">
                 {coachData?.telegram_chat_id ? (
@@ -1552,7 +1469,6 @@ export const AdminPage = () => {
               className="bb-motion-page"
             >
               {activeTab === 'dashboard' && <Dashboard onQuickAction={handleQuickAction} role={role} coachId={coachId} />}
-              {activeTab === 'smm' && <SMMModule />}
               {activeTab === 'shingi' && role === 'admin' && <AdminShinGi />}
               {activeTab === 'content' && <ContentEditor initialAction={initialAction} onActionComplete={() => setInitialAction(null)} />}
               {activeTab === 'audit_logs' && <AuditLogsViewer />}
