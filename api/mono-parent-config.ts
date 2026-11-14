@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 import pkg from 'pg';
 import { parseFeePercent } from './_shared/card-fee.js';
 import { DISCOUNT_REASON_LABELS, discountedMonthly, parentDiscount, parseDiscountPercent } from './_shared/parent-pricing.js';
+import { buildParentCardHtml, widgetFits, widgetsEnabled, type ParentCardKid } from './_shared/tg-widgets.js';
 
 const { Pool } = pkg;
 
@@ -1090,14 +1091,11 @@ async function getParticipantIdsForChat(chatId: string) {
 
 function mainReplyKeyboard() {
   return {
+    // Мінімальне меню: щоденне — тут, рідкісне — під «Ще». Старі підписи кнопок теж обробляються.
     keyboard: [
-      [{ text: 'Мої діти / Мій профіль' }, { text: 'Домашні завдання' }],
-      [{ text: 'Методичка' }, { text: 'Розклад' }],
-      [{ text: 'Оплата' }, { text: 'Прогрес' }],
-      [{ text: 'Рейтинг' }, { text: 'Зв’язок з тренером' }],
-      [{ text: 'Сповіщення' }, { text: 'Відкрити кабінет' }],
-      [{ text: 'Instagram' }, { text: 'Facebook' }],
-      [{ text: 'Відключити Telegram' }],
+      [{ text: 'Картка' }, { text: 'Розклад' }],
+      [{ text: 'Оплата' }, { text: 'Домашні завдання' }],
+      [{ text: 'Зв’язок з тренером' }, { text: 'Ще' }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -1353,15 +1351,123 @@ function homeworkStatusLabel(status: unknown) {
 async function sendTelegramMenu(chatId: string, intro?: string) {
   await sendParentTelegram(
     chatId,
-    `${intro ? `${intro}\n\n` : ''}Оберіть потрібний розділ нижче.\n\nПідписуйтесь на клуб в Instagram і Facebook - там фото, відео, новини, змагання та атестації.`,
+    `${intro ? `${intro}\n\n` : ''}Оберіть розділ у меню нижче. «Картка» — головне про дитину одним екраном.`,
     mainReplyKeyboard()
   );
+}
+
+const MONTH_LOCATIVE = ['січні', 'лютому', 'березні', 'квітні', 'травні', 'червні', 'липні', 'серпні', 'вересні', 'жовтні', 'листопаді', 'грудні'];
+
+function shortDay(value: unknown) {
+  const v = String(value || '').trim().toLowerCase().replace(/[ʼ’']/g, '');
+  const map: Array<[string, string]> = [['пон', 'Пн'], ['вів', 'Вт'], ['сер', 'Ср'], ['чет', 'Чт'], ['пят', 'Пт'], ['суб', 'Сб'], ['нед', 'Нд']];
+  for (const [prefix, label] of map) if (v.startsWith(prefix)) return label;
+  return String(value || '').trim();
+}
+
+const shortTime = (value: unknown) => String(value || '').trim().slice(0, 5);
+
+async function buildParentCardKids(participants: any[]): Promise<ParentCardKid[]> {
+  if (!pool || participants.length === 0) return [];
+  const ids = participants.map((p: any) => Number(p.id));
+  const [visits, schedule] = await Promise.all([
+    pool.query(
+      `SELECT participant_id, COUNT(*) FILTER (WHERE status IN ('present', 'late'))::int AS visits
+       FROM attendance
+       WHERE participant_id = ANY($1::int[])
+         AND date >= date_trunc('month', (now() AT TIME ZONE 'Europe/Kyiv'))::date
+       GROUP BY participant_id`,
+      [ids]
+    ),
+    pool.query(
+      `SELECT DISTINCT p.id AS participant_id, s.day_of_week, s.start_time, s.end_time
+       FROM participants p
+       JOIN groups g ON g.id = p.group_id
+       JOIN schedule s ON (
+         LOWER(TRIM(COALESCE(s.group_name, ''))) = LOWER(TRIM(COALESCE(g.name, '')))
+         OR LOWER(COALESCE(s.group_name, '')) LIKE '%' || LOWER(COALESCE(g.name, '')) || '%'
+         OR LOWER(COALESCE(g.name, '')) LIKE '%' || LOWER(COALESCE(s.group_name, '')) || '%'
+       )
+       WHERE p.id = ANY($1::int[])`,
+      [ids]
+    ),
+  ]);
+  const visitsById = new Map(visits.rows.map((row: any) => [Number(row.participant_id), Number(row.visits || 0)]));
+  const order = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'];
+  const scheduleById = new Map<number, Array<{ day: string; line: string }>>();
+  for (const row of schedule.rows) {
+    const day = shortDay(row.day_of_week);
+    const time = `${shortTime(row.start_time)}${row.end_time ? `–${shortTime(row.end_time)}` : ''}`;
+    const list = scheduleById.get(Number(row.participant_id)) || [];
+    list.push({ day, line: `${day} ${time}`.trim() });
+    scheduleById.set(Number(row.participant_id), list);
+  }
+  const { month } = getKyivDateParts();
+  return participants.map((p: any) => {
+    const lines = (scheduleById.get(Number(p.id)) || [])
+      .sort((a, b) => order.indexOf(a.day) - order.indexOf(b.day) || a.line.localeCompare(b.line))
+      .map((item) => item.line);
+    return {
+      id: Number(p.id),
+      name: String(p.name || ''),
+      belt: p.belt || 'Білий',
+      points: Number(p.rank_points || 0),
+      group: p.group_name || null,
+      coach: p.coach_name || null,
+      location: p.location_name || null,
+      schedule: lines,
+      visits: visitsById.get(Number(p.id)) || 0,
+      month: MONTH_LOCATIVE[(month - 1 + 12) % 12],
+      payment: participantPaymentLabel(p),
+      paid: isAttendanceFreezeActive(p) ? 'freeze' : isPaidStatus(p.payment_status),
+    };
+  });
+}
+
+/** Картка дитини HTML-віджетом (Bot API 10.4). false — віджет не відправлено, треба текстовий варіант. */
+async function sendTelegramProfileWidget(chatId: string, participants: any[]) {
+  if (!widgetsEnabled() || participants.length === 0) return false;
+  try {
+    const kids = await buildParentCardKids(participants);
+    const html = buildParentCardHtml(kids);
+    const fit = widgetFits(html);
+    if (!fit.ok) {
+      console.warn('Parent card widget too large:', fit);
+      return false;
+    }
+    const base = getPortalBaseUrl();
+    const result = await callParentTelegram('sendWidget', {
+      chat_id: chatId,
+      html,
+      caption: kids.length === 1 ? `Картка: ${kids[0].name}` : 'Картки дітей',
+      reply_markup: inlineRowsKeyboard([[
+        { text: 'Оплата', url: `${base}/parent?tab=payments` },
+        { text: 'Кабінет', url: `${base}/parent` },
+      ]]),
+    });
+    if (!result.ok) console.warn('Parent card widget failed:', (result as any).description);
+    return Boolean(result.ok);
+  } catch (error) {
+    console.error('Parent card widget error:', error);
+    return false;
+  }
+}
+
+async function sendTelegramMore(chatId: string) {
+  const base = getPortalBaseUrl();
+  await sendParentTelegram(chatId, 'Інші розділи:', inlineRowsKeyboard([
+    [{ text: 'Прогрес', callback_data: 'm:progress' }, { text: 'Рейтинг', callback_data: 'm:rating' }],
+    [{ text: 'Методичка', callback_data: 'm:manual' }, { text: 'Сповіщення', callback_data: 'm:notifications' }],
+    [{ text: 'Instagram / Facebook', callback_data: 'm:social' }, { text: 'Кабінет', url: `${base}/parent` }],
+    [{ text: 'Відключити Telegram', callback_data: 'm:stop' }],
+  ]));
 }
 
 async function sendTelegramProfile(chatId: string) {
   const ids = await requireTelegramConnection(chatId);
   if (ids.length === 0) return;
   const participants = await fetchTelegramParticipants(ids);
+  if (await sendTelegramProfileWidget(chatId, participants)) return;
   const hasChildren = participants.some((p: any) => p.member_type !== 'adult');
   const title = hasChildren ? 'Ваші діти в BLACK BEAR DOJO' : 'Ваш профіль BLACK BEAR DOJO';
   const lines = participants.map((p: any) => [
@@ -1669,6 +1775,21 @@ async function handleTelegramCallback(chatId: string, data: string, callbackQuer
     return;
   }
 
+  if (data.startsWith('m:')) {
+    await answerParentTelegramCallback(callbackQueryId);
+    const section = data.slice(2);
+    if (section === 'progress') return sendTelegramProgress(chatId);
+    if (section === 'rating') return sendTelegramRatings(chatId);
+    if (section === 'manual') return sendTelegramManual(chatId);
+    if (section === 'notifications') return sendTelegramNotifications(chatId);
+    if (section === 'social') return sendTelegramSocialLinks(chatId);
+    if (section === 'stop') {
+      await disableTelegramChat(chatId);
+      await sendParentTelegram(chatId, 'Telegram-сповіщення вимкнено для цього чату. Інші підключені батьки або учасники залишаються підключеними.');
+      return;
+    }
+  }
+
   await answerParentTelegramCallback(callbackQueryId, 'Кнопка застаріла');
   await sendTelegramMenu(chatId, 'Оновив меню.');
 }
@@ -1694,6 +1815,7 @@ async function handleTelegramMessage(chatId: string, text: string, from: any) {
       user: from,
     });
     await sendTelegramMenu(chatId, 'Telegram підключено до кабінету BLACK BEAR DOJO. Тут будуть тільки важливі персональні повідомлення: ДЗ, оплата, повідомлення тренера та важливі оголошення.');
+    await sendTelegramProfile(chatId);
     return;
   }
 
@@ -1704,7 +1826,8 @@ async function handleTelegramMessage(chatId: string, text: string, from: any) {
   }
 
   if (normalized === '/menu' || normalized === 'Меню') return sendTelegramMenu(chatId);
-  if (normalized === 'Мої діти / Мій профіль') return sendTelegramProfile(chatId);
+  if (normalized === 'Картка' || normalized === 'Мої діти / Мій профіль' || normalized === '/card') return sendTelegramProfile(chatId);
+  if (normalized === 'Ще' || normalized === '/more') return sendTelegramMore(chatId);
   if (normalized === 'Домашні завдання') return sendTelegramHomework(chatId);
   if (normalized === 'Методичка') return sendTelegramManual(chatId);
   if (normalized === 'Розклад') return sendTelegramSchedule(chatId);
