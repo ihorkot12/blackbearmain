@@ -21,6 +21,16 @@ import {
   type HomeworkLibraryExercise,
 } from './_homeworkLibrary.js';
 import shingiHandler from './_shingi/handler.js';
+import {
+  attendanceChatData,
+  attendanceState,
+  buildCoachAttendanceHtml,
+  isMarkableDate,
+  parseCoachWidgetRequest,
+  stateFits,
+  widgetFits,
+  widgetsEnabled,
+} from './_shared/tg-widgets.js';
 const { Pool } = pkg;
 
 dotenv.config();
@@ -2130,7 +2140,7 @@ async function startServer() {
           ],
           ...participantRows,
           [
-            { text: 'Оновити', callback_data: `c:g:${groupId}` },
+            { text: 'Оновити', callback_data: `c:g:${groupId}:t` },
             { text: 'Всі групи', callback_data: 'c:groups' }
           ],
           [{ text: 'Редагувати в порталі', url: getCoachPortalUrl(req, 'today', 'mark_attendance', { groupId }) }]
@@ -2138,6 +2148,154 @@ async function startServer() {
       },
       messageId
     );
+  }
+
+  // ── HTML-віджет відмітки групи (Bot API 10.4). Текстові кнопки нижче лишаються запасним шляхом. ──
+  async function callCoachTelegramApi(method: string, payload: Record<string, any>) {
+    const token = getCoachTelegramBotToken();
+    if (!token) return { ok: false, description: 'missing_token' } as any;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify(payload)
+      });
+      const data: any = await response.json().catch(() => ({}));
+      return { ok: Boolean(data?.ok), result: data?.result, description: data?.description } as any;
+    } catch (e: any) {
+      return { ok: false, description: String(e?.message || e) } as any;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async function fetchCoachGroupAttendanceState(groupId: number, date: string) {
+    const result = await pool.query(`
+      SELECT p.id, a.status
+      FROM participants p
+      LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
+      WHERE p.group_id = $1
+      AND COALESCE(p.status, 'active') IN ('active', 'new')
+    `, [groupId, date]);
+    return attendanceState(result.rows);
+  }
+
+  async function sendCoachAttendanceWidget(
+    chatId: string | number,
+    coach: CoachTelegramCoach,
+    req: express.Request,
+    groupId: number
+  ) {
+    if (!widgetsEnabled()) return false;
+    try {
+      const date = getKyivDateString();
+      const groupResult = await pool.query(
+        `SELECT g.id, g.name, l.name as location_name
+         FROM groups g
+         LEFT JOIN locations l ON g.location_id = l.id
+         WHERE g.id = $1 AND g.coach_id = $2
+         LIMIT 1`,
+        [groupId, coach.id]
+      );
+      const group = groupResult.rows[0];
+      if (!group) return false;
+      const participantsResult = await pool.query(`
+        SELECT p.id, p.name, COALESCE(a.status, '') as status
+        FROM participants p
+        LEFT JOIN attendance a ON a.participant_id = p.id AND a.date = $2
+        WHERE p.group_id = $1
+        AND COALESCE(p.status, 'active') IN ('active', 'new')
+        ORDER BY p.name ASC
+      `, [groupId, date]);
+      const participants = participantsResult.rows;
+      if (participants.length === 0 || participants.length > 40) return false;
+
+      const html = buildCoachAttendanceHtml({
+        groupId,
+        title: String(group.name || 'Група'),
+        subtitle: [formatCoachDate(date), group.location_name].filter(Boolean).join(' · '),
+        date,
+        participants: participants.map((p: any) => ({ id: Number(p.id), name: String(p.name || '') }))
+      });
+      const chatData = attendanceChatData(date, attendanceState(participants));
+      const fit = widgetFits(html);
+      if (!fit.ok || !stateFits(chatData)) {
+        console.warn('Coach attendance widget too large:', fit);
+        return false;
+      }
+
+      const result = await callCoachTelegramApi('sendWidget', {
+        chat_id: chatId,
+        html,
+        chat_data: chatData,
+        allow_queries: true,
+        caption: `Відмітка: ${group.name} · ${formatCoachDate(date)}`,
+        reply_markup: {
+          inline_keyboard: [[
+            { text: 'Всі групи', callback_data: 'c:groups' },
+            { text: 'Портал', url: getCoachPortalUrl(req, 'today', 'mark_attendance', { groupId }) }
+          ]]
+        }
+      });
+      if (!result.ok) console.warn('Coach attendance widget failed:', result.description);
+      return Boolean(result.ok);
+    } catch (e) {
+      console.error('Coach attendance widget error:', e);
+      return false;
+    }
+  }
+
+  async function handleCoachWidgetQuery(widgetQuery: any) {
+    const queryId = String(widgetQuery?.id || '');
+    const answer = (data: Record<string, any>) =>
+      callCoachTelegramApi('answerWidgetQuery', { widget_query_id: queryId, data: JSON.stringify(data) });
+    if (!queryId) return;
+
+    const chatId = widgetQuery?.chat?.id || widgetQuery?.from?.id;
+    const coach = chatId ? await getCoachByTelegramChatId(chatId) : null;
+    if (!coach) return void (await answer({ e: 'Бот не підключено до тренера' }));
+
+    const request = parseCoachWidgetRequest(widgetQuery?.data);
+    if (!request) return void (await answer({ e: 'Дія застаріла' }));
+    if (!isMarkableDate(request.date, getKyivDateString())) {
+      return void (await answer({ e: 'Ця відмітка застаріла — відкрийте групу ще раз' }));
+    }
+
+    const statusMap: Record<string, CoachAttendanceStatus> = { p: 'present', a: 'absent', e: 'excused' };
+    if (request.kind === 'mark') {
+      const done = request.code === 'u'
+        ? await clearCoachAttendance(coach.id, request.groupId, request.participantId, request.date)
+        : await markCoachAttendance(coach.id, request.groupId, request.participantId, statusMap[request.code], request.date);
+      if (!done) return void (await answer({ e: 'Немає доступу до цього учасника' }));
+    } else {
+      const owns = await pool.query('SELECT 1 FROM groups WHERE id = $1 AND coach_id = $2', [request.groupId, coach.id]);
+      if (owns.rows.length === 0) return void (await answer({ e: 'Немає доступу до групи' }));
+      const before = await fetchCoachGroupAttendanceState(request.groupId, request.date);
+      const rest = await pool.query(
+        `SELECT id FROM participants WHERE group_id = $1 AND COALESCE(status, 'active') IN ('active', 'new')`,
+        [request.groupId]
+      );
+      for (const row of rest.rows) {
+        if (!before[String(row.id)]) {
+          await markCoachAttendance(coach.id, request.groupId, Number(row.id), 'present', request.date);
+        }
+      }
+    }
+
+    const state = await fetchCoachGroupAttendanceState(request.groupId, request.date);
+    await answer({ s: state });
+    const chatData = attendanceChatData(request.date, state);
+    const messageId = Number(widgetQuery?.message_id || 0);
+    if (widgetQuery?.chat?.id && messageId && stateFits(chatData)) {
+      await callCoachTelegramApi('editMessageWidgetData', {
+        chat_id: widgetQuery.chat.id,
+        message_id: messageId,
+        chat_data: chatData
+      });
+    }
   }
 
   async function markCoachAttendance(
@@ -2879,6 +3037,9 @@ async function startServer() {
       const groupId = Number(data.split(':')[2]);
       await answerCoachTelegramCallback(callbackId);
       if (Number.isInteger(groupId) && groupId > 0) {
+        // `c:g:<id>:t` — явний текстовий режим (кнопка «Оновити» у запасному повідомленні)
+        const textMode = data.split(':')[3] === 't';
+        if (!textMode && await sendCoachAttendanceWidget(chatId, coach, req, groupId)) return;
         await sendCoachGroupAttendance(chatId, coach, req, groupId, messageId);
       }
       return;
@@ -3005,9 +3166,14 @@ async function startServer() {
       if (headerSecret !== configuredSecret) return res.sendStatus(401);
     }
 
-    const { message, callback_query } = req.body || {};
+    const { message, callback_query, widget_query } = req.body || {};
 
     try {
+      if (widget_query) {
+        await handleCoachWidgetQuery(widget_query);
+        return res.sendStatus(200);
+      }
+
       if (callback_query) {
         await handleCoachTelegramCallback(req, callback_query);
         return res.sendStatus(200);
@@ -3168,7 +3334,7 @@ async function startServer() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: webhookUrl,
-          allowed_updates: ['message', 'callback_query'],
+          allowed_updates: ['message', 'callback_query', 'widget_query'],
           drop_pending_updates: false,
           ...(secretToken ? { secret_token: secretToken } : {})
         })
@@ -3200,7 +3366,7 @@ async function startServer() {
         })
       }).catch(() => null);
 
-      res.json({ success: true, webhookUrl, allowed_updates: ['message', 'callback_query'] });
+      res.json({ success: true, webhookUrl, allowed_updates: ['message', 'callback_query', 'widget_query'] });
     } catch (e) {
       console.error('Failed to configure coach Telegram webhook:', e);
       res.status(500).json({ error: "Failed to configure coach Telegram webhook" });
