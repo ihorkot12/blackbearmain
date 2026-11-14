@@ -43,17 +43,27 @@ export const minify = (html: string) =>
     .join('\n')
     .replace(/>\n</g, '><');
 
-/** Спільний стиль: кольори і шрифт беруться з теми Telegram користувача. */
+/**
+ * Спільний стиль у клубному візуальному коді Black Bear Dojo:
+ * чорна база #0A0A0A, текст #F2F2F0, службовий сірий #7A7A7A, золото #C9A227 лише для регалій (пояс),
+ * червона риска + надрядок «BLACK BEAR DOJO · …», кандзі-водяний знак. Статуси — окремі смислові кольори.
+ */
 const BASE_CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
-body{font:15px/1.35 -apple-system,system-ui,sans-serif;color:var(--tg-theme-text-color,#000);padding:12px}
-.h{color:var(--tg-theme-hint-color,#888);font-size:13px}
-.c{background:var(--tg-theme-secondary-bg-color,#f1f1f1);border-radius:12px;padding:8px 10px}
-.c b{display:block;font-size:16px}
-.ok{color:#2ea043}.no{color:var(--tg-theme-destructive-text-color,#e53935)}
-button{border:0;font:inherit;color:inherit;background:var(--tg-theme-secondary-bg-color,#f1f1f1);border-radius:12px;padding:7px 12px}
-button.on{background:var(--tg-theme-button-color,#2481cc);color:var(--tg-theme-button-text-color,#fff)}
+body{font:15px/1.35 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;color:#F2F2F0;background:#0A0A0A;padding:14px;position:relative;overflow:hidden}
+body:after{content:"極真";position:absolute;right:-6px;top:-10px;font-size:92px;font-weight:800;color:#fff;opacity:.04;pointer-events:none}
+.o{font-size:10px;letter-spacing:.16em;color:#7A7A7A;text-transform:uppercase;display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.o:before{content:"";width:16px;height:2px;background:#E11B22}
+.o b{color:#E11B22;font-weight:700}
+.h{color:#7A7A7A;font-size:13px}
+.c{background:#151515;border:1px solid #222;border-radius:12px;padding:9px 11px}
+.c b{display:block;font-size:17px;margin-top:2px}
+.ok{color:#3FB950}.no{color:#F85149}.gd{color:#C9A227}
+button{border:1px solid #262626;font:inherit;color:#F2F2F0;background:#151515;border-radius:12px;padding:7px 12px}
+button.on{background:#F2F2F0;color:#0A0A0A;border-color:#F2F2F0;font-weight:600}
 `;
+
+const OVERLINE = (tail: string) => `<div class="o">Black Bear <b>Dojo</b> · ${esc(tail)}</div>`;
 
 const shortName = (name: unknown, max = 22) => {
   const value = String(name ?? '').trim() || 'Учасник';
@@ -84,7 +94,6 @@ export function visitsLabel(n: number) {
 
 function kidPanel(kid: ParentCardKid, index: number) {
   const payClass = kid.paid === true ? 'ok' : kid.paid === 'freeze' ? '' : 'no';
-  const meta = [kid.belt || 'Білий пояс', `${Number(kid.points || 0)} балів`].join(' · ');
   const where = [kid.group || 'група уточнюється', kid.location, kid.coach ? `тренер ${kid.coach}` : '']
     .filter(Boolean)
     .join(' · ');
@@ -93,7 +102,7 @@ function kidPanel(kid: ParentCardKid, index: number) {
     : '<span class="h">Розклад уточнюється</span>';
   return `<div id="k${index}"${index ? ' style="display:none"' : ''}>
 <div class="n">${esc(shortName(kid.name, 40))}</div>
-<div class="h">${esc(meta)}</div>
+<div class="h"><span class="gd">${esc(kid.belt || 'Білий пояс')}</span> · ${Number(kid.points || 0)} балів</div>
 <div class="g">
 <div class="c"><span class="h">У ${esc(kid.month)}</span><b>${visitsLabel(Number(kid.visits || 0))}</b></div>
 <div class="c"><span class="h">Оплата</span><b class="${payClass}">${esc(kid.payment)}</b></div>
@@ -122,13 +131,14 @@ if(window.TelegramWidget&&TelegramWidget.ready)TelegramWidget.ready();
 </script>`
       : '';
   return minify(`<style>${BASE_CSS}
-.t{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.n{font-size:18px;font-weight:600}
+.t{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.n{font-size:20px;font-weight:700;letter-spacing:-.01em}
 .g{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 8px}
 .w{margin-bottom:6px}
 .ds{display:flex;gap:6px;flex-wrap:wrap}
-.d{background:var(--tg-theme-secondary-bg-color,#f1f1f1);border-radius:8px;padding:3px 8px;font-size:13px}
+.d{border:1px solid #262626;border-radius:8px;padding:3px 8px;font-size:13px}
 </style>
+${OVERLINE('картка учня')}
 ${tabs}
 ${list.map(kidPanel).join('\n')}
 ${script}`);
@@ -166,16 +176,17 @@ export function buildCoachAttendanceHtml(params: {
     .join('');
   return minify(`<style>${BASE_CSS}
 .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.n{font-size:17px;font-weight:600}
+.n{font-size:19px;font-weight:700}
 #sum{margin:4px 0 8px}
 .l{display:grid;gap:5px}
 .r{display:flex;align-items:center;gap:10px;text-align:left;width:100%;padding:8px 10px}
 .r i{font-style:normal;width:22px;text-align:center;font-weight:700}
-.r.p i{color:#2ea043}.r.a i{color:var(--tg-theme-destructive-text-color,#e53935)}.r.e i{color:#d29922}
-.r.p{box-shadow:inset 3px 0 #2ea043}.r.a{box-shadow:inset 3px 0 var(--tg-theme-destructive-text-color,#e53935)}.r.e{box-shadow:inset 3px 0 #d29922}
+.r i{color:#7A7A7A}.r.p i{color:#3FB950}.r.a i{color:#F85149}.r.e i{color:#D29922}
+.r.p{box-shadow:inset 3px 0 #3FB950}.r.a{box-shadow:inset 3px 0 #F85149}.r.e{box-shadow:inset 3px 0 #D29922}
 #all{width:100%;margin-top:8px}
 #m{margin-top:6px;min-height:16px}
 </style>
+${OVERLINE('відмітка')}
 <div class="top"><div class="n">${esc(params.title)}</div><div class="h">${esc(params.subtitle)}</div></div>
 <div class="h" id="sum"></div>
 <div class="l">${rows}</div>
@@ -258,11 +269,9 @@ export function buildShingiTeamHtml(card: ShingiTeamCard) {
         ? '<b class="ok">Усе оплачено</b>'
         : '<b>Бійців ще немає</b>';
   return minify(`<style>${BASE_CSS}
-body{background:#111;color:#f2f2f2}
-.k{color:#c9a227;font-size:12px;letter-spacing:.12em}
-.n{font-size:18px;font-weight:700;margin:2px 0}
-.h{color:#9a9a9a}
-.c{background:#1d1d1d}
+body:after{content:"心技"}
+.k{color:#C9A227;font-size:11px;letter-spacing:.18em;margin-bottom:4px}
+.n{font-size:20px;font-weight:700;margin:2px 0}
 .g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
 .p{margin-top:2px}
 </style>
