@@ -13,6 +13,7 @@ import {
   HttpError,
   Reply,
   capped,
+  daysBetween,
   kyivToday,
   normalizePhone,
   toInt,
@@ -22,6 +23,7 @@ import {
   type Route,
 } from './http.js';
 import { randomBytes } from 'crypto';
+import { buildShingiTeamHtml, widgetFits, widgetsEnabled } from '../_shared/tg-widgets.js';
 import { parseFighters } from './parser.js';
 import { feeInfo } from './fee.js';
 import { answerQuestion, forwardQuestion, isStaffTelegram } from './notify.js';
@@ -42,7 +44,7 @@ import {
 } from './store.js';
 import { originAllowed } from './admin-auth.js';
 import { publicBaseUrl, secretMatches, startReply } from './bot.js';
-import { getBotToken, sendMessage } from './telegram-client.js';
+import { getBotToken, sendMessage, tgCall } from './telegram-client.js';
 
 const isSecure = (ctx: Ctx) => !/^localhost(:\d+)?$/.test(String(ctx.req.headers?.host || ''));
 
@@ -560,6 +562,10 @@ export const publicRoutes: Route[] = [
       if (message?.chat?.type === 'private' && typeof message.text === 'string' && chatId) {
         const event = await resolveEvent(null).catch(() => null);
         const reply = startReply(message.text, publicBaseUrl(), event ? feeInfo(event) : undefined);
+        // зареєстрованому тренеру/бійцю — картка команди віджетом замість загального вітання
+        if (reply && event && message.from?.id && (await sendTeamCardWidget(chatId, message.from.id, event, reply))) {
+          return { ok: true };
+        }
         if (reply) {
           try {
             await sendMessage(chatId, reply.text, {
@@ -667,3 +673,58 @@ export const publicRoutes: Route[] = [
     },
   },
 ];
+
+/** Картка «Моя команда» HTML-віджетом (Bot API 10.4). false — профілю немає або віджет не пройшов. */
+async function sendTeamCardWidget(
+  chatId: number | string,
+  tgId: number | string,
+  event: any,
+  reply: { buttonText: string; url: string },
+): Promise<boolean> {
+  if (!widgetsEnabled()) return false;
+  try {
+    const [profile] = await query<{ id: number; role: string | null; club: string | null }>(
+      'SELECT id, role, club FROM shingi_profiles WHERE tg_id = $1 ORDER BY id LIMIT 1',
+      [tgId],
+    );
+    if (!profile?.role) return false;
+    const [row] = await query<{ kids: number; open: number; paid: number; waiting: number; drafts: number }>(
+      `SELECT COUNT(*) FILTER (WHERE block = 'kids' AND status IN ('submitted', 'paid', 'fought'))::int AS kids,
+              COUNT(*) FILTER (WHERE block = 'open' AND status IN ('submitted', 'paid', 'fought'))::int AS open,
+              COUNT(*) FILTER (WHERE status IN ('paid', 'fought'))::int AS paid,
+              COUNT(*) FILTER (WHERE status = 'submitted')::int AS waiting,
+              COUNT(*) FILTER (WHERE status = 'draft')::int AS drafts
+       FROM shingi_entries WHERE event_id = $1 AND profile_id = $2`,
+      [event.id, profile.id],
+    );
+    const date = String(event.event_date || '');
+    const [y, m, d] = date.split('-');
+    const schedule = event.schedule_json || {};
+    const html = buildShingiTeamHtml({
+      eventTitle: String(event.title || 'SHIN GI'),
+      eventDate: y && m && d ? `${d}.${m}.${y}` : date,
+      daysTo: date ? daysBetween(kyivToday(), date) : null,
+      club: String(profile.club || (profile.role === 'solo' ? 'Мої заявки' : 'Моя команда')),
+      kids: row?.kids ?? 0,
+      open: row?.open ?? 0,
+      paid: row?.paid ?? 0,
+      waiting: row?.waiting ?? 0,
+      drafts: row?.drafts ?? 0,
+      feeLine: feeInfo(event).sentence,
+      schedule: [schedule.kids ? `Діти ${schedule.kids}` : '', schedule.open ? `Дорослі ${schedule.open}` : '']
+        .filter(Boolean)
+        .join(' · '),
+    });
+    if (!widgetFits(html).ok) return false;
+    await tgCall('sendWidget', {
+      chat_id: chatId,
+      html,
+      caption: 'SHIN GI · моя команда',
+      reply_markup: { inline_keyboard: [[{ text: reply.buttonText, web_app: { url: reply.url } }]] },
+    });
+    return true;
+  } catch (error) {
+    console.error('shingi team widget failed:', (error as Error).message);
+    return false;
+  }
+}
